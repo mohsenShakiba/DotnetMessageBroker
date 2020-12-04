@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net5.0</TargetFramework>
+        <LangVersion>9.0</LangVersion>
+        <UserSecretsId>1749bf18-8287-4f53-9539-36b3b21ba84e</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="NetCoreServer" Version="5.0.2" />
+    </ItemGroup>
+
+</Project>
