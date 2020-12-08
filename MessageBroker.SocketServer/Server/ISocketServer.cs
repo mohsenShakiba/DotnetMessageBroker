@@ -9,7 +9,5 @@ namespace MessageBroker.SocketServer.Server
         void Start();
         void Stop();
 
-        event Action<SocketClient> OnClientConnected;
-        event Action<SocketClient> OnClientDisconnected;
     }
 }

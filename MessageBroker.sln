@@ -9,7 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MessageBroker.SocketServer"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MessageBroker.Messages", "src\MessageBroker.Messages\MessageBroker.Messages.csproj", "{2401536B-E8E6-43C2-A380-48B7030760C6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessageBroker.Core", "src\MessageBroker.Core\MessageBroker.Core.csproj", "{5948EA13-1280-4165-A875-81E0937E30D1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MessageBroker.Core", "src\MessageBroker.Core\MessageBroker.Core.csproj", "{5948EA13-1280-4165-A875-81E0937E30D1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

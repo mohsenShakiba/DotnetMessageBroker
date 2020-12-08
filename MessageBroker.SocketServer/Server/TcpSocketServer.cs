@@ -1,23 +1,18 @@
-﻿using MessageBroker.SocketServer.Models;
-using MessageBroker.SocketServer.Service;
+﻿using MessageBroker.Core;
+using MessageBroker.Messages;
+using MessageBroker.SocketServer.Models;
 using NetCoreServer;
-using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MessageBroker.SocketServer.Server
 {
     public class TcpSocketServer : TcpServer, ISocketServer
     {
-        public event Action<SocketClient> OnClientConnected;
-        public event Action<SocketClient> OnClientDisconnected;
-        private readonly IMessageQueue _messageQueue;
+        private readonly IMessageProcessor _messageProcessor;
 
-        public TcpSocketServer(IPEndPoint endpoint, IMessageQueue messageQueue) : base(endpoint)
+        public TcpSocketServer(IPEndPoint endpoint, IMessageProcessor messageProcessor) : base(endpoint)
         {
-            _messageQueue = messageQueue;
+            _messageProcessor = messageProcessor;
         }
 
         public void Start() => base.Start();
@@ -31,18 +26,18 @@ namespace MessageBroker.SocketServer.Server
 
         protected override void OnConnected(TcpSession session)
         {
-            OnClientConnected?.Invoke(new SocketClient(session.Id));
+            _messageProcessor.OnClientConnected(session.Id);
         }
 
         protected override void OnDisconnected(TcpSession session)
         {
-            OnClientConnected?.Invoke(new SocketClient(session.Id));
+            _messageProcessor.OnClientDisconnected(session.Id);
         }
 
 
-        protected void OnMessageReceived(MessagePayload msg)
+        protected void OnMessageReceived(Payload msg)
         {
-            _messageQueue.Push(msg);
+            _messageProcessor.OnMessage(msg);
         }
 
     }

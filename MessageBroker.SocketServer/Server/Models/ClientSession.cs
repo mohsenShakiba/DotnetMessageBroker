@@ -1,4 +1,5 @@
-﻿using NetCoreServer;
+﻿using MessageBroker.Messages;
+using NetCoreServer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,9 +10,9 @@ namespace MessageBroker.SocketServer.Models
 {
     public class ClientSession: TcpSession
     {
-        private readonly Action<MessagePayload> _onMessage;
+        private readonly Action<Payload> _onMessage;
 
-        public ClientSession(TcpServer server, Action<MessagePayload> onMessage): base(server)
+        public ClientSession(TcpServer server, Action<Payload> onMessage): base(server)
         {
             _onMessage = onMessage;
         }
@@ -19,7 +20,7 @@ namespace MessageBroker.SocketServer.Models
         protected override void OnReceived(byte[] buffer, long offset, long size)
         {
             var data = buffer.AsMemory((int)offset, (int)size);
-            _onMessage?.Invoke(new MessagePayload(data, Id));
+            _onMessage?.Invoke(new Payload(Id, data));
         }
 
     }

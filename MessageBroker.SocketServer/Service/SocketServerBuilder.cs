@@ -1,43 +1,30 @@
-﻿using MessageBroker.SocketServer.Models;
+﻿using MessageBroker.Core;
 using MessageBroker.SocketServer.Server;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MessageBroker.SocketServer.Service
 {
     public class SocketServerBuilder
     {
-
+        private IPEndPoint _endPoint;
         private ISocketServer _socketServer;
-        private InMemoryMessageQueue _memoryMessageQueue;
-        private Action<SocketClient> _onClientConnectedEvent;
-        private Action<SocketClient> _onClientDisconnectedEvent;
+        private IMessageProcessor _messageProcessor;
 
-        public static SocketServerBuilder CreateTcpSocket(IPEndPoint endpoint)
+        public SocketServerBuilder WithEndPoint(IPEndPoint endpoint)
         {
-            return new SocketServerBuilder { _socketServer = new TcpSocketServer(endpoint) };
-        }
-
-        public SocketServerBuilder WithInMemoryMessageQueue()
-        {
-            _memoryMessageQueue = new InMemoryMessageQueue();
+            _endPoint = endpoint;
             return this;
         }
 
-        public SocketServerBuilder WithEvents(Action<SocketClient> onClientConnectedEvent, Action<SocketClient> onClientDisconnectedEvent)
+        public SocketServerBuilder WithProcessor(IMessageProcessor messageProcessor)
         {
-            _onClientConnectedEvent = onClientConnectedEvent;
-            _onClientDisconnectedEvent = onClientDisconnectedEvent;
+            _messageProcessor = messageProcessor;
             return this;
         }
 
-        public SocketServerOrchestrator Build()
+        public ISocketServer Build()
         {
-            return new SocketServerOrchestrator(_socketServer, _memoryMessageQueue, _onClientConnectedEvent, _onClientDisconnectedEvent);
+            return new TcpSocketServer(_endPoint, _messageProcessor);
         }
     }
 }

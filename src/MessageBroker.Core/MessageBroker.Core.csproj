@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MessageBroker.Messages\MessageBroker.Messages.csproj" />
+    <ProjectReference Include="..\..\MessageBroker.SocketServer\MessageBroker.SocketServer.csproj" />
   </ItemGroup>
 
 </Project>

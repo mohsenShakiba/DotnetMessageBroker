@@ -10,4 +10,8 @@
       <PackageReference Include="NetCoreServer" Version="5.0.2" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\src\MessageBroker.Messages\MessageBroker.Messages.csproj" />
+    </ItemGroup>
+
 </Project>

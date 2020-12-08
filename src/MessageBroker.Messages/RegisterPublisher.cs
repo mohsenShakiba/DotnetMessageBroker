@@ -5,5 +5,4 @@ using System.Text;
 namespace MessageBroker.Messages
 {
     public record RegisterPublisher(Guid SessionId);
-
 }

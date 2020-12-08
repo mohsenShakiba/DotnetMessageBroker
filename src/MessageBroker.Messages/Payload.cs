@@ -4,10 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MessageBroker.Core.Abstractions
+namespace MessageBroker.Messages
 {
-    public interface IWritable
-    {
-        Task WriteAsync();
-    }
+    public record Payload(Guid sessionId, ReadOnlyMemory<byte> data);
 }
