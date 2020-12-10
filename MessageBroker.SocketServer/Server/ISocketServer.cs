@@ -1,5 +1,4 @@
-﻿using MessageBroker.SocketServer.Models;
-using System;
+﻿using System;
 using System.Threading.Tasks;
 
 namespace MessageBroker.SocketServer.Server
