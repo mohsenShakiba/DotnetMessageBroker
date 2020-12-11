@@ -13,6 +13,7 @@ namespace MessageBroker.Messages
         public const string Message = "MSG";
         public const string RegisterPublisher = "REGPUB";
         public const string RegisterSubscriber = "REGSUB";
+        public const string UnRegister = "UREG";
         public const string ListenRoute = "LROUT";
         public const string UnlistenListenRoute = "ULROUT";
     }

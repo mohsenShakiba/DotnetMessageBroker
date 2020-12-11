@@ -105,7 +105,7 @@ namespace Tests
                 {
                     var len = client.Receive(buffer);
 
-                    Assert.Equal(message, Encoding.UTF8.GetString(buffer.AsSpan(4, msgSize)));
+                    Assert.Equal(message, Encoding.ASCII.GetString(buffer.AsSpan(4, msgSize)));
                 }
 
                 resetEvent.Set();
@@ -128,7 +128,7 @@ namespace Tests
         private Span<byte> MessageToByte(string message)
         {
             var len = BitConverter.GetBytes(message.Length);
-            var msg = Encoding.UTF8.GetBytes(message);
+            var msg = Encoding.ASCII.GetBytes(message);
 
             var payload = new byte[len.Length + msg.Length];
 
