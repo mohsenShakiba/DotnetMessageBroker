@@ -20,7 +20,7 @@ namespace TcpChatServer
         static void Main(string[] args)
         {
             // TCP server port
-            int port = 1111;
+            int port = 8080;
             if (args.Length > 0)
                 port = int.Parse(args[0]);
 
@@ -29,7 +29,7 @@ namespace TcpChatServer
             Console.WriteLine();
 
             // Create a new TCP chat server
-            var endpoint = new IPEndPoint(IPAddress.Any, port);
+            var endpoint = new IPEndPoint(IPAddress.Loopback, port);
             var server = new TcpSocketServer(endpoint, null);
 
             // Start the server

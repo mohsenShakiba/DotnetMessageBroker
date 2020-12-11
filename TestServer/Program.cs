@@ -58,7 +58,7 @@ namespace TcpChatClient
                 address = args[0];
 
             // TCP server port
-            int port = 1111;
+            int port = 8080;
             if (args.Length > 1)
                 port = int.Parse(args[1]);
 
@@ -68,14 +68,19 @@ namespace TcpChatClient
             Console.WriteLine();
 
             // Create a new TCP chat client
-            var client = new ChatClient(address, port);
+            //var client = new ChatClient();
+            var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
 
             // Connect the client
             Console.Write("Client connecting...");
-            client.ConnectAsync();
+            client.Connect(address, port);
             Console.WriteLine("Done!");
 
+            Thread.Sleep(1000);
+
             Console.WriteLine("Press Enter to stop the client or '!' to reconnect the client...");
+            client.SendBufferSize = 10024;
 
             // Perform text input
             for (; ; )
@@ -97,13 +102,18 @@ namespace TcpChatClient
                 var msg = "this is a test";
                 var length = msg.Length;
                 var lengthBinary = BitConverter.GetBytes(length);
-                client.SendAsync(lengthBinary);
-                client.SendAsync(msg);
+                var msgBinary = Encoding.UTF8.GetBytes(msg);
+                var z = new byte[lengthBinary.Length + msgBinary.Length];
+                lengthBinary.CopyTo(z, 0);
+                msgBinary.CopyTo(z, lengthBinary.Length);
+                client.Send(z);
+                //Thread.Sleep(100);
+
             }
 
             // Disconnect the client
             Console.Write("Client disconnecting...");
-            client.DisconnectAndStop();
+            client.Disconnect(true);
             Console.WriteLine("Done!");
         }
     }

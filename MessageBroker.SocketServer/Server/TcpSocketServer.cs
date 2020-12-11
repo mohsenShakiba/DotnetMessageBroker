@@ -11,16 +11,18 @@ namespace MessageBroker.SocketServer.Server
     public class TcpSocketServer : ISocketServer
     {
         private readonly IMessageProcessor _messageProcessor;
+        private readonly ServerStat _stat;
         private readonly IPEndPoint _endPoint;
         private Socket _socket;
         private SocketAsyncEventArgs _socketAsyncEventArgs;
         private bool _isAccepting = false;
         private readonly List<ClientSession> _sessions = new();
 
-        public TcpSocketServer(IPEndPoint endpoint, IMessageProcessor messageProcessor)
+        public TcpSocketServer(IPEndPoint endpoint, IMessageProcessor messageProcessor, ServerStat stat)
         {
             _endPoint = endpoint;
             _messageProcessor = messageProcessor;
+            _stat = stat;
         }
 
         public void Start()
@@ -42,6 +44,12 @@ namespace MessageBroker.SocketServer.Server
             _socketAsyncEventArgs.Dispose();
 
             RemoveAllSessions();
+        }
+
+        internal void OnReceived(Guid sessionId, Memory<byte> data)
+        {
+            _stat.Inc();
+            _messageProcessor.OnMessage(new Payload(sessionId, data));
         }
 
         private void CreateSocket()
@@ -92,7 +100,6 @@ namespace MessageBroker.SocketServer.Server
         {
             Console.WriteLine($"failed to accept connection due to {err}");
         }
-
 
         private void RemoveAllSessions()
         {
