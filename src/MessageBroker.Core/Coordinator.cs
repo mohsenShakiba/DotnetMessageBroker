@@ -1,16 +1,24 @@
-﻿using System;
+﻿using MessageBroker.Common;
+using System;
 using System.Collections.Concurrent;
 
 namespace MessageBroker.Core
 {
     public class Coordinator
     {
+        private readonly IMessageProcessor _messageProcessor;
         private readonly ConcurrentDictionary<Guid, Subscriber> _subscribers;
         private readonly ConcurrentDictionary<Guid, Publisher> _publishers;
 
+        public Coordinator(IMessageProcessor messageProcessor)
+        {
+            _messageProcessor = messageProcessor;
+            _subscribers = new();
+            _publishers = new();
+        }
+
         public void OnMessage(Messages.Message message)
         {
-
         }
 
         public void OnAck(Messages.Ack ack)

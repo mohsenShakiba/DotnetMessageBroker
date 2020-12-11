@@ -10,8 +10,14 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.SocketServer.Server
 {
+    /// <summary>
+    /// ClientSession stores information about the accepted socket
+    /// it will continue to receive data from socket and allows sending data to socket
+    /// </summary>
     public class ClientSession : IDisposable
     {
+        public Guid SessionId { get; }
+
         private TcpSocketServer _server;
         private readonly Socket _socket;
         private readonly SessionConfiguration _config;
@@ -21,7 +27,6 @@ namespace MessageBroker.SocketServer.Server
         private readonly AutoResetEvent _receiveResetEvent;
         private readonly AutoResetEvent _sendResetEvent;
         private readonly ILogger<ClientSession> _logger;
-        private readonly Guid _sessionId;
 
         private byte[] _receiveBuff;
         private bool _connected;
@@ -34,7 +39,7 @@ namespace MessageBroker.SocketServer.Server
             _config = config;
 
             _connected = true;
-            _sessionId = new();
+            SessionId = new();
 
             _sendEventArgs = new();
             _receiveEventArgs = new();
@@ -225,7 +230,7 @@ namespace MessageBroker.SocketServer.Server
         {
             _logger.LogInformation($"received {buff.Length} from client");
 
-            _server.OnReceived(_sessionId, buff);
+            _server.OnReceived(SessionId, buff);
         }
 
         public void Close()

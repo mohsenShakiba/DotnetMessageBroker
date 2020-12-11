@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.SocketServer.Server
 {
+    /// <summary>
+    /// class that is used for configuring the behavior of session socket
+    /// </summary>
     public class SessionConfiguration
     {
         public int DefaultHeaderSize { get; set; }
