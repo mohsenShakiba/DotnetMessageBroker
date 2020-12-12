@@ -4,5 +4,5 @@ using System.Text;
 
 namespace MessageBroker.Messages
 {
-    public record RegisterSubscriber(Guid SessionId);
+    public record Register;
 }

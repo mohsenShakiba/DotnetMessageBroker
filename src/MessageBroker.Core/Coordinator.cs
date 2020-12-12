@@ -34,7 +34,7 @@ namespace MessageBroker.Core
             _publishers[registerPublisher.SessionId] = new Publisher(registerPublisher.SessionId);
         }
 
-        public void OnNewSubscriber(Messages.RegisterSubscriber registerSubscriber)
+        public void OnNewSubscriber(Messages.Register registerSubscriber)
         {
             _subscribers[registerSubscriber.SessionId] = new Subscriber(registerSubscriber.SessionId);
         }
