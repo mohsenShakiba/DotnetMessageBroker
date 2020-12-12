@@ -75,6 +75,7 @@ namespace MessageBroker.Messages
 
             return new Message(messageId, route, rentedMemory);
         }
+
         private Route ToListenRoute(Span<byte> data)
         {
             var routeRes = data.FindNext(0, Delimiter);
@@ -87,7 +88,6 @@ namespace MessageBroker.Messages
         {
             return new Register();
         }
-
 
         private IEnumerable<Memory<byte>> Split(Memory<byte> b)
         {
@@ -112,7 +112,7 @@ namespace MessageBroker.Messages
     {
         public static NextSpan FindNext(this Span<byte> b, int fromIndex, ReadOnlySpan<byte> symbol)
         {
-            var index = b.Slice(fromIndex).IndexOf(symbol);
+            var index = b.Slice(fromIndex).Trim(symbol).IndexOf(symbol);
 
             return new NextSpan(b.Slice(fromIndex, index), index);
         }
