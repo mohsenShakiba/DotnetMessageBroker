@@ -45,7 +45,20 @@ namespace Tests
             Assert.IsType<Message>(convertedMsg);
             Assert.Equal(msg.Id, convertedMsg.Id);
             Assert.Equal(msg.Route, convertedMsg.Route);
-            Assert.Equal(msg.Data, convertedMsg.Data);
+            Assert.Equal(Encoding.UTF8.GetString(msg.Data.Span), Encoding.UTF8.GetString(convertedMsg.Data.Span));
+        }
+
+        [Fact]
+        public void TestListenMessage()
+        {
+            var listen = new Listen("TEST");
+
+            var b = ToBinary(listen);
+
+            var convertedListen = _parser.Parse(b) as Message;
+
+            Assert.IsType<Listen>(convertedListen);
+            Assert.Equal(listen.Route, convertedListen.Route);
         }
 
         private byte[] ToBinary(Ack ack)
@@ -65,7 +78,17 @@ namespace Tests
             buff.AddWithDelimiter(MessageTypes.Message);
             buff.AddWithDelimiter(msg.Id);
             buff.AddWithDelimiter(msg.Route);
-            buff.AddWithDelimiter(msg.Data);
+            buff.AddWithDelimiter(msg.Data.ToArray());
+
+            return buff.ToArray();
+        }
+
+        private byte[] ToBinary(Listen msg)
+        {
+            var buff = new List<byte>();
+
+            buff.AddWithDelimiter(MessageTypes.Message);
+            buff.AddWithDelimiter(msg.route);
 
             return buff.ToArray();
         }

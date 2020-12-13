@@ -6,5 +6,5 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Messages
 {
-    public record Payload(Guid sessionId, ReadOnlyMemory<byte> data);
+    public record Listen(string Route);
 }

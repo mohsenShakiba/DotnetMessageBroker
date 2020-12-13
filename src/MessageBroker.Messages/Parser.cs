@@ -73,15 +73,15 @@ namespace MessageBroker.Messages
             var rentedMemory = ArrayPool<byte>.Shared.Rent(dataRes.Result.Length);
             dataRes.Result.CopyTo(rentedMemory);
 
-            return new Message(messageId, route, rentedMemory);
+            return new Message(messageId, route, rentedMemory.AsMemory().Trim(Encoding.UTF8.GetBytes("\0")));
         }
 
-        private Route ToListenRoute(Span<byte> data)
+        private Listen ToListenRoute(Span<byte> data)
         {
             var routeRes = data.FindNext(0, Delimiter);
             var route = Encoding.UTF8.GetString(routeRes.Result);
 
-            return new Route(route);
+            return new Listen(route);
         }
 
         private Register ToRegister(Span<byte> data)
@@ -92,7 +92,7 @@ namespace MessageBroker.Messages
         private IEnumerable<Memory<byte>> Split(Memory<byte> b)
         {
             var start = 0;
-            while(true)
+            while (true)
             {
                 var index = b.Span.IndexOf(Delimiter);
                 if (index > 0 && index != b.Length)
@@ -112,9 +112,10 @@ namespace MessageBroker.Messages
     {
         public static NextSpan FindNext(this Span<byte> b, int fromIndex, ReadOnlySpan<byte> symbol)
         {
-            var index = b.Slice(fromIndex).Trim(symbol).IndexOf(symbol);
+            var s = b.Slice(fromIndex).TrimStart(symbol);
+            var index = s.IndexOf(symbol);
 
-            return new NextSpan(b.Slice(fromIndex, index), index);
+            return new NextSpan(s.Slice(0, index), index + fromIndex + symbol.Length);
         }
     }
 

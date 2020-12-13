@@ -25,7 +25,7 @@ namespace MessageBroker.Core
         {
         }
 
-        public void OnNack(Messages.Nack nack)
+        public void OnNack(Messages.Ack nack)
         {
         } 
 
