@@ -1,4 +1,6 @@
 ﻿using MessageBroker.Common;
+using MessageBroker.Messages;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 
@@ -7,41 +9,57 @@ namespace MessageBroker.Core
     public class Coordinator
     {
         private readonly IMessageProcessor _messageProcessor;
+        private readonly ILogger<Coordinator> _logger;
         private readonly ConcurrentDictionary<Guid, Subscriber> _subscribers;
-        private readonly ConcurrentDictionary<Guid, Publisher> _publishers;
 
-        public Coordinator(IMessageProcessor messageProcessor)
+        public Coordinator(IMessageProcessor messageProcessor, ILogger<Coordinator> logger)
         {
             _messageProcessor = messageProcessor;
+            _logger = logger;
             _subscribers = new();
-            _publishers = new();
         }
 
-        public void OnMessage(Messages.Message message)
+        public void OnMessage(Message message)
+        {
+            // find which subscribers should receive this message
+            // send to subscribers
+            // release the message
+        }
+
+        public void OnAck(Ack ack)
         {
         }
 
-        public void OnAck(Messages.Ack ack)
-        {
-        }
-
-        public void OnNack(Messages.Ack nack)
+        public void OnNack(Ack nack)
         {
         } 
 
-        public void OnNewPublisher(Messages.RegisterPublisher registerPublisher)
+        public void OnListen(Guid sessionId, Listen listen)
         {
-            _publishers[registerPublisher.SessionId] = new Publisher(registerPublisher.SessionId);
+            if (_subscribers.TryGetValue(sessionId, out var subscriber))
+            {
+                subscriber.AddRoute(listen.Route);
+            }
+            else
+            {
+                _logger.LogError($"failed to find subscriber with id: {sessionId}");
+            }
         }
 
-        public void OnNewSubscriber(Messages.Register registerSubscriber)
+        public void OnUnListen(Guid sessionId, Listen listen)
         {
-            _subscribers[registerSubscriber.SessionId] = new Subscriber(registerSubscriber.SessionId);
+            if (_subscribers.TryGetValue(sessionId, out var subscriber))
+            {
+                subscriber.RemoveRoute(listen.Route);
+            }
+            else
+            {
+                _logger.LogError($"failed to find subscriber with id: {sessionId}");
+            }
         }
 
         public void OnClientDisconnected(Guid sessionId)
         {
-            _publishers.TryRemove(sessionId, out _);
             _subscribers.TryRemove(sessionId, out _);
         }
 
