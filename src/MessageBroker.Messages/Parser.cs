@@ -37,15 +37,55 @@ namespace MessageBroker.Messages
             return messageTypeStr switch
             {
                 MessageTypes.Ack => ToAck(messageBody),
-                MessageTypes.Nack => ToNack(messageBody),
+                MessageTypes.Nack => ToAck(messageBody),
                 MessageTypes.Message => ToMessage(messageBody),
                 MessageTypes.ListenRoute => ToListenRoute(messageBody),
                 MessageTypes.UnlistenListenRoute => ToListenRoute(messageBody),
-                MessageTypes.RegisterPublisher => ToRegister(messageBody),
-                MessageTypes.RegisterSubscriber => ToRegister(messageBody),
-                MessageTypes.UnRegister => ToRegister(messageBody),
                 _ => null
             };
+        }
+
+        public byte[] ToBinary(object o)
+        {
+            return o switch
+            {
+                Ack ack => ToBinary(ack),
+                Message message => ToBinary(message),
+                Listen listen => ToBinary(listen),
+                _ => throw new NotImplementedException(),
+            };
+        }
+
+        private byte[] ToBinary(Ack ack)
+        {
+            var buff = new List<byte>();
+
+            buff.AddWithDelimiter(MessageTypes.Ack);
+            buff.AddWithDelimiter(ack.MsgId);
+
+            return buff.ToArray();
+        }
+
+        private byte[] ToBinary(Message msg)
+        {
+            var buff = new List<byte>();
+
+            buff.AddWithDelimiter(MessageTypes.Message);
+            buff.AddWithDelimiter(msg.Id);
+            buff.AddWithDelimiter(msg.Route);
+            buff.AddWithDelimiter(msg.Data.ToArray());
+
+            return buff.ToArray();
+        }
+
+        private byte[] ToBinary(Listen msg)
+        {
+            var buff = new List<byte>();
+
+            buff.AddWithDelimiter(MessageTypes.ListenRoute);
+            buff.AddWithDelimiter(msg.Route);
+
+            return buff.ToArray();
         }
 
         private Ack ToAck(Span<byte> data)
@@ -53,13 +93,6 @@ namespace MessageBroker.Messages
             var dataTrimmed = data.TrimEnd(Delimiter);
             var messageId = new Guid(dataTrimmed);
             return new Ack(messageId);
-        }
-
-        private Nack ToNack(Span<byte> data)
-        {
-            var dataTrimmed = data.TrimEnd(Delimiter);
-            var messageId = new Guid(dataTrimmed);
-            return new Nack(messageId);
         }
 
         private Message ToMessage(Span<byte> data)
@@ -73,7 +106,7 @@ namespace MessageBroker.Messages
             var rentedMemory = ArrayPool<byte>.Shared.Rent(dataRes.Result.Length);
             dataRes.Result.CopyTo(rentedMemory);
 
-            return new Message(messageId, route, rentedMemory.AsMemory().Trim(Encoding.UTF8.GetBytes("\0")));
+            return new Message(messageId, route, rentedMemory);
         }
 
         private Listen ToListenRoute(Span<byte> data)
@@ -82,11 +115,6 @@ namespace MessageBroker.Messages
             var route = Encoding.UTF8.GetString(routeRes.Result);
 
             return new Listen(route);
-        }
-
-        private Register ToRegister(Span<byte> data)
-        {
-            return new Register();
         }
 
         private IEnumerable<Memory<byte>> Split(Memory<byte> b)
@@ -130,5 +158,29 @@ namespace MessageBroker.Messages
             Index = index;
         }
 
+    }
+
+    public static class HelperExtensions
+    {
+        public static void AddWithDelimiter(this List<byte> b, string s)
+        {
+            var delimiter = Encoding.UTF8.GetBytes("\n");
+            b.AddRange(Encoding.UTF8.GetBytes(s));
+            b.AddRange(delimiter);
+        }
+
+        public static void AddWithDelimiter(this List<byte> b, Guid g)
+        {
+            var delimiter = Encoding.UTF8.GetBytes("\n");
+            b.AddRange(g.ToByteArray());
+            b.AddRange(delimiter);
+        }
+
+        public static void AddWithDelimiter(this List<byte> b, byte[] d)
+        {
+            var delimiter = Encoding.UTF8.GetBytes("\n");
+            b.AddRange(d);
+            b.AddRange(delimiter);
+        }
     }
 }

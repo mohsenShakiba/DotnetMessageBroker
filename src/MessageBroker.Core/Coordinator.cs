@@ -11,15 +11,15 @@ namespace MessageBroker.Core
     public class Coordinator
     {
         private readonly IMessageProcessor _messageProcessor;
-        private readonly ISessionResolver _sessionResolver;
+        private readonly MessageDispatcher _messageDispatcher;
         private readonly IRouteMatcher _routeMatcher;
         private readonly ILogger<Coordinator> _logger;
         private readonly ConcurrentDictionary<Guid, Subscriber> _subscribers;
 
-        public Coordinator(IMessageProcessor messageProcessor, ISessionResolver sessionResolver, IRouteMatcher routeMatcher, ILogger<Coordinator> logger)
+        public Coordinator(IMessageProcessor messageProcessor, MessageDispatcher messageDispatcher, IRouteMatcher routeMatcher, ILogger<Coordinator> logger)
         {
             _messageProcessor = messageProcessor;
-            _sessionResolver = sessionResolver;
+            _messageDispatcher = messageDispatcher;
             _routeMatcher = routeMatcher;
             _logger = logger;
             _subscribers = new();
@@ -28,17 +28,23 @@ namespace MessageBroker.Core
         public void OnMessage(Message message)
         {
             // find which subscribers should receive this message
-            var listOfSubscribersWhichShouldReceiveThisMessage = new List<Subscriber>();
+            var listOfSubscribersWhichShouldReceiveThisMessage = new List<Guid>();
 
-            foreach(var (_, subscriber) in _subscribers) {
+            foreach (var (_, subscriber) in _subscribers)
                 if (subscriber.MatchRoute(message.Route, _routeMatcher))
-                {
-                    listOfSubscribersWhichShouldReceiveThisMessage.Send(Message);
-                }
-            }
+                    listOfSubscribersWhichShouldReceiveThisMessage.Add(subscriber.SessionId);
+
+            if (listOfSubscribersWhichShouldReceiveThisMessage.Count == 0)
+                return;
 
             // send to subscribers
-            // release the message
+            var destination = new MessageDestination
+            {
+                Data = message,
+                Destinations = listOfSubscribersWhichShouldReceiveThisMessage
+            };
+
+            _messageDispatcher.Dispatch(destination);
         }
 
         public void OnAck(Ack ack)
@@ -47,7 +53,7 @@ namespace MessageBroker.Core
 
         public void OnNack(Ack nack)
         {
-        } 
+        }
 
         public void OnListen(Guid sessionId, Listen listen)
         {

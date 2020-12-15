@@ -14,7 +14,7 @@ namespace MessageBroker.SocketServer.Server
     /// ClientSession stores information about the accepted socket
     /// it will continue to receive data from socket and allows sending data to socket
     /// </summary>
-    public class ClientSession : IDisposable
+    public class ClientSession : IClientSession, IDisposable
     {
         public Guid SessionId { get; }
 
@@ -95,7 +95,7 @@ namespace MessageBroker.SocketServer.Server
         /// this method will read only the 4 bytes of the message to know how long the actual incoming message is.
         /// it will then call receive message method once the size in known
         /// </summary>
-        public void ReceiveMessageSize()
+        private void ReceiveMessageSize()
         {
             if (!_connected)
                 return;

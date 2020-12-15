@@ -28,11 +28,12 @@ namespace Tests
 
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new MessageProcessor();
+            var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
-            var server = new TcpSocketServer(messageProcessor, sessionConfiguration, loggerFactory);
+            var server = new TcpSocketServer(messageProcessor, resolver, sessionConfiguration, loggerFactory);
             server.Start(ipEndPoint);
 
             var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -74,11 +75,12 @@ namespace Tests
 
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new MessageProcessor();
+            var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
-            var server = new TcpSocketServer(messageProcessor, sessionConfiguration, loggerFactory);
+            var server = new TcpSocketServer(messageProcessor, resolver, sessionConfiguration, loggerFactory);
             server.Start(ipEndPoint);
 
 
