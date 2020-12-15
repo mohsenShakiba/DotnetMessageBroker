@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.SocketServer.Server
 {
-    interface ISessionResolver
+    public interface ISessionResolver
     {
         void AddSession(ClientSession session);
-        void RemoveSession(ClientSession session);
+        void RemoveSession(Guid sessionId);
 
         ClientSession ResolveSession(Guid guid);
     }

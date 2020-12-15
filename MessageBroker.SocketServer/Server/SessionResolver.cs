@@ -22,9 +22,9 @@ namespace MessageBroker.SocketServer.Server
             _sesions[session.SessionId] = session;
         }
 
-        public void RemoveSession(ClientSession session)
+        public void RemoveSession(Guid sessionId)
         {
-            _sesions.TryRemove(session.SessionId, out _);
+            _sesions.TryRemove(sessionId, out _);
         }
 
         public ClientSession ResolveSession(Guid guid)

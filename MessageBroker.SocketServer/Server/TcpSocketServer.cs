@@ -16,6 +16,7 @@ namespace MessageBroker.SocketServer.Server
     public class TcpSocketServer : ISocketServer
     {
         private readonly IMessageProcessor _messageProcessor;
+        private readonly ISessionResolver _sessionResolver;
         private readonly SessionConfiguration _sessionConfiguration;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<TcpSocketServer> _logger;
@@ -26,9 +27,10 @@ namespace MessageBroker.SocketServer.Server
         private bool _isAccepting;
         private IPEndPoint _endPoint;
 
-        public TcpSocketServer(IMessageProcessor messageProcessor, SessionConfiguration sessionConfiguration, ILoggerFactory loggerFactory)
+        public TcpSocketServer(IMessageProcessor messageProcessor, ISessionResolver sessionResolver, SessionConfiguration sessionConfiguration, ILoggerFactory loggerFactory)
         {
             _messageProcessor = messageProcessor;
+            _sessionResolver = sessionResolver;
             _sessionConfiguration = sessionConfiguration;
             _loggerFactory = loggerFactory;
             _logger = _loggerFactory.CreateLogger<TcpSocketServer>();
@@ -93,6 +95,7 @@ namespace MessageBroker.SocketServer.Server
         {
             _logger.LogInformation($"removed session due to being disconnected, sessionId: {SessionId}");
             _sessions.TryRemove(SessionId, out _);
+            _sessionResolver.RemoveSession(SessionId);
             _messageProcessor.ClientDisconnected(SessionId);
         }
 
@@ -159,6 +162,7 @@ namespace MessageBroker.SocketServer.Server
             _logger.LogInformation($"accepted socket from {socket.RemoteEndPoint} with sessionId {session.SessionId}");
 
             _sessions[session.SessionId] = session;
+            _sessionResolver.AddSession(session);
 
             _messageProcessor.ClientConnected(session.SessionId);
         }
