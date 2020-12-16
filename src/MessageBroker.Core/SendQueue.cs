@@ -16,14 +16,18 @@ namespace MessageBroker.Core
         private readonly Parser _parser;
         private ConcurrentQueue<Message> _queue;
         private readonly List<Guid> _pendingMessages;
-        private int _maxConcurrency = 10;
-        private int _currentConcurrency = 0;
+        private int _maxConcurrency;
+        private int _currentConcurrency;
+        private int _totalSentCount;
 
         public int CurrentCuncurrency => _currentConcurrency;
         public IReadOnlyList<Guid> PendingMessages => _pendingMessages;
+        public IClientSession Session => _session;
 
-        public SendQueue(IClientSession session)
+        public SendQueue(IClientSession session, int maxConcurrency = 10, int currentConcurrency = 0)
         {
+            _maxConcurrency = maxConcurrency;
+            _currentConcurrency = currentConcurrency;
             _session = session;
             _queue = new();
             _pendingMessages = new();
@@ -46,7 +50,8 @@ namespace MessageBroker.Core
             if (_pendingMessages.Contains(ack.MsgId))
             {
                 Interlocked.Decrement(ref _currentConcurrency);
-                SendPendingMessages();
+                if (!IsQueueFull)
+                    SendPendingMessages();
             }
         }
 
@@ -61,7 +66,8 @@ namespace MessageBroker.Core
             Interlocked.Increment(ref this._currentConcurrency);
             _pendingMessages.Add(msg.Id);
             var b = _parser.ToBinary(msg);
-            _session.Send(b);
+            _session.SendSync(b);
+            _totalSentCount += 1;
         }
 
         private bool IsQueueFull => _currentConcurrency >= _maxConcurrency;

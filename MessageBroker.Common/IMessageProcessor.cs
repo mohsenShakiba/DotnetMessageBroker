@@ -5,7 +5,7 @@ namespace MessageBroker.Common
     public interface IMessageProcessor
     {
 
-        event Action<(Guid, Memory<byte>)> OnMessageReceived;
+        event Action<Guid, Memory<byte>> OnMessageReceived;
         event Action<Guid> OnClientConnected;
         event Action<Guid> OnClientDisconnected;
 

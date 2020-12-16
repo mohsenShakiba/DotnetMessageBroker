@@ -13,14 +13,13 @@ namespace MessageBroker.SocketServer.Server
     /// <summary>
     /// TCP implementation of ISocketServer
     /// </summary>
-    public class TcpSocketServer : ISocketServer
+    public class TcpSocketServer : ISocketServer, ISessionEventListener
     {
         private readonly IMessageProcessor _messageProcessor;
         private readonly ISessionResolver _sessionResolver;
         private readonly SessionConfiguration _sessionConfiguration;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<TcpSocketServer> _logger;
-        private readonly ConcurrentDictionary<Guid, ClientSession> _sessions;
 
         private Socket _socket;
         private SocketAsyncEventArgs _socketAsyncEventArgs;
@@ -34,7 +33,6 @@ namespace MessageBroker.SocketServer.Server
             _sessionConfiguration = sessionConfiguration;
             _loggerFactory = loggerFactory;
             _logger = _loggerFactory.CreateLogger<TcpSocketServer>();
-            _sessions = new();
         }
 
         /// <summary>
@@ -80,7 +78,7 @@ namespace MessageBroker.SocketServer.Server
         /// <param name="data">
         /// the message received 
         /// </param>
-        internal void OnReceived(Guid sessionId, Memory<byte> data)
+        public void OnReceived(Guid sessionId, Memory<byte> data)
         {
             _messageProcessor.MessageReceived(sessionId, data);
         }
@@ -91,10 +89,9 @@ namespace MessageBroker.SocketServer.Server
         /// <param name="SessionId">
         /// the id of session
         /// </param>
-        internal void OnSessionDisconnected(Guid SessionId)
+        public void OnSessionDisconnected(Guid SessionId)
         {
             _logger.LogInformation($"removed session due to being disconnected, sessionId: {SessionId}");
-            _sessions.TryRemove(SessionId, out _);
             _sessionResolver.RemoveSession(SessionId);
             _messageProcessor.ClientDisconnected(SessionId);
         }
@@ -161,7 +158,6 @@ namespace MessageBroker.SocketServer.Server
 
             _logger.LogInformation($"accepted socket from {socket.RemoteEndPoint} with sessionId {session.SessionId}");
 
-            _sessions[session.SessionId] = session;
             _sessionResolver.AddSession(session);
 
             _messageProcessor.ClientConnected(session.SessionId);
@@ -182,7 +178,7 @@ namespace MessageBroker.SocketServer.Server
         private void RemoveAllSessions()
         {
             _logger.LogInformation("removing all sessions");
-            foreach (var (sessionId, session) in _sessions)
+            foreach (var session in _sessionResolver.Sessions)
             {
                 _messageProcessor.ClientDisconnected(session.SessionId);
                 session.Close();
@@ -191,9 +187,9 @@ namespace MessageBroker.SocketServer.Server
 
         public void Send(Guid sessionId, byte[] payload)
         {
-            if(_sessions.TryGetValue(sessionId, out var session))
+            var session = _sessionResolver.ResolveSession(sessionId);
+            if (session != null)
             {
-                session.Send(payload);
             }
             else
             {

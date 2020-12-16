@@ -10,14 +10,18 @@ namespace MessageBroker.SocketServer.Server
     public class SessionResolver : ISessionResolver
     {
 
-        private readonly ConcurrentDictionary<Guid, ClientSession> _sesions;
+        private readonly ConcurrentDictionary<Guid, IClientSession> _sesions;
+        public IReadOnlyList<IClientSession> Sessions => _sesions.Values.ToList();
+
+
 
         public SessionResolver()
         {
             _sesions = new();
         }
 
-        public void AddSession(ClientSession session)
+
+        public void AddSession(IClientSession session)
         {
             _sesions[session.SessionId] = session;
         }
@@ -27,7 +31,7 @@ namespace MessageBroker.SocketServer.Server
             _sesions.TryRemove(sessionId, out _);
         }
 
-        public ClientSession ResolveSession(Guid guid)
+        public IClientSession ResolveSession(Guid guid)
         {
             return _sesions[guid];
         }

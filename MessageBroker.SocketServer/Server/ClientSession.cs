@@ -18,7 +18,7 @@ namespace MessageBroker.SocketServer.Server
     {
         public Guid SessionId { get; }
 
-        private TcpSocketServer _server;
+        private ISessionEventListener _eventListener;
         private readonly Socket _socket;
         private readonly SessionConfiguration _config;
         private readonly SocketAsyncEventArgs _sendEventArgs;
@@ -31,15 +31,15 @@ namespace MessageBroker.SocketServer.Server
         private byte[] _receiveBuff;
         private bool _connected;
 
-        public ClientSession(TcpSocketServer server, Socket socket, SessionConfiguration config, ILogger<ClientSession> logger)
+        public ClientSession(ISessionEventListener eventListener, Socket socket, SessionConfiguration config, ILogger<ClientSession> logger)
         {
             _logger = logger;
-            _server = server;
+            _eventListener = eventListener;
             _socket = socket;
             _config = config;
 
             _connected = true;
-            SessionId = new();
+            SessionId = Guid.NewGuid();
 
             _sendEventArgs = new();
             _receiveEventArgs = new();
@@ -161,7 +161,9 @@ namespace MessageBroker.SocketServer.Server
             if (msgSize > _config.DefaultMaxBodySize)
                 IncreaseReceiveBuffer(msgSize);
 
-            _receiveEventArgs.SetBuffer(_receiveBuff, 0, msgSize);
+            var sizeToReceive = msgSize > _receiveBuff.Length ? _receiveBuff.Length : msgSize;
+
+            _receiveEventArgs.SetBuffer(_receiveBuff, 0, sizeToReceive);
 
             if (!_socket.ReceiveAsync(_receiveEventArgs))
                 OnMessageReceived(null, _receiveEventArgs);
@@ -198,6 +200,14 @@ namespace MessageBroker.SocketServer.Server
 
         #region Send    
 
+        public void SendSync(byte[] payload)
+        {
+            var data = new byte[4 + payload.Length];
+            var size = BitConverter.TryWriteBytes(data, payload.Length);
+            payload.CopyTo(data, 4);
+            _socket.Send(data);
+        }
+
         public void Send(byte[] payload)
         {
             _sendResetEvent.WaitOne();
@@ -230,12 +240,11 @@ namespace MessageBroker.SocketServer.Server
         {
             _logger.LogInformation($"received {buff.Length} from client");
 
-            _server.OnReceived(SessionId, buff);
+            _eventListener.OnReceived(SessionId, buff);
         }
 
         public void Close()
         {
-            _server = null;
             _connected = false;
 
             _sendEventArgs.Completed -= OnSendCompleted;
@@ -244,6 +253,8 @@ namespace MessageBroker.SocketServer.Server
 
             _socket.Close();
             _socket.Dispose();
+
+            _eventListener.OnSessionDisconnected(SessionId);
         }
 
         public void Dispose()

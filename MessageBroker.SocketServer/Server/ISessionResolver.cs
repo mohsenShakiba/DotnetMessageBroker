@@ -8,9 +8,10 @@ namespace MessageBroker.SocketServer.Server
 {
     public interface ISessionResolver
     {
-        void AddSession(ClientSession session);
+        void AddSession(IClientSession session);
         void RemoveSession(Guid sessionId);
 
-        ClientSession ResolveSession(Guid guid);
+        IClientSession ResolveSession(Guid guid);
+        IReadOnlyList<IClientSession> Sessions { get; }
     }
 }

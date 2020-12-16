@@ -11,22 +11,33 @@ namespace MessageBroker.Core
 {
     public class MessageDispatcher
     {
-        private readonly SessionResolver _sessionResolver;
+        private readonly ISessionResolver _sessionResolver;
         private readonly ConcurrentDictionary<Guid, SendQueue> _sendQueues;
 
 
-        public MessageDispatcher(SessionResolver sessionResolver)
+        public MessageDispatcher(ISessionResolver sessionResolver)
         {
             _sessionResolver = sessionResolver;
+            _sendQueues = new();
         }
 
-        public void Dispatch(MessageDestination msgDestination)
+        public SendQueue GetSendQueue(Guid sessionId)
         {
-            foreach(var destination in msgDestination.Destinations)
+            if (_sendQueues.TryGetValue(sessionId, out var sendQueue))
+            {
+                return sendQueue;
+            }
+
+            return null;
+        }
+
+        public void Dispatch(Message msg, IEnumerable<Guid> destinations)
+        {
+            foreach(var destination in destinations)
             {
                 if (_sendQueues.TryGetValue(destination, out var sendQueue))
                 {
-                    sendQueue.Enqueue(msgDestination.Data);
+                    sendQueue.Enqueue(msg);
                 }
                 else
                 {
@@ -34,7 +45,7 @@ namespace MessageBroker.Core
                     if (session != null)
                     {
                         var queue = new SendQueue(session);
-                        queue.Enqueue(msgDestination.Data);
+                        queue.Enqueue(msg);
                         _sendQueues[destination] = queue;
                     }
                 }
@@ -50,15 +61,7 @@ namespace MessageBroker.Core
                     sendQueue.ReleaseOne(ack);
                 }
             }
-            
         }
 
-
-    }
-
-    public class MessageDestination
-    {
-        public IList<Guid> Destinations { get; set; }
-        public Message Data { get; set; }
     }
 }

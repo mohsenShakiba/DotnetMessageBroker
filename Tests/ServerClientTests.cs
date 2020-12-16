@@ -43,7 +43,7 @@ namespace Tests
 
             var message = RandomString(msgSize);
 
-            messageProcessor.OnMessageReceived += (msg) =>
+            messageProcessor.OnMessageReceived += (_, msg) =>
             {
                 messageReceivedCount -= 1;
 

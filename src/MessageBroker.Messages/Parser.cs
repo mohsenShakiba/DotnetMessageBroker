@@ -37,10 +37,10 @@ namespace MessageBroker.Messages
             return messageTypeStr switch
             {
                 MessageTypes.Ack => ToAck(messageBody),
-                MessageTypes.Nack => ToAck(messageBody),
+                MessageTypes.Nack => ToNack(messageBody),
                 MessageTypes.Message => ToMessage(messageBody),
                 MessageTypes.ListenRoute => ToListenRoute(messageBody),
-                MessageTypes.UnlistenListenRoute => ToListenRoute(messageBody),
+                MessageTypes.UnlistenListenRoute => ToUnlistenRoute(messageBody),
                 _ => null
             };
         }
@@ -66,6 +66,16 @@ namespace MessageBroker.Messages
             return buff.ToArray();
         }
 
+        private byte[] ToBinary(Nack nack)
+        {
+            var buff = new List<byte>();
+
+            buff.AddWithDelimiter(MessageTypes.Nack);
+            buff.AddWithDelimiter(nack.MsgId);
+
+            return buff.ToArray();
+        }
+
         private byte[] ToBinary(Message msg)
         {
             var buff = new List<byte>();
@@ -78,12 +88,22 @@ namespace MessageBroker.Messages
             return buff.ToArray();
         }
 
-        private byte[] ToBinary(Listen msg)
+        private byte[] ToBinary(Listen listen)
         {
             var buff = new List<byte>();
 
             buff.AddWithDelimiter(MessageTypes.ListenRoute);
-            buff.AddWithDelimiter(msg.Route);
+            buff.AddWithDelimiter(listen.Route);
+
+            return buff.ToArray();
+        }
+
+        private byte[] ToBinary(Unlisten unlisten)
+        {
+            var buff = new List<byte>();
+
+            buff.AddWithDelimiter(MessageTypes.ListenRoute);
+            buff.AddWithDelimiter(unlisten.Route);
 
             return buff.ToArray();
         }
@@ -95,26 +115,50 @@ namespace MessageBroker.Messages
             return new Ack(messageId);
         }
 
+        private Nack ToNack(Span<byte> data)
+        {
+            var dataTrimmed = data.TrimEnd(Delimiter);
+            var messageId = new Guid(dataTrimmed);
+            return new Nack(messageId);
+        }
+
         private Message ToMessage(Span<byte> data)
         {
-            var messaageIdRes = data.FindNext(0, Delimiter);
-            var routeRes = data.FindNext(messaageIdRes.Index, Delimiter);
-            var dataRes = data.FindNext(routeRes.Index, Delimiter);
+            try
+            {
+                var messaageIdRes = data.FindNext(0, Delimiter);
+                var routeRes = data.FindNext(messaageIdRes.Index, Delimiter);
+                var dataRes = data.FindNext(routeRes.Index, Delimiter);
 
-            var messageId = new Guid(messaageIdRes.Result);
-            var route = Encoding.UTF8.GetString(routeRes.Result);
-            var rentedMemory = ArrayPool<byte>.Shared.Rent(dataRes.Result.Length);
-            dataRes.Result.CopyTo(rentedMemory);
+                var messageId = new Guid(messaageIdRes.Result);
+                var route = Encoding.UTF8.GetString(routeRes.Result);
+                var rentedMemory = ArrayPool<byte>.Shared.Rent(dataRes.Result.Length);
+                dataRes.Result.CopyTo(rentedMemory);
 
-            return new Message(messageId, route, rentedMemory);
+                return new Message(messageId, route, rentedMemory);
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
+            
         }
 
         private Listen ToListenRoute(Span<byte> data)
         {
-            var routeRes = data.FindNext(0, Delimiter);
+            var routeRes = data.FindNext(0, Delimiter); 
             var route = Encoding.UTF8.GetString(routeRes.Result);
 
             return new Listen(route);
+        }
+
+        private Unlisten ToUnlistenRoute(Span<byte> data)
+        {
+            var routeRes = data.FindNext(0, Delimiter);
+            var route = Encoding.UTF8.GetString(routeRes.Result);
+
+            return new Unlisten(route);
         }
 
         private IEnumerable<Memory<byte>> Split(Memory<byte> b)

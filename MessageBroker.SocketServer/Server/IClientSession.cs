@@ -8,6 +8,10 @@ namespace MessageBroker.SocketServer.Server
 {
     public interface IClientSession
     {
+
+        Guid SessionId { get; }
+
+        void SendSync(byte[] payload);
         void Send(byte[] payload);
         void Close();
         void Dispose();

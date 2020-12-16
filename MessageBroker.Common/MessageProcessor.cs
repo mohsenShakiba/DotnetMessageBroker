@@ -8,7 +8,7 @@ namespace MessageBroker.Common
 {
     public class MessageProcessor : IMessageProcessor
     {
-        public event Action<(Guid, Memory<byte>)> OnMessageReceived;
+        public event Action<Guid, Memory<byte>> OnMessageReceived;
         public event Action<Guid> OnClientConnected;
         public event Action<Guid> OnClientDisconnected;
 
@@ -24,7 +24,7 @@ namespace MessageBroker.Common
 
         public void MessageReceived(Guid sessionId, Memory<byte> payload)
         {
-            OnMessageReceived?.Invoke((sessionId, payload));
+            OnMessageReceived?.Invoke(sessionId, payload);
         }
 
     }

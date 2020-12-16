@@ -14,47 +14,51 @@ namespace Tests
     public class SendQueueTests
     {
 
-        public SendQueueTests()
-        {
-
-        }
-
-        [Fact]
-        public void TestEnqueuWhenNotFull()
-        {
-            var pareser = new Parser();
-            var session = new Mock<IClientSession>();
-            var message = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
-
-            var sendQueue = new SendQueue(session.Object);
-
-            sendQueue.Enqueue(message);
-
-            // make sure the session send was called
-            session.Verify(session => session.Send(It.IsAny<byte[]>()));
-
-            // make sure the session has 
-            Assert.Equal(1, sendQueue.CurrentCuncurrency);
-            Assert.Equal(message.Id, sendQueue.PendingMessages.First());
-        }
-
         [Fact]
         public void TestEnqueuWhenFull()
         {
             var pareser = new Parser();
             var session = new Mock<IClientSession>();
-            var message = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
+            var messageOne = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
+            var messageTwo = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
 
-            var sendQueue = new SendQueue(session.Object);
+            var sendQueue = new SendQueue(session.Object, 1, 0);
 
-            sendQueue.Enqueue(message);
+            // enqueu first message
+            sendQueue.Enqueue(messageOne);
+
+            // make sure send method was called
+            session.Verify(session => session.Send(It.IsAny<byte[]>()));
+
+            // enqueue second message
+            sendQueue.Enqueue(messageTwo);
 
             // make sure the session send was not called
             session.VerifyNoOtherCalls();
 
             // make sure the session has 
-            Assert.Equal(10, sendQueue.CurrentCuncurrency);
+            Assert.Equal(1, sendQueue.CurrentCuncurrency);
+
+            // when release is called, send method of session should be called 
+            var ack = new Ack(messageOne.Id);
+            sendQueue.ReleaseOne(ack);
+
+            // verify send was called
+            session.Verify(session => session.Send(It.IsAny<byte[]>()));
         }
+
+        [Fact]
+        public void TestReleaseWhenMessageDoesNotExists()
+        {
+            var session = new Mock<IClientSession>();
+            var sendQueue = new SendQueue(session.Object, 1, 1);
+            var randomId = Guid.NewGuid();
+
+            sendQueue.ReleaseOne(new Ack(randomId));
+
+            Assert.Equal(1, sendQueue.CurrentCuncurrency);
+        }
+
 
     }
 }
