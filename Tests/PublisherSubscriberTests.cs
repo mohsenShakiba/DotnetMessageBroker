@@ -1,11 +1,10 @@
-﻿using MessageBroker.Common;
-using MessageBroker.Core;
+﻿using MessageBroker.Core;
+using MessageBroker.Core.Models;
 using MessageBroker.Core.RouteMatching;
-using MessageBroker.Messages;
-using MessageBroker.SocketServer.Server;
+using MessageBroker.Core.Serialize;
+using MessageBroker.SocketServer;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -19,13 +18,8 @@ namespace Tests
 {
     public class PublisherSubscriberTests
     {
-        public PublisherSubscriberTests()
-        {
-
-        }
-
         [Theory]
-        [InlineData(10_000)]
+        [InlineData(100_000)]
         public void TestPublishSubscribe(int count)
         {
             var resetEvent = new ManualResetEvent(false);
@@ -37,19 +31,19 @@ namespace Tests
                 builder.AddConsole();
             });
 
-            var messageProcessor = new MessageProcessor();
             var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
-            var parser = new Parser();
-            var dispatcher = new MessageDispatcher(resolver);
+            var serializer = new DefaultSerializer();
+            var dispatcher = new MessageDispatcher(resolver, serializer);
             var routeMatching = new DefaultRouteMatching();
             var publisherEventListener = new TestEventListener();
             var subscriberEventListener = new TestEventListener();
+            var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, loggerFactory.CreateLogger<Coordinator>());
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
             // setup server
-            var server = new TcpSocketServer(messageProcessor, resolver, sessionConfiguration, loggerFactory);
+            var server = new TcpSocketServer(coordiantor, resolver, sessionConfiguration, loggerFactory);
             server.Start(ipEndPoint);
 
             // setup publisher
@@ -62,12 +56,19 @@ namespace Tests
             subscriberSocket.Connect(ipEndPoint);
             var subscriber = new ClientSession(subscriberEventListener, subscriberSocket, sessionConfiguration, loggerFactory.CreateLogger<ClientSession>());
 
-            var coordiantor = new Coordinator(messageProcessor, resolver, parser, dispatcher, routeMatching, loggerFactory.CreateLogger<Coordinator>());
+            // send subscribe
+            var subscribe = new Subscribe(Guid.NewGuid(), 10);
+            var subscribeB = serializer.Serialize(subscribe);
+            subscriber.Send(subscribeB);
+
+            Thread.Sleep(1000);
 
             // send listen
-            var listen = new Listen("TEST");
-            var listenB = parser.ToBinary(listen);
-            subscriber.SendSync(listenB);
+            var listen = new Listen(Guid.NewGuid(), "TEST");
+            var listenB = serializer.Serialize(listen);
+            subscriber.Send(listenB);
+
+            Thread.Sleep(1000);
 
             var receivedMessageCount = 0;
             var receivedAckCount = 0;
@@ -76,7 +77,7 @@ namespace Tests
             {
                 subscriberEventListener.ReceivedEvent += (_, d) =>
                 {
-                    var receivedMessage = parser.Parse(d.Span);
+                    var receivedMessage = serializer.Deserialize(d);
                     switch (receivedMessage)
                     {
                         case Message m:
@@ -85,8 +86,10 @@ namespace Tests
                                 resetEvent.Set();
 
                             var ack = new Ack(m.Id);
-                            var ackB = parser.ToBinary(ack);
-                            subscriber.SendSync(ackB);
+                            var ackB = serializer.Serialize(ack);
+                            subscriber.Send(ackB);
+                            break;
+                        case Ack a:
                             break;
                         default:
                             throw new Exception("test");
@@ -98,7 +101,7 @@ namespace Tests
             {
                 publisherEventListener.ReceivedEvent += (_, d) =>
                 {
-                    var receivedMessage = parser.Parse(d.Span);
+                    var receivedMessage = serializer.Deserialize(d);
                     switch (receivedMessage)
                     {
                         case Ack a:
@@ -134,8 +137,8 @@ namespace Tests
                 }
 
                 var message = new Message(guid, "TEST", Encoding.UTF8.GetBytes("TEST"));
-                    var messageB = parser.ToBinary(message);
-                    publisher.SendSync(messageB);
+                    var messageB = serializer.Serialize(message);
+                    publisher.Send(messageB);
                 }
             });
 

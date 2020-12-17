@@ -4,15 +4,15 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MessageBroker.SocketServer.Server
+namespace MessageBroker.SocketServer.Abstractions
 {
     public interface IClientSession
     {
 
         Guid SessionId { get; }
 
-        void SendSync(byte[] payload);
         void Send(byte[] payload);
+        void SendAsync(byte[] payload);
         void Close();
         void Dispose();
     }

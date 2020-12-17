@@ -1,14 +1,11 @@
-﻿using MessageBroker.Messages;
+﻿using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MessageBroker.SocketServer.Server
+namespace MessageBroker.SocketServer
 {
     /// <summary>
     /// ClientSession stores information about the accepted socket
@@ -200,7 +197,7 @@ namespace MessageBroker.SocketServer.Server
 
         #region Send    
 
-        public void SendSync(byte[] payload)
+        public void Send(byte[] payload)
         {
             var data = new byte[4 + payload.Length];
             var size = BitConverter.TryWriteBytes(data, payload.Length);
@@ -208,7 +205,7 @@ namespace MessageBroker.SocketServer.Server
             _socket.Send(data);
         }
 
-        public void Send(byte[] payload)
+        public void SendAsync(byte[] payload)
         {
             _sendResetEvent.WaitOne();
 

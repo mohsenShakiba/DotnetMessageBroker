@@ -1,6 +1,9 @@
-﻿using MessageBroker.Common;
+﻿using MessageBroker.Core.MessageProcessor;
+using MessageBroker.Core.Models;
+using MessageBroker.Core.RouteMatching;
+using MessageBroker.Core.Serialize;
 using MessageBroker.Messages;
-using MessageBroker.SocketServer.Server;
+using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
@@ -8,30 +11,67 @@ using System.Collections.Generic;
 
 namespace MessageBroker.Core
 {
-    public class Coordinator
+    public class Coordinator : IMessageProcessor
     {
-        private readonly IMessageProcessor _messageProcessor;
         private readonly ISessionResolver _sessionResolver;
-        private readonly Parser _parser;
+        private readonly ISerializer _serializer;
         private readonly MessageDispatcher _messageDispatcher;
         private readonly IRouteMatcher _routeMatcher;
         private readonly ILogger<Coordinator> _logger;
         private readonly ConcurrentDictionary<Guid, Subscriber> _subscribers;
         public int _stat;
 
-        public Coordinator(IMessageProcessor messageProcessor, ISessionResolver sessionResolver, Parser parser, MessageDispatcher messageDispatcher, IRouteMatcher routeMatcher, ILogger<Coordinator> logger)
+        public Coordinator(ISessionResolver sessionResolver, ISerializer serializer, MessageDispatcher messageDispatcher, IRouteMatcher routeMatcher, ILogger<Coordinator> logger)
         {
-            _messageProcessor = messageProcessor;
             _sessionResolver = sessionResolver;
-            _parser = parser;
+            _serializer = serializer;
             _messageDispatcher = messageDispatcher;
             _routeMatcher = routeMatcher;
             _logger = logger;
             _subscribers = new();
+        }
 
-            messageProcessor.OnMessageReceived += OnMessageRecieved;
+        public void ClientConnected(Guid sessionId)
+        {
+            // nothing
+        }
 
-            messageProcessor.OnClientDisconnected += OnClientDisconnected;
+        public void ClientDisconnected(Guid sessionId)
+        {
+            _subscribers.TryRemove(sessionId, out _);
+        }
+
+        public void DataReceived(Guid sessionId, Memory<byte> data)
+        {
+            var payload = _serializer.Deserialize(data);
+
+            if (payload == null)
+            {
+                _logger.LogError($"failed to parse message from publisher: {sessionId}");
+            }
+
+            switch (payload)
+            {
+                case Message message:
+                    OnMessage(sessionId, message);
+                    _stat += 1;
+                    break;
+                case Ack ack:
+                    OnAck(sessionId, ack);
+                    break;
+                case Nack nack:
+                    OnNack(sessionId, nack);
+                    break;
+                case Listen listen:
+                    OnListen(sessionId, listen);
+                    break;
+                case Unlisten unlisten:
+                    OnUnListen(sessionId, unlisten);
+                    break;
+                case Subscribe subscribe:
+                    OnSubscribe(sessionId, subscribe);
+                    break;
+            }
         }
 
         public void OnMessage(Guid sessionId, Message message)
@@ -50,25 +90,17 @@ namespace MessageBroker.Core
             _messageDispatcher.Dispatch(message, listOfSubscribersWhichShouldReceiveThisMessage);
 
             // send received ack to publisher
-            var publisher = _sessionResolver.ResolveSession(sessionId);
-
-            if (publisher == null)
-                _logger.LogError($"failed to find a publisher with id: {sessionId}");
-
-            var ack = new Ack(message.Id);
-            var ackData = _parser.ToBinary(ack);
-
-            publisher.SendSync(ackData);
+            AckRecieved(sessionId, message.Id);
         }
 
         public void OnAck(Guid sessionId, Ack ack)
         {
-            _messageDispatcher.Release(ack, new Guid[1] { sessionId });
+            _messageDispatcher.Release(ack.Id, new Guid[1] { sessionId });
         }
 
         public void OnNack(Guid sessionId, Nack nack)
         {
-            //_messageDispatcher.Release(nack, new Guid[1] { sessionId });
+            _messageDispatcher.Release(nack.Id, new Guid[1] { sessionId });
         }
 
         public void OnListen(Guid sessionId, Listen listen)
@@ -81,47 +113,27 @@ namespace MessageBroker.Core
             {
                 RegisterSubscriber(sessionId, listen.Route);
             }
+
+            AckRecieved(sessionId, listen.Id);
         }
 
-        public void OnUnListen(Guid sessionId, Unlisten listen)
+        public void OnUnListen(Guid sessionId, Unlisten unlisten)
         {
             if (_subscribers.TryGetValue(sessionId, out var subscriber))
             {
-                subscriber.RemoveRoute(listen.Route);
+                subscriber.RemoveRoute(unlisten.Route);
             }
             else
             {
                 _logger.LogError($"failed to find subscriber with id: {sessionId}");
             }
+
+            AckRecieved(sessionId, unlisten.Id);
         }
 
-        public void OnClientDisconnected(Guid sessionId)
+        private void OnSubscribe(Guid sessionId, Subscribe subscribe)
         {
-            _subscribers.TryRemove(sessionId, out _);
-        }
-
-        private void OnMessageRecieved(Guid sessionId, Memory<byte> data)
-        {
-            var o = _parser.Parse(data.Span);
-            switch (o)
-            {
-                case Message message:
-                    OnMessage(sessionId, message);
-                    _stat += 1;
-                    break;
-                case Ack ack:
-                    OnAck(sessionId, ack);
-                    break;
-                case Nack nack:
-                    OnNack(sessionId, nack);
-                    break;
-                case Listen listen:
-                    OnListen(sessionId, listen);
-                    break;
-                case Unlisten unlisten:
-                    OnUnListen(sessionId, unlisten);
-                    break;
-            }
+            _messageDispatcher.AddSendQueue(sessionId, subscribe.Concurrency);
         }
 
         private void RegisterSubscriber(Guid sessionId, string route)
@@ -130,5 +142,24 @@ namespace MessageBroker.Core
             subscriber.AddRoute(route);
             _subscribers[sessionId] = subscriber;
         }
+
+        private void AckRecieved(Guid sessionId, Guid payloadId)
+        {
+            var session = _sessionResolver.Resolve(sessionId);
+
+            if (session == null)
+            {
+                _logger.LogError($"failed to find a publisher with id: {sessionId}");
+                return;
+            }
+
+            var ack = new Ack(payloadId);
+            var ackData = _serializer.Serialize(ack);
+
+            session.Send(ackData);
+
+        }
+
+
     }
 }

@@ -4,14 +4,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MessageBroker.SocketServer.Server
+namespace MessageBroker.SocketServer.Abstractions
 {
     public interface ISessionResolver
     {
-        void AddSession(IClientSession session);
-        void RemoveSession(Guid sessionId);
-
-        IClientSession ResolveSession(Guid guid);
+        void Add(IClientSession session);
+        void Remove(Guid sessionId);
+        IClientSession Resolve(Guid guid);
         IReadOnlyList<IClientSession> Sessions { get; }
     }
 }

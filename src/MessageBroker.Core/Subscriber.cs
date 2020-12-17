@@ -1,4 +1,5 @@
-﻿using MessageBroker.Messages;
+﻿using MessageBroker.Core.RouteMatching;
+using MessageBroker.Messages;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -6,17 +7,18 @@ using System.Text;
 
 namespace MessageBroker.Core
 {
+    /// <summary>
+    /// Subscriber is in charge of handling routing of messages
+    /// </summary>
     class Subscriber
     {
         private readonly IList<string> _listenRoutes;
 
         public Guid SessionId { get; private set; }
-        public bool Connected { get; private set; }
 
         public Subscriber(Guid sessionId)
         {
             SessionId = sessionId;
-            Connected = true;
             _listenRoutes = new List<string>();
         }
 
@@ -28,11 +30,6 @@ namespace MessageBroker.Core
         public void RemoveRoute(string route)
         {
             _listenRoutes.Remove(route);
-        }
-
-        public void SetAsDisconnected()
-        {
-            Connected = false;
         }
 
         public bool MatchRoute(string route, IRouteMatcher routeMatcher)

@@ -1,4 +1,4 @@
-﻿using MessageBroker.SocketServer.Server;
+﻿using MessageBroker.SocketServer.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;

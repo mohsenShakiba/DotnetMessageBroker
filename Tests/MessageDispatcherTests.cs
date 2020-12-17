@@ -1,6 +1,8 @@
 ﻿using MessageBroker.Core;
+using MessageBroker.Core.Models;
+using MessageBroker.Core.Serialize;
 using MessageBroker.Messages;
-using MessageBroker.SocketServer.Server;
+using MessageBroker.SocketServer.Abstractions;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -19,11 +21,14 @@ namespace Tests
             var sessionId = Guid.NewGuid();
             var session = new Mock<IClientSession>(); 
             var sessionResolver = new Mock<ISessionResolver>();
+            var serializer = new DefaultSerializer();
 
             session.Setup(s => s.SessionId).Returns(sessionId);
-            sessionResolver.Setup(sr => sr.ResolveSession(It.IsAny<Guid>())).Returns(session.Object);
+            sessionResolver.Setup(sr => sr.Resolve(It.IsAny<Guid>())).Returns(session.Object);
 
-            var dispatcher = new MessageDispatcher(sessionResolver.Object);
+            var dispatcher = new MessageDispatcher(sessionResolver.Object, serializer);
+
+            dispatcher.AddSendQueue(sessionId, 1);
 
             var message = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
 
@@ -34,7 +39,7 @@ namespace Tests
             Assert.Equal(session.Object, sendQueue.Session);
 
             // make sure the resolve method of session resolver was called
-            sessionResolver.Verify(sr => sr.ResolveSession(It.IsAny<Guid>()));
+            sessionResolver.Verify(sr => sr.Resolve(It.IsAny<Guid>()));
 
             // make sure the send method of session was called
             session.Verify(s => s.Send(It.IsAny<byte[]>()));

@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace MessageBroker.SocketServer.Server
+﻿namespace MessageBroker.SocketServer
 {
     /// <summary>
     /// class that is used for configuring the behavior of session socket

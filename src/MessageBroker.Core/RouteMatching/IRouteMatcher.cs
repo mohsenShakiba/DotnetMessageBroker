@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace MessageBroker.Core
+namespace MessageBroker.Core.RouteMatching
 {
     public interface IRouteMatcher
     {

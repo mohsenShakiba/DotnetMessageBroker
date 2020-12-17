@@ -1,18 +1,17 @@
-﻿using System;
+﻿using MessageBroker.SocketServer.Abstractions;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MessageBroker.SocketServer.Server
+namespace MessageBroker.SocketServer
 {
     public class SessionResolver : ISessionResolver
     {
 
         private readonly ConcurrentDictionary<Guid, IClientSession> _sesions;
-        public IReadOnlyList<IClientSession> Sessions => _sesions.Values.ToList();
 
+        public IReadOnlyList<IClientSession> Sessions => _sesions.Values.ToList();
 
 
         public SessionResolver()
@@ -20,20 +19,20 @@ namespace MessageBroker.SocketServer.Server
             _sesions = new();
         }
 
-
-        public void AddSession(IClientSession session)
+        public void Add(IClientSession session)
         {
             _sesions[session.SessionId] = session;
         }
 
-        public void RemoveSession(Guid sessionId)
+        public void Remove(Guid sessionId)
         {
             _sesions.TryRemove(sessionId, out _);
         }
 
-        public IClientSession ResolveSession(Guid guid)
+        public IClientSession Resolve(Guid guid)
         {
-            return _sesions[guid];
+            _sesions.TryGetValue(guid, out var session);
+            return session;
         }
     }
 }

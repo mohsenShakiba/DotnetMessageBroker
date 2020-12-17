@@ -1,14 +1,11 @@
-﻿using MessageBroker.Common;
-using MessageBroker.Messages;
-using Microsoft.Extensions.DependencyInjection;
+﻿using MessageBroker.Core.MessageProcessor;
+using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 
-namespace MessageBroker.SocketServer.Server
+namespace MessageBroker.SocketServer
 {
     /// <summary>
     /// TCP implementation of ISocketServer
@@ -80,7 +77,7 @@ namespace MessageBroker.SocketServer.Server
         /// </param>
         public void OnReceived(Guid sessionId, Memory<byte> data)
         {
-            _messageProcessor.MessageReceived(sessionId, data);
+            _messageProcessor.DataReceived(sessionId, data);
         }
 
         /// <summary>
@@ -92,7 +89,7 @@ namespace MessageBroker.SocketServer.Server
         public void OnSessionDisconnected(Guid SessionId)
         {
             _logger.LogInformation($"removed session due to being disconnected, sessionId: {SessionId}");
-            _sessionResolver.RemoveSession(SessionId);
+            _sessionResolver.Remove(SessionId);
             _messageProcessor.ClientDisconnected(SessionId);
         }
 
@@ -158,7 +155,7 @@ namespace MessageBroker.SocketServer.Server
 
             _logger.LogInformation($"accepted socket from {socket.RemoteEndPoint} with sessionId {session.SessionId}");
 
-            _sessionResolver.AddSession(session);
+            _sessionResolver.Add(session);
 
             _messageProcessor.ClientConnected(session.SessionId);
         }
@@ -169,7 +166,7 @@ namespace MessageBroker.SocketServer.Server
         /// <param name="err"></param>
         private void OnAcceptError(SocketError err)
         {
-            Console.WriteLine($"failed to accept connection due to {err}");
+            _logger.LogError($"failed to accept connection due to {err}");
         }
 
         /// <summary>
@@ -185,16 +182,5 @@ namespace MessageBroker.SocketServer.Server
             }
         }
 
-        public void Send(Guid sessionId, byte[] payload)
-        {
-            var session = _sessionResolver.ResolveSession(sessionId);
-            if (session != null)
-            {
-            }
-            else
-            {
-                _logger.LogError($"session not found by id: {sessionId}");
-            }
-        }
     }
 }

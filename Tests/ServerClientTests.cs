@@ -1,14 +1,15 @@
-﻿using MessageBroker.Common;
-using MessageBroker.SocketServer.Server;
+﻿using MessageBroker.Core.Models;
+using MessageBroker.Core.Serialize;
+using MessageBroker.SocketServer;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Tests.Classes;
 using Xunit;
 
 namespace Tests
@@ -26,8 +27,9 @@ namespace Tests
             var resetEvent = new ManualResetEvent(false);
             var messageReceivedCount = count;
 
+            var serializer = new DefaultSerializer();
             var loggerFactory = new LoggerFactory();
-            var messageProcessor = new MessageProcessor();
+            var messageProcessor = new TestMessageProcessor();
             var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
 
@@ -41,9 +43,12 @@ namespace Tests
 
             Thread.Sleep(100);
 
-            var message = RandomString(msgSize);
+            var messagePayload = RandomString(msgSize);
+            var message = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes(messagePayload));
 
-            messageProcessor.OnMessageReceived += (_, msg) =>
+            var payload = serializer.Serialize(message);
+
+            messageProcessor.OnDataReceived += (_, msg) =>
             {
                 messageReceivedCount -= 1;
 
@@ -51,10 +56,9 @@ namespace Tests
                     resetEvent.Set();
             };
 
-            var payload = MessageToByte(message);
-
             for (var i = 0; i < count; i++)
             {
+                client.Send(BitConverter.GetBytes(payload.Length));
                 client.Send(payload);
             }
 
@@ -73,10 +77,12 @@ namespace Tests
             var messageReceivedCount = count;
             Guid sessionId = new();
 
+            var serializer = new DefaultSerializer();
             var loggerFactory = new LoggerFactory();
-            var messageProcessor = new MessageProcessor();
+            var messageProcessor = new TestMessageProcessor();
             var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
+            var eventListener = new TestEventListener();
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
@@ -95,19 +101,22 @@ namespace Tests
 
             Thread.Sleep(100);
 
-            var message = RandomString(msgSize);
+            var messagePayload = RandomString(msgSize);
+            var message = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes(messagePayload));
 
-            var payload = MessageToByte(message).ToArray();
+            var payload = serializer.Serialize(message);
 
             Task.Factory.StartNew(() =>
             {
-                var buffer = new byte[payload.Length];
+                var buffer = new byte[payload.Length + 4];
 
                 for(var i = 0; i < count; i++)
                 {
                     var len = client.Receive(buffer);
 
-                    Assert.Equal(message, Encoding.ASCII.GetString(buffer.AsSpan(4, msgSize)));
+                    var msg = serializer.Deserialize(buffer.AsSpan(4).ToArray()) as Message;
+
+                    Assert.Equal(messagePayload, Encoding.UTF8.GetString(msg.Data.AsSpan(0, msgSize)));
                 }
 
                 resetEvent.Set();
@@ -116,28 +125,16 @@ namespace Tests
 
             resetEvent.WaitOne();
 
+            var clientSession = resolver.Sessions.First();
 
             for (var i = 0; i < count; i++)
             {
-                server.Send(sessionId, payload);
+                clientSession.Send(payload);
             }
 
             resetEvent.WaitOne();
 
             server.Stop();
-        }
-
-        private Span<byte> MessageToByte(string message)
-        {
-            var len = BitConverter.GetBytes(message.Length);
-            var msg = Encoding.ASCII.GetBytes(message);
-
-            var payload = new byte[len.Length + msg.Length];
-
-            len.CopyTo(payload, 0);
-            msg.CopyTo(payload, len.Length);
-
-            return payload;
         }
 
         private string RandomString(int length)

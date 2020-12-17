@@ -1,6 +1,8 @@
 ﻿using MessageBroker.Core;
+using MessageBroker.Core.Models;
+using MessageBroker.Core.Serialize;
 using MessageBroker.Messages;
-using MessageBroker.SocketServer.Server;
+using MessageBroker.SocketServer.Abstractions;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -17,12 +19,12 @@ namespace Tests
         [Fact]
         public void TestEnqueuWhenFull()
         {
-            var pareser = new Parser();
+            var serializer = new DefaultSerializer();
             var session = new Mock<IClientSession>();
             var messageOne = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
             var messageTwo = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
 
-            var sendQueue = new SendQueue(session.Object, 1, 0);
+            var sendQueue = new SendQueue(session.Object, serializer, 1, 0);
 
             // enqueu first message
             sendQueue.Enqueue(messageOne);
@@ -40,8 +42,7 @@ namespace Tests
             Assert.Equal(1, sendQueue.CurrentCuncurrency);
 
             // when release is called, send method of session should be called 
-            var ack = new Ack(messageOne.Id);
-            sendQueue.ReleaseOne(ack);
+            sendQueue.ReleaseOne(messageOne.Id);
 
             // verify send was called
             session.Verify(session => session.Send(It.IsAny<byte[]>()));
@@ -51,10 +52,11 @@ namespace Tests
         public void TestReleaseWhenMessageDoesNotExists()
         {
             var session = new Mock<IClientSession>();
-            var sendQueue = new SendQueue(session.Object, 1, 1);
+            var serializer = new DefaultSerializer();
+            var sendQueue = new SendQueue(session.Object, serializer, 1, 1);
             var randomId = Guid.NewGuid();
 
-            sendQueue.ReleaseOne(new Ack(randomId));
+            sendQueue.ReleaseOne(randomId);
 
             Assert.Equal(1, sendQueue.CurrentCuncurrency);
         }

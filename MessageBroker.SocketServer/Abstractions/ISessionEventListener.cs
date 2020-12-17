@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MessageBroker.SocketServer.Server
+namespace MessageBroker.SocketServer.Abstractions
 {
     public interface ISessionEventListener
     {
