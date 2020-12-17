@@ -25,7 +25,7 @@ namespace Tests
         }
 
         [Theory]
-        [InlineData(100)]
+        [InlineData(10_000)]
         public void TestPublishSubscribe(int count)
         {
             var resetEvent = new ManualResetEvent(false);

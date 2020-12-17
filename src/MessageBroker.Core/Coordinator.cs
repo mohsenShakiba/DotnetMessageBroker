@@ -58,7 +58,7 @@ namespace MessageBroker.Core
             var ack = new Ack(message.Id);
             var ackData = _parser.ToBinary(ack);
 
-            publisher.Send(ackData);
+            publisher.SendSync(ackData);
         }
 
         public void OnAck(Guid sessionId, Ack ack)
