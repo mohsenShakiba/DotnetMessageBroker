@@ -160,6 +160,7 @@ namespace MessageBroker.Core.Serialize
             var payload = data.Slice(17 + indexOfRouteDelimiter + 1, data.Length  - (17 + indexOfRouteDelimiter) - 2);
             var rentedMemory = ArrayPool<byte>.Shared.Rent(payload.Length);
             payload.CopyTo(rentedMemory);
+
             return new Message(messageId, route, rentedMemory);
         }
 
