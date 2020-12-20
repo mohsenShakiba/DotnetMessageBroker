@@ -1,4 +1,5 @@
-﻿using MessageBroker.Core.Extensions;
+﻿using MessageBroker.Core.BufferPool;
+using MessageBroker.Core.Extensions;
 using MessageBroker.Core.Models;
 using MessageBroker.Messages;
 using System;
@@ -12,6 +13,13 @@ namespace MessageBroker.Core.Serialize
 {
     public class DefaultSerializer : ISerializer
     {
+
+        private readonly IBufferPool _bufferPool;
+
+        public DefaultSerializer(IBufferPool bufferPool)
+        {
+            _bufferPool = bufferPool;
+        }
 
         #region Serialize
 
@@ -53,6 +61,8 @@ namespace MessageBroker.Core.Serialize
 
             buff.AddWithDelimiter(ModelTypes.Ack);
             buff.AddWithDelimiter(ack.Id);
+
+            ack.Id.TryWriteBytes()
 
             return buff.ToArray();
         }

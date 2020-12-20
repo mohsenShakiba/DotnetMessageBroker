@@ -1,5 +1,7 @@
 ﻿using MessageBroker.Core.MessageProcessor;
+using MessageBroker.Core.MessageRefStore;
 using MessageBroker.Core.Models;
+using MessageBroker.Core.Persistance;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Serialize;
 using MessageBroker.Messages;
@@ -17,16 +19,21 @@ namespace MessageBroker.Core
         private readonly ISerializer _serializer;
         private readonly MessageDispatcher _messageDispatcher;
         private readonly IRouteMatcher _routeMatcher;
+        private readonly IMessageStore _messageStore;
+        private readonly IMessageRefStore _messageRefStore;
         private readonly ILogger<Coordinator> _logger;
         private readonly ConcurrentDictionary<Guid, Subscriber> _subscribers;
         public int _stat;
 
-        public Coordinator(ISessionResolver sessionResolver, ISerializer serializer, MessageDispatcher messageDispatcher, IRouteMatcher routeMatcher, ILogger<Coordinator> logger)
+        public Coordinator(ISessionResolver sessionResolver, ISerializer serializer, MessageDispatcher messageDispatcher, 
+            IRouteMatcher routeMatcher, IMessageStore messageStore, IMessageRefStore messageRefStore, ILogger<Coordinator> logger)
         {
             _sessionResolver = sessionResolver;
             _serializer = serializer;
             _messageDispatcher = messageDispatcher;
             _routeMatcher = routeMatcher;
+            _messageStore = messageStore;
+            _messageRefStore = messageRefStore;
             _logger = logger;
             _subscribers = new();
         }
@@ -85,6 +92,9 @@ namespace MessageBroker.Core
 
             if (listOfSubscribersWhichShouldReceiveThisMessage.Count == 0)
                 return;
+
+            // setup ref count
+            _messageRefStore.SetUpRefCounter(message.Id, listOfSubscribersWhichShouldReceiveThisMessage.Count);
 
             // send to subscribers
             _messageDispatcher.Dispatch(message, listOfSubscribersWhichShouldReceiveThisMessage);

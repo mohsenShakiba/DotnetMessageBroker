@@ -1,4 +1,6 @@
-﻿using MessageBroker.Core.Models;
+﻿using MessageBroker.Core.BufferPool;
+using MessageBroker.Core.MessageRefStore;
+using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
 using MessageBroker.Messages;
 using MessageBroker.SocketServer.Abstractions;
@@ -20,6 +22,8 @@ namespace MessageBroker.Core
     {
         private readonly IClientSession _session;
         private readonly ISerializer _serializer;
+        private readonly IMessageRefStore _messageRefStore;
+        private readonly IBufferPool _bufferPool;
         private ConcurrentQueue<Message> _queue;
         private readonly List<Guid> _pendingMessages;
         private int _maxConcurrency;
@@ -31,12 +35,14 @@ namespace MessageBroker.Core
         private bool IsQueueFull => _currentConcurrency >= _maxConcurrency;
 
 
-        public SendQueue(IClientSession session, ISerializer serializer, int maxConcurrency, int currentConcurrency = 0)
+        public SendQueue(IClientSession session, ISerializer serializer, IMessageRefStore messageRefStore, IBufferPool bufferPool, int maxConcurrency, int currentConcurrency = 0)
         {
             _maxConcurrency = maxConcurrency;
             _currentConcurrency = currentConcurrency;
             _session = session;
             _serializer = serializer;
+            _messageRefStore = messageRefStore;
+            _bufferPool = bufferPool;
             _queue = new();
             _pendingMessages = new();
         }
@@ -95,6 +101,13 @@ namespace MessageBroker.Core
             _pendingMessages.Add(msg.Id);
             var b = _serializer.Serialize(msg);
             _session.Send(b);
+
+            // update ref store
+            if (_messageRefStore.ReleaseOne(msg.Id))
+            {
+                // if the ref store is clear, return the buffer to pool
+                _bufferPool.Release(msg.Id);
+            }
         }
 
 
