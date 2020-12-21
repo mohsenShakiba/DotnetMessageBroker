@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,7 +9,6 @@ namespace MessageBroker.Core.BufferPool
 {
     public interface IBufferPool
     {
-        void Release(Guid messageId);
-        Memory<byte> Reserve(int size, Guid messageId);
+        IMemoryOwner<byte> Rent(int size);
     }
 }

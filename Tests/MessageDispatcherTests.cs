@@ -1,4 +1,6 @@
 ﻿using MessageBroker.Core;
+using MessageBroker.Core.BufferPool;
+using MessageBroker.Core.MessageRefStore;
 using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
 using MessageBroker.Messages;
@@ -18,19 +20,21 @@ namespace Tests
         [Fact]
         public void TestDispatchMessage()
         {
+            var bufferPool = new DefaultBufferPool();
+            var messageRefStore = new DefaultMessageRefStore();
             var sessionId = Guid.NewGuid();
             var session = new Mock<IClientSession>(); 
             var sessionResolver = new Mock<ISessionResolver>();
-            var serializer = new DefaultSerializer();
+            var serializer = new DefaultSerializer(bufferPool);
 
             session.Setup(s => s.SessionId).Returns(sessionId);
             sessionResolver.Setup(sr => sr.Resolve(It.IsAny<Guid>())).Returns(session.Object);
 
-            var dispatcher = new MessageDispatcher(sessionResolver.Object, serializer);
+            var dispatcher = new MessageDispatcher(sessionResolver.Object, serializer, messageRefStore);
 
             dispatcher.AddSendQueue(sessionId, 1);
 
-            var message = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
+            var message = new Message { Id = Guid.NewGuid(), Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
 
             dispatcher.Dispatch(message, new Guid[] { session.Object.SessionId });
 

@@ -11,7 +11,7 @@ namespace MessageBroker.SocketServer.Abstractions
 
         Guid SessionId { get; }
 
-        void Send(byte[] payload);
+        void Send(Memory<byte> payload);
         void SendAsync(byte[] payload);
         void Close();
         void Dispose();

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Persistance
 {
-    class InMemoryMessageStore : IMessageStore
+    public class InMemoryMessageStore : IMessageStore
     {
         private readonly ConcurrentDictionary<Guid, byte[]> _messages;
 

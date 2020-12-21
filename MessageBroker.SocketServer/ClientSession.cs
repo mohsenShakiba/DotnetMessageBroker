@@ -197,11 +197,11 @@ namespace MessageBroker.SocketServer
 
         #region Send    
 
-        public void Send(byte[] payload)
+        public void Send(Memory<byte> payload)
         {
             var data = new byte[4 + payload.Length];
             var size = BitConverter.TryWriteBytes(data, payload.Length);
-            payload.CopyTo(data, 4);
+            payload.CopyTo(data.AsMemory().Slice(4));
             _socket.Send(data);
         }
 

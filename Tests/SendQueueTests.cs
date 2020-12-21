@@ -1,4 +1,6 @@
 ﻿using MessageBroker.Core;
+using MessageBroker.Core.BufferPool;
+using MessageBroker.Core.MessageRefStore;
 using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
 using MessageBroker.Messages;
@@ -19,12 +21,26 @@ namespace Tests
         [Fact]
         public void TestEnqueuWhenFull()
         {
-            var serializer = new DefaultSerializer();
+            var messageRefStore = new DefaultMessageRefStore();
+            var bufferPool = new DefaultBufferPool();
+            var serializer = new DefaultSerializer(bufferPool);
             var session = new Mock<IClientSession>();
-            var messageOne = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
-            var messageTwo = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("TEST"));
 
-            var sendQueue = new SendQueue(session.Object, serializer, 1, 0);
+            var messageOne = new Message
+            {
+                Id = Guid.NewGuid(),
+                Route = "TEST", 
+                Data = Encoding.UTF8.GetBytes("TEST")
+            };
+
+            var messageTwo = new Message
+            {
+                Id = Guid.NewGuid(),
+                Route = "TEST",
+                Data = Encoding.UTF8.GetBytes("TEST")
+            };
+
+            var sendQueue = new SendQueue(session.Object, serializer, messageRefStore, 1, 0);
 
             // enqueu first message
             sendQueue.Enqueue(messageOne);
@@ -51,9 +67,11 @@ namespace Tests
         [Fact]
         public void TestReleaseWhenMessageDoesNotExists()
         {
+            var messageRefStore = new DefaultMessageRefStore();
+            var bufferPool = new DefaultBufferPool();
+            var serializer = new DefaultSerializer(bufferPool);
             var session = new Mock<IClientSession>();
-            var serializer = new DefaultSerializer();
-            var sendQueue = new SendQueue(session.Object, serializer, 1, 1);
+            var sendQueue = new SendQueue(session.Object, serializer, messageRefStore, 1, 1);
             var randomId = Guid.NewGuid();
 
             sendQueue.ReleaseOne(randomId);

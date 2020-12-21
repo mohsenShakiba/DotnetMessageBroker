@@ -1,5 +1,8 @@
 ﻿using MessageBroker.Core;
+using MessageBroker.Core.BufferPool;
+using MessageBroker.Core.MessageRefStore;
 using MessageBroker.Core.Models;
+using MessageBroker.Core.Persistance;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer;
@@ -33,12 +36,15 @@ namespace Tests
 
             var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
-            var serializer = new DefaultSerializer();
-            var dispatcher = new MessageDispatcher(resolver, serializer);
+            var messageRefStore = new DefaultMessageRefStore();
+            var bufferPool = new DefaultBufferPool();
+            var messageStore = new InMemoryMessageStore();
+            var serializer = new DefaultSerializer(bufferPool);
+            var dispatcher = new MessageDispatcher(resolver, serializer, messageRefStore);
             var routeMatching = new DefaultRouteMatching();
             var publisherEventListener = new TestEventListener();
             var subscriberEventListener = new TestEventListener();
-            var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, loggerFactory.CreateLogger<Coordinator>());
+            var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, messageStore, messageRefStore, loggerFactory.CreateLogger<Coordinator>());
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
@@ -57,7 +63,7 @@ namespace Tests
             var subscriber = new ClientSession(subscriberEventListener, subscriberSocket, sessionConfiguration, loggerFactory.CreateLogger<ClientSession>());
 
             // send subscribe
-            var subscribe = new Subscribe(Guid.NewGuid(), 10);
+            var subscribe = new Subscribe { Id = Guid.NewGuid(), Concurrency = 10 };
             var subscribeB = serializer.Serialize(subscribe);
             subscriber.Send(subscribeB);
 

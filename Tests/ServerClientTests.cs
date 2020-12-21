@@ -1,4 +1,5 @@
-﻿using MessageBroker.Core.Models;
+﻿using MessageBroker.Core.BufferPool;
+using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer;
 using Microsoft.Extensions.Logging;
@@ -27,7 +28,8 @@ namespace Tests
             var resetEvent = new ManualResetEvent(false);
             var messageReceivedCount = count;
 
-            var serializer = new DefaultSerializer();
+            var bufferPool = new DefaultBufferPool();
+            var serializer = new DefaultSerializer(bufferPool);
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new TestMessageProcessor();
             var resolver = new SessionResolver();
@@ -44,9 +46,14 @@ namespace Tests
             Thread.Sleep(100);
 
             var messagePayload = RandomString(msgSize);
-            var message = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes(messagePayload));
+            var message = new Message
+            {
+                Id = Guid.NewGuid(),
+                Route = "TEST",
+                Data = Encoding.UTF8.GetBytes(messagePayload)
+            };
 
-            var payload = serializer.Serialize(message);
+            var payload = serializer.ToSendPayloadTest(message);
 
             messageProcessor.OnDataReceived += (_, msg) =>
             {
@@ -58,8 +65,8 @@ namespace Tests
 
             for (var i = 0; i < count; i++)
             {
-                client.Send(BitConverter.GetBytes(payload.Length));
-                client.Send(payload);
+                client.Send(BitConverter.GetBytes(payload.Data.Length));
+                client.Send(payload.Data.ToArray());
             }
 
             resetEvent.WaitOne();
@@ -77,7 +84,8 @@ namespace Tests
             var messageReceivedCount = count;
             Guid sessionId = new();
 
-            var serializer = new DefaultSerializer();
+            var bufferPool = new DefaultBufferPool();
+            var serializer = new DefaultSerializer(bufferPool);
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new TestMessageProcessor();
             var resolver = new SessionResolver();
@@ -102,21 +110,28 @@ namespace Tests
             Thread.Sleep(100);
 
             var messagePayload = RandomString(msgSize);
-            var message = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes(messagePayload));
+            var message = new Message
+            {
+                Id = Guid.NewGuid(),
+                Route = "TEST",
+                Data = Encoding.UTF8.GetBytes(messagePayload)
+            };
 
-            var payload = serializer.Serialize(message);
+            var payload = serializer.ToSendPayloadTest(message);
+
+            var data = payload.Data;
 
             Task.Factory.StartNew(() =>
             {
-                var buffer = new byte[payload.Length + 4];
+                var buffer = new byte[data.Length + 4];
 
                 for(var i = 0; i < count; i++)
                 {
                     var len = client.Receive(buffer);
 
-                    var msg = serializer.Deserialize(buffer.AsSpan(4).ToArray()) as Message;
+                    var msg = serializer.ToMessage(buffer.AsSpan(4).ToArray());
 
-                    Assert.Equal(messagePayload, Encoding.UTF8.GetString(msg.Data.AsSpan(0, msgSize)));
+                    Assert.Equal(messagePayload, Encoding.UTF8.GetString(msg.Data.Slice(0, msgSize).Span));
                 }
 
                 resetEvent.Set();
@@ -129,7 +144,7 @@ namespace Tests
 
             for (var i = 0; i < count; i++)
             {
-                clientSession.Send(payload);
+                clientSession.Send(payload.Data);
             }
 
             resetEvent.WaitOne();

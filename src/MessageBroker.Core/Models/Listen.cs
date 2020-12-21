@@ -6,5 +6,9 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Models
 {
-    public record Listen(Guid Id, string Route): IPayload;
+    public ref struct Listen
+    {
+        public Guid Id { get; init; }
+        public string Route { get; init; }
+    };
 }

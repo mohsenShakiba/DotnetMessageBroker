@@ -1,4 +1,5 @@
-﻿using MessageBroker.Core.Models;
+﻿using MessageBroker.Core.BufferPool;
+using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
 using MessageBroker.Messages;
 using System;
@@ -14,7 +15,8 @@ namespace Tests
 
         public ParserTests()
         {
-            _serializer = new DefaultSerializer();
+            var bufferPool = new DefaultBufferPool();
+            _serializer = new DefaultSerializer(bufferPool);
         }
 
         [Fact]

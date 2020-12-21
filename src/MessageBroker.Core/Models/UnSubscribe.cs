@@ -6,5 +6,9 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Models
 {
-    public record Nack(Guid Id): IPayload;
+    public ref struct UnSubscribe
+    {
+        public Guid Id { get; init; }
+        public int Concurrency { get; init; }
+    }
 }

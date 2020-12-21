@@ -50,32 +50,34 @@ namespace MessageBroker.Core
 
         public void DataReceived(Guid sessionId, Memory<byte> data)
         {
-            var payload = _serializer.Deserialize(data);
-
-            if (payload == null)
+            var type = _serializer.ParsePayloadType(data);
+            var payloadData = data.Slice(4).Span;
+            
+            switch (type)
             {
-                _logger.LogError($"failed to parse message from publisher: {sessionId}");
-            }
-
-            switch (payload)
-            {
-                case Message message:
+                case PayloadType.Msg:
+                    var message = _serializer.ToMessage(payloadData);
                     OnMessage(sessionId, message);
                     _stat += 1;
                     break;
-                case Ack ack:
+                case PayloadType.Ack:
+                    var ack = _serializer.ToAck(payloadData);
                     OnAck(sessionId, ack);
                     break;
-                case Nack nack:
+                case PayloadType.Nack:
+                    var nack = _serializer.ToAck(payloadData);
                     OnNack(sessionId, nack);
                     break;
-                case Listen listen:
+                case PayloadType.Listen:
+                    var listen = _serializer.ToListenRoute(payloadData);
                     OnListen(sessionId, listen);
                     break;
-                case Unlisten unlisten:
-                    OnUnListen(sessionId, unlisten);
+                case PayloadType.Unlisten:
+                    var unListen = _serializer.ToListenRoute(payloadData);
+                    OnUnListen(sessionId, unListen);
                     break;
-                case Subscribe subscribe:
+                case PayloadType.Subscribe:
+                    var subscribe = _serializer.ToSubscribe(payloadData);
                     OnSubscribe(sessionId, subscribe);
                     break;
             }
@@ -100,7 +102,7 @@ namespace MessageBroker.Core
             _messageDispatcher.Dispatch(message, listOfSubscribersWhichShouldReceiveThisMessage);
 
             // send received ack to publisher
-            AckRecieved(sessionId, message.Id);
+            SendRecievedPayloadAck(sessionId, message.Id);
         }
 
         public void OnAck(Guid sessionId, Ack ack)
@@ -108,7 +110,7 @@ namespace MessageBroker.Core
             _messageDispatcher.Release(ack.Id, new Guid[1] { sessionId });
         }
 
-        public void OnNack(Guid sessionId, Nack nack)
+        public void OnNack(Guid sessionId, Ack nack)
         {
             _messageDispatcher.Release(nack.Id, new Guid[1] { sessionId });
         }
@@ -124,10 +126,10 @@ namespace MessageBroker.Core
                 RegisterSubscriber(sessionId, listen.Route);
             }
 
-            AckRecieved(sessionId, listen.Id);
+            SendRecievedPayloadAck(sessionId, listen.Id);
         }
 
-        public void OnUnListen(Guid sessionId, Unlisten unlisten)
+        public void OnUnListen(Guid sessionId, Listen unlisten)
         {
             if (_subscribers.TryGetValue(sessionId, out var subscriber))
             {
@@ -138,7 +140,7 @@ namespace MessageBroker.Core
                 _logger.LogError($"failed to find subscriber with id: {sessionId}");
             }
 
-            AckRecieved(sessionId, unlisten.Id);
+            SendRecievedPayloadAck(sessionId, unlisten.Id);
         }
 
         private void OnSubscribe(Guid sessionId, Subscribe subscribe)
@@ -153,7 +155,12 @@ namespace MessageBroker.Core
             _subscribers[sessionId] = subscriber;
         }
 
-        private void AckRecieved(Guid sessionId, Guid payloadId)
+        /// <summary>
+        /// Ack that is sent to client indicating the payload has been successfully processed
+        /// </summary>
+        /// <param name="sessionId"></param>
+        /// <param name="payloadId"></param>
+        private void SendRecievedPayloadAck(Guid sessionId, Guid payloadId)
         {
             var session = _sessionResolver.Resolve(sessionId);
 
@@ -163,10 +170,14 @@ namespace MessageBroker.Core
                 return;
             }
 
-            var ack = new Ack(payloadId);
-            var ackData = _serializer.Serialize(ack);
+            var ack = new Ack
+            {
+                Id = payloadId
+            };
 
-            session.Send(ackData);
+            var ackData = _serializer.ToSendPayload(ack);
+
+            session.Send(ackData.Data);
 
         }
 
