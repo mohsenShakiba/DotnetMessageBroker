@@ -34,7 +34,11 @@ namespace Tests
 
             dispatcher.AddSendQueue(sessionId, 1);
 
-            var message = new Message { Id = Guid.NewGuid(), Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
+            var originalMessage = new Message { Id = Guid.NewGuid(), Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
+
+            var originalMessageSendData = serializer.ToSendPayloadTest(originalMessage);
+
+            var message = serializer.ToMessage(originalMessageSendData.Data.Span);
 
             dispatcher.Dispatch(message, new Guid[] { session.Object.SessionId });
 

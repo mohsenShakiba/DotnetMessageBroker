@@ -11,7 +11,7 @@ namespace Tests
     public class ParserTests
     {
 
-        private ISerializer _serializer;
+        private DefaultSerializer _serializer;
 
         public ParserTests()
         {
@@ -22,82 +22,57 @@ namespace Tests
         [Fact]
         public void TestParseAck()
         {
-            var ack = new Ack(Guid.NewGuid());
+            var ack = new Ack { Id = Guid.NewGuid() };
 
-            var b = _serializer.Serialize(ack);
+            var b = _serializer.ToSendPayload(ack);
 
-            var convertedAck = _serializer.Deserialize(b) as Ack;
+            var convertedAck = _serializer.ToAck(b.Data.Span);
 
-            Assert.IsType<Ack>(convertedAck);
             Assert.Equal(ack.Id, convertedAck.Id);
-        }
-
-        [Fact]
-        public void TestParseNack()
-        {
-            var nack = new Nack(Guid.NewGuid());
-
-            var b = _serializer.Serialize(nack);
-
-            var convertedNack = _serializer.Deserialize(b) as Nack;
-
-            Assert.IsType<Nack>(convertedNack);
-            Assert.Equal(nack.Id, convertedNack.Id);
         }
 
         [Fact]
         public void TestParseMessage()
         {
-            var msg = new Message(Guid.NewGuid(), "TEST", Encoding.UTF8.GetBytes("DATA"));
+            var msg = new Message
+            {
+                Id = Guid.NewGuid(),
+                Route = "TEST",
+                Data = Encoding.UTF8.GetBytes("DATA")
+            };
 
-            var b = _serializer.Serialize(msg);
+            var b = _serializer.ToSendPayloadTest(msg);
 
-            var convertedMsg = _serializer.Deserialize(b) as Message;
+            var convertedMsg = _serializer.ToMessage(b.Data.Span);
 
-            Assert.IsType<Message>(convertedMsg);
             Assert.Equal(msg.Id, convertedMsg.Id);
             Assert.Equal(msg.Route, convertedMsg.Route);
-            Assert.Equal(Encoding.UTF8.GetString(msg.Data), Encoding.UTF8.GetString(convertedMsg.Data.AsMemory().Trim(Encoding.UTF8.GetBytes("\0")).ToArray()));
+            Assert.Equal(Encoding.UTF8.GetString(msg.Data.ToArray()), Encoding.UTF8.GetString(convertedMsg.Data.Trim(Encoding.UTF8.GetBytes("\0")).ToArray()));
         }
 
         [Fact]
         public void TestParseListen()
         {
-            var listen = new Listen(Guid.NewGuid(), "TEST");
+            var listen = new Listen { Id = Guid.NewGuid(), Route = "TEST" };
 
-            var b = _serializer.Serialize(listen);
+            var b = _serializer.ToSendPayload(listen);
 
-            var convertedListen = _serializer.Deserialize(b) as Listen;
+            var convertedListen = _serializer.ToListenRoute(b.Data.Span);
 
-            Assert.IsType<Listen>(convertedListen);
             Assert.Equal(listen.Id, convertedListen.Id);
             Assert.Equal(listen.Route, convertedListen.Route);
         }
 
-        [Fact]
-        public void TestParseUnlisten()
-        {
-            var unlisten = new Unlisten(Guid.NewGuid(), "TEST");
-
-            var b = _serializer.Serialize(unlisten);
-
-            var convertedUnlisten = _serializer.Deserialize(b) as Unlisten;
-
-            Assert.IsType<Unlisten>(convertedUnlisten);
-            Assert.Equal(unlisten.Id, convertedUnlisten.Id);
-            Assert.Equal(unlisten.Route, convertedUnlisten.Route);
-        }
 
         [Fact]
         public void TestParseSubscribe()
         {
-            var subscribe = new Subscribe(Guid.NewGuid(), 10);
+            var subscribe = new Subscribe { Id = Guid.NewGuid(), Concurrency = 10 };
 
-            var b = _serializer.Serialize(subscribe);
+            var b = _serializer.ToSendPayload(subscribe);
 
-            var convertedSubscribe = _serializer.Deserialize(b) as Subscribe;
+            var convertedSubscribe = _serializer.ToSubscribe(b.Data.Span);
 
-            Assert.IsType<Subscribe>(convertedSubscribe);
             Assert.Equal(subscribe.Id, convertedSubscribe.Id);
             Assert.Equal(subscribe.Concurrency, convertedSubscribe.Concurrency);
         }

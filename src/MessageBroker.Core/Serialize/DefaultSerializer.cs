@@ -45,18 +45,16 @@ namespace MessageBroker.Core.Serialize
 
         public SendPayload ToSendPayload(Ack ack)
         {
-            var size = GuidSize + PayloadTypeSize;
-            var memoryOwner = _bufferPool.Rent(size);
+            var builder = new SendPayloadBuilder(PayloadType.Ack);
 
-            var span = memoryOwner.Memory.Span.Slice(0, size);
+            builder.InitiateBuffer();
 
-            BitConverter.TryWriteBytes(span, (int)PayloadType.Ack);
-            ack.Id.TryWriteBytes(span.Slice(PayloadTypeSize));
+            builder.WriteGuid(ack.Id);
 
             return new SendPayload
             {
-                MemoryOwner = memoryOwner,
-                Data = memoryOwner.Memory
+                Data = builder.Data,
+                MemoryOwner = builder.MemoryOwner
             };
         }
 
@@ -72,7 +70,7 @@ namespace MessageBroker.Core.Serialize
 
             var span = memoryOwner.Memory.Span.Slice(0, size);
 
-            BitConverter.TryWriteBytes(span, (int)PayloadType.Nack);
+            BitConverter.TryWriteBytes(span, (int)PayloadType.Msg);
             msg.Id.TryWriteBytes(span.Slice(PayloadTypeSize));
             var routeB = Encoding.UTF8.GetBytes(msg.Route);
             routeB.CopyTo(span.Slice(PayloadTypeSize + GuidSize));
@@ -95,6 +93,43 @@ namespace MessageBroker.Core.Serialize
 
         }
 
+        public SendPayload ToSendPayload(Subscribe sub)
+        {
+            var size = GuidSize + PayloadTypeSize + 4;
+            var memoryOwner = _bufferPool.Rent(size);
+
+            var span = memoryOwner.Memory.Span.Slice(0, size);
+
+            BitConverter.TryWriteBytes(span, (int)PayloadType.Ack);
+            sub.Id.TryWriteBytes(span.Slice(PayloadTypeSize));
+            BitConverter.TryWriteBytes(span.Slice(PayloadTypeSize + GuidSize), sub.Concurrency);
+
+            return new SendPayload
+            {
+                MemoryOwner = memoryOwner,
+                Data = memoryOwner.Memory
+            };
+
+        }
+
+        public SendPayload ToSendPayload(Listen listen)
+        {
+            var size = GuidSize + PayloadTypeSize + listen.Route.Length;
+            var memoryOwner = _bufferPool.Rent(size);
+
+            var span = memoryOwner.Memory.Span.Slice(0, size);
+
+            BitConverter.TryWriteBytes(span, (int)PayloadType.Ack);
+            listen.Id.TryWriteBytes(span.Slice(PayloadTypeSize));
+            Encoding.UTF8.GetBytes(listen.Route).CopyTo(span.Slice(PayloadTypeSize + GuidSize));
+
+            return new SendPayload
+            {
+                MemoryOwner = memoryOwner,
+                Data = memoryOwner.Memory
+            };
+        }
+
         #endregion
 
         #region Deserialize
@@ -108,14 +143,14 @@ namespace MessageBroker.Core.Serialize
 
         public Ack ToAck(Span<byte> data)
         {
-            var dataTrimmed = data.TrimEnd(Delimiter);
-            var messageId = new Guid(dataTrimmed);
+            var messageId = new Guid(data.Slice(10, 16));
             return new Ack { Id = messageId };
         }
 
 
         public Message ToMessage(Span<byte> data)
         {
+            data = data.Slice(4);
             var messageMemoryOwner = _bufferPool.Rent(data.Length);
 
             data.CopyTo(messageMemoryOwner.Memory.Span);
@@ -135,6 +170,7 @@ namespace MessageBroker.Core.Serialize
 
         public Listen ToListenRoute(Span<byte> data)
         {
+            data = data.Slice(4);
             var id = new Guid(data.Slice(0, 16));
             var route = Encoding.UTF8.GetString(data.Slice(17, data.Length - 18));
 
@@ -148,6 +184,7 @@ namespace MessageBroker.Core.Serialize
 
         public Subscribe ToSubscribe(Span<byte> data)
         {
+            data = data.Slice(4);
             var id = new Guid(data.Slice(0, 16));
             var concurrency = BitConverter.ToInt32(data.Slice(17, 4));
 

@@ -5,6 +5,7 @@ using MessageBroker.Core.Models;
 using MessageBroker.Core.Persistance;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Serialize;
+using MessageBroker.Messages;
 using MessageBroker.SocketServer;
 using Microsoft.Extensions.Logging;
 using System;
@@ -64,15 +65,15 @@ namespace Tests
 
             // send subscribe
             var subscribe = new Subscribe { Id = Guid.NewGuid(), Concurrency = 10 };
-            var subscribeB = serializer.Serialize(subscribe);
-            subscriber.Send(subscribeB);
+            var subscribeB = serializer.ToSendPayload(subscribe);
+            subscriber.Send(subscribeB.Data);
 
             Thread.Sleep(1000);
 
             // send listen
-            var listen = new Listen(Guid.NewGuid(), "TEST");
-            var listenB = serializer.Serialize(listen);
-            subscriber.Send(listenB);
+            var listen = new Listen { Id = Guid.NewGuid(), Route = "TEST" };
+            var listenB = serializer.ToSendPayload(listen);
+            subscriber.Send(listenB.Data);
 
             Thread.Sleep(1000);
 
@@ -83,19 +84,21 @@ namespace Tests
             {
                 subscriberEventListener.ReceivedEvent += (_, d) =>
                 {
-                    var receivedMessage = serializer.Deserialize(d);
-                    switch (receivedMessage)
+                    var payloadType = serializer.ParsePayloadType(d);
+
+                    switch (payloadType)
                     {
-                        case Message m:
+                        case PayloadType.Msg:
+                            var receivedMessage = serializer.ToMessage(d.Span);
                             Interlocked.Increment(ref receivedMessageCount);
                             if (receivedMessageCount == count)
                                 resetEvent.Set();
 
-                            var ack = new Ack(m.Id);
-                            var ackB = serializer.Serialize(ack);
-                            subscriber.Send(ackB);
+                            var ack = new Ack { Id = receivedMessage.Id };
+                            var ackB = serializer.ToSendPayload(ack);
+                            subscriber.Send(ackB.Data);
                             break;
-                        case Ack a:
+                        case PayloadType.Ack:
                             break;
                         default:
                             throw new Exception("test");
@@ -107,10 +110,11 @@ namespace Tests
             {
                 publisherEventListener.ReceivedEvent += (_, d) =>
                 {
-                    var receivedMessage = serializer.Deserialize(d);
-                    switch (receivedMessage)
+                    var payloadType = serializer.ParsePayloadType(d);
+                    switch (payloadType)
                     {
-                        case Ack a:
+                        case PayloadType.Ack:
+                            var receivedMessage = serializer.ToMessage(d.Span);
                             Interlocked.Increment(ref receivedAckCount);
                             if (receivedAckCount == count)
                                 publisherAck.Set();
@@ -125,26 +129,26 @@ namespace Tests
             {
                 for (var i = 0; i < count; i++)
                 {
-                var guid = Guid.NewGuid();
-                var delimiter = Encoding.UTF8.GetBytes("\n").First();
+                    var guid = Guid.NewGuid();
+                    var delimiter = Encoding.UTF8.GetBytes("\n").First();
 
-                while (true)
-                {
-                    var s = guid.ToByteArray().AsSpan();
-                    if (s.Contains(delimiter))
+                    while (true)
                     {
-                        guid = Guid.NewGuid();
-                    }
-                    else
-                    {
-                        break;
+                        var s = guid.ToByteArray().AsSpan();
+                        if (s.Contains(delimiter))
+                        {
+                            guid = Guid.NewGuid();
+                        }
+                        else
+                        {
+                            break;
+                        }
+
                     }
 
-                }
-
-                var message = new Message(guid, "TEST", Encoding.UTF8.GetBytes("TEST"));
-                    var messageB = serializer.Serialize(message);
-                    publisher.Send(messageB);
+                    var message = new Message { Id = guid, Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
+                    var messageB = serializer.ToSendPayloadTest(message);
+                    publisher.Send(messageB.Data);
                 }
             });
 
