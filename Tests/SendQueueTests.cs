@@ -46,7 +46,7 @@ namespace Tests
             sendQueue.Enqueue(messageOne);
 
             // make sure send method was called
-            session.Verify(session => session.Send(It.IsAny<byte[]>()));
+            session.Verify(session => session.Send(It.IsAny<Memory<byte>>()));
 
             // enqueue second message
             sendQueue.Enqueue(messageTwo);
@@ -61,7 +61,7 @@ namespace Tests
             sendQueue.ReleaseOne(messageOne.Id);
 
             // verify send was called
-            session.Verify(session => session.Send(It.IsAny<byte[]>()));
+            session.Verify(session => session.Send(It.IsAny<Memory<byte>>()));
         }
 
         [Fact]

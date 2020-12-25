@@ -199,10 +199,7 @@ namespace MessageBroker.SocketServer
 
         public void Send(Memory<byte> payload)
         {
-            var data = new byte[4 + payload.Length];
-            var size = BitConverter.TryWriteBytes(data, payload.Length);
-            payload.CopyTo(data.AsMemory().Slice(4));
-            _socket.Send(data);
+            _socket.Send(payload.Span);
         }
 
         public void SendAsync(byte[] payload)
@@ -237,7 +234,14 @@ namespace MessageBroker.SocketServer
         {
             _logger.LogInformation($"received {buff.Length} from client");
 
-            _eventListener.OnReceived(SessionId, buff);
+            try
+            {
+                _eventListener.OnReceived(SessionId, buff);
+            }
+            catch (Exception)
+            {
+                throw;
+            }
         }
 
         public void Close()

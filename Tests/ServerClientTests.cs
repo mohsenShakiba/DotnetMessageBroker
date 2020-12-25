@@ -53,7 +53,7 @@ namespace Tests
                 Data = Encoding.UTF8.GetBytes(messagePayload)
             };
 
-            var payload = serializer.ToSendPayloadTest(message);
+            var payload = serializer.ToSendPayload(message);
 
             messageProcessor.OnDataReceived += (_, msg) =>
             {
@@ -117,19 +117,19 @@ namespace Tests
                 Data = Encoding.UTF8.GetBytes(messagePayload)
             };
 
-            var payload = serializer.ToSendPayloadTest(message);
+            var payload = serializer.ToSendPayload(message);
 
             var data = payload.Data;
 
             Task.Factory.StartNew(() =>
             {
-                var buffer = new byte[data.Length + 4];
+                var buffer = new byte[data.Length];
 
                 for(var i = 0; i < count; i++)
                 {
                     var len = client.Receive(buffer);
 
-                    var msg = serializer.ToMessage(buffer.AsSpan(4).ToArray());
+                    var msg = serializer.ToMessage(buffer.AsSpan(4));
 
                     Assert.Equal(messagePayload, Encoding.UTF8.GetString(msg.Data.Slice(0, msgSize).Span));
                 }

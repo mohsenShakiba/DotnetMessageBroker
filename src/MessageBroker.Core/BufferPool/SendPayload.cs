@@ -12,6 +12,7 @@ namespace MessageBroker.Core.BufferPool
     {
         public IMemoryOwner<byte> MemoryOwner { get; init; }
         public Memory<byte> Data { get; init; }
+        public Span<byte> DataWithoutSize => Data.Slice(4).Span;
 
         public void Dispose()
         {

@@ -51,8 +51,8 @@ namespace MessageBroker.Core
         public void DataReceived(Guid sessionId, Memory<byte> data)
         {
             var type = _serializer.ParsePayloadType(data);
-            var payloadData = data.Slice(4).Span;
-            
+            var payloadData = data.Span;
+
             switch (type)
             {
                 case PayloadType.Msg:

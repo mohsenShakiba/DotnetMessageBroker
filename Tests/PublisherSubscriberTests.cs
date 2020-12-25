@@ -114,7 +114,7 @@ namespace Tests
                     switch (payloadType)
                     {
                         case PayloadType.Ack:
-                            var receivedMessage = serializer.ToMessage(d.Span);
+                            var receivedMessage = serializer.ToAck(d.Span);
                             Interlocked.Increment(ref receivedAckCount);
                             if (receivedAckCount == count)
                                 publisherAck.Set();
@@ -129,30 +129,19 @@ namespace Tests
             {
                 for (var i = 0; i < count; i++)
                 {
-                    var guid = Guid.NewGuid();
-                    var delimiter = Encoding.UTF8.GetBytes("\n").First();
-
-                    while (true)
+                    try
                     {
-                        var s = guid.ToByteArray().AsSpan();
-                        if (s.Contains(delimiter))
-                        {
-                            guid = Guid.NewGuid();
-                        }
-                        else
-                        {
-                            break;
-                        }
-
+                        var guid = Guid.NewGuid();
+                        var message = new Message { Id = guid, Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
+                        var messageB = serializer.ToSendPayload(message);
+                        publisher.Send(messageB.Data);
                     }
-
-                    var message = new Message { Id = guid, Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
-                    var messageB = serializer.ToSendPayloadTest(message);
-                    publisher.Send(messageB.Data);
+                    catch (Exception)
+                    {
+                        throw;
+                    }
                 }
             });
-
-
 
             while (receivedMessageCount != count)
             {
