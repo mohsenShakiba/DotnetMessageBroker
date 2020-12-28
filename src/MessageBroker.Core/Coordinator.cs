@@ -146,6 +146,7 @@ namespace MessageBroker.Core
         private void OnSubscribe(Guid sessionId, Subscribe subscribe)
         {
             _messageDispatcher.AddSendQueue(sessionId, subscribe.Concurrency);
+            SendRecievedPayloadAck(sessionId, subscribe.Id);
         }
 
         private void RegisterSubscriber(Guid sessionId, string route)

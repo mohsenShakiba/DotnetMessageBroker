@@ -23,7 +23,7 @@ namespace MessageBroker.Core
         private readonly IClientSession _session;
         private readonly ISerializer _serializer;
         private readonly IMessageRefStore _messageRefStore;
-        private readonly ConcurrentQueue<Message> _queue;
+        private readonly ConcurrentQueue<SendPayload> _queue;
         private readonly List<Guid> _pendingMessages;
         private int _maxConcurrency;
         private int _currentConcurrency;
@@ -54,7 +54,8 @@ namespace MessageBroker.Core
         {
             if (IsQueueFull)
             {
-                _queue.Enqueue(message);
+                var sendPayload = _serializer.ToSendPayload(message);
+                _queue.Enqueue(sendPayload);
             }
             else
             {
@@ -93,11 +94,11 @@ namespace MessageBroker.Core
         /// it will also increament the _currentConcurrency and add the message to _pendingMessages list
         /// </summary>
         /// <param name="msg"></param>
-        public void Send(Message msg)
+        public void Send(SendPayload sendPayload)
         {
+            
             Interlocked.Increment(ref _currentConcurrency);
             _pendingMessages.Add(msg.Id);
-            var b = _serializer.ToSendPayload(msg);
             _session.Send(b.Data);
 
             // update ref store

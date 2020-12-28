@@ -64,6 +64,7 @@ namespace MessageBroker.Core.Serialize
 
             return new SendPayload
             {
+                Id = ack.Id,
                 Data = memoryOwner.Memory.Slice(0, payloadSize),
                 MemoryOwner = memoryOwner
             };
@@ -102,6 +103,7 @@ namespace MessageBroker.Core.Serialize
 
             return new SendPayload
             {
+                Id = msg.Id,
                 Data = memoryOwner.Memory.Slice(0, payloadSize),
                 MemoryOwner = memoryOwner
             };
@@ -134,6 +136,7 @@ namespace MessageBroker.Core.Serialize
 
             return new SendPayload
             {
+                Id = sub.Id,
                 Data = memoryOwner.Memory.Slice(0, payloadSize),
                 MemoryOwner = memoryOwner
             };
@@ -167,6 +170,7 @@ namespace MessageBroker.Core.Serialize
 
             return new SendPayload
             {
+                Id = listen.Id,
                 Data = memoryOwner.Memory.Slice(0, payloadSize),
                 MemoryOwner = memoryOwner
             };

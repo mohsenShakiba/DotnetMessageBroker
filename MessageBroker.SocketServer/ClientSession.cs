@@ -233,15 +233,8 @@ namespace MessageBroker.SocketServer
         protected void OnReceived(Memory<byte> buff)
         {
             _logger.LogInformation($"received {buff.Length} from client");
+            _eventListener.OnReceived(SessionId, buff);
 
-            try
-            {
-                _eventListener.OnReceived(SessionId, buff);
-            }
-            catch (Exception)
-            {
-                throw;
-            }
         }
 
         public void Close()

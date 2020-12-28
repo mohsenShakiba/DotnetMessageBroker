@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Models
 {
-    public struct Message
+    public ref struct Message
     {
         public Guid Id { get; init; }
         public string Route { get; init; }
