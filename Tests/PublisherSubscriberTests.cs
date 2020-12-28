@@ -97,6 +97,7 @@ namespace Tests
                             var ack = new Ack { Id = receivedMessage.Id };
                             var ackB = serializer.ToSendPayload(ack);
                             subscriber.Send(ackB.Data);
+
                             break;
                         case PayloadType.Ack:
                             break;

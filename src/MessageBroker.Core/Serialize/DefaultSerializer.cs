@@ -51,7 +51,7 @@ namespace MessageBroker.Core.Serialize
             var bufferSpan = memoryOwner.Memory.Span;
 
             // write payload size
-            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize);
+            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
 
             // write payload type
             BitConverter.TryWriteBytes(bufferSpan.Slice(4, 4), (int)PayloadType.Ack);
@@ -77,7 +77,7 @@ namespace MessageBroker.Core.Serialize
             var bufferSpan = memoryOwner.Memory.Span;
 
             // write payload size
-            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize);
+            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
 
             // write payload type
             BitConverter.TryWriteBytes(bufferSpan.Slice(4, 4), (int)PayloadType.Msg);
@@ -117,7 +117,7 @@ namespace MessageBroker.Core.Serialize
             var bufferSpan = memoryOwner.Memory.Span;
 
             // write payload size
-            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize);
+            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
 
             // write payload type
             BitConverter.TryWriteBytes(bufferSpan.Slice(4, 4), (int)PayloadType.Subscribe);
@@ -150,7 +150,7 @@ namespace MessageBroker.Core.Serialize
             var bufferSpan = memoryOwner.Memory.Span;
 
             // write payload size
-            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize);
+            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
 
             // write payload type
             BitConverter.TryWriteBytes(bufferSpan.Slice(4, 4), (int)PayloadType.Listen);
