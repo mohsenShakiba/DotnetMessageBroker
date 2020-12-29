@@ -26,7 +26,7 @@ namespace Tests
 
             var b = _serializer.ToSendPayload(ack);
 
-            var convertedAck = _serializer.ToAck(b.DataWithoutSize);
+            var convertedAck = _serializer.ToAck(b.DataWithoutSize.Span);
 
             Assert.Equal(ack.Id, convertedAck.Id);
         }
@@ -43,7 +43,7 @@ namespace Tests
 
             var b = _serializer.ToSendPayload(msg);
 
-            var convertedMsg = _serializer.ToMessage(b.DataWithoutSize);
+            var convertedMsg = _serializer.ToMessage(b.DataWithoutSize.Span);
 
             Assert.Equal(msg.Id, convertedMsg.Id);
             Assert.Equal(msg.Route, convertedMsg.Route);
@@ -57,7 +57,7 @@ namespace Tests
 
             var b = _serializer.ToSendPayload(listen);
 
-            var convertedListen = _serializer.ToListenRoute(b.DataWithoutSize);
+            var convertedListen = _serializer.ToListenRoute(b.DataWithoutSize.Span);
 
             Assert.Equal(listen.Id, convertedListen.Id);
             Assert.Equal(listen.Route, convertedListen.Route);
@@ -71,7 +71,7 @@ namespace Tests
 
             var b = _serializer.ToSendPayload(subscribe);
 
-            var convertedSubscribe = _serializer.ToSubscribe(b.DataWithoutSize);
+            var convertedSubscribe = _serializer.ToSubscribe(b.DataWithoutSize.Span);
 
             Assert.Equal(subscribe.Id, convertedSubscribe.Id);
             Assert.Equal(subscribe.Concurrency, convertedSubscribe.Concurrency);

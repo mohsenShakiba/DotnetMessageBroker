@@ -5,6 +5,7 @@ using MessageBroker.Core.Serialize;
 using MessageBroker.Messages;
 using MessageBroker.SocketServer.Abstractions;
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -52,14 +53,15 @@ namespace MessageBroker.Core
         /// <param name="message">The message that must be sent</param>
         public void Enqueue(Message message)
         {
+            var sendPayload = _serializer.ToSendPayload(message);
+
             if (IsQueueFull)
             {
-                var sendPayload = _serializer.ToSendPayload(message);
                 _queue.Enqueue(sendPayload);
             }
             else
             {
-                Send(message);
+                Send(sendPayload);
             }
         }
 
@@ -98,14 +100,14 @@ namespace MessageBroker.Core
         {
             
             Interlocked.Increment(ref _currentConcurrency);
-            _pendingMessages.Add(msg.Id);
-            _session.Send(b.Data);
+            _pendingMessages.Add(sendPayload.Id);
+            _session.Send(sendPayload.Data);
 
             // update ref store
-            if (_messageRefStore.ReleaseOne(msg.Id))
+            if (_messageRefStore.ReleaseOne(sendPayload.Id))
             {
                 // if the ref store is clear, return the buffer to pool
-                b.Dispose();
+                ArrayPool<byte>.Shared.Return(sendPayload.OriginalData);
             }
         }
 

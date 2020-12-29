@@ -33,7 +33,7 @@ namespace Benchmarks
         {
             var ack = new Ack { Id = Guid.NewGuid() };
             var res = _serializer.ToSendPayload(ack);
-            res.Dispose();
+            ArrayPool<byte>.Shared.Return(res.OriginalData);
         }
 
     }

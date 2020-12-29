@@ -9,6 +9,7 @@ namespace MessageBroker.Core.BufferPool
 {
     public interface IBufferPool
     {
-        IMemoryOwner<byte> Rent(int size);
+        byte[] Rent(int size);
+        void Return(byte[] data);
     }
 }

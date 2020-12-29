@@ -2,6 +2,7 @@
 using MessageBroker.Core.Extensions;
 using MessageBroker.Core.Models;
 using MessageBroker.Messages;
+using Microsoft.Extensions.ObjectPool;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -48,7 +49,7 @@ namespace MessageBroker.Core.Serialize
         {
             var payloadSize = 4 + 4 + 1 + 16 + 1;
             var memoryOwner = _bufferPool.Rent(payloadSize);
-            var bufferSpan = memoryOwner.Memory.Span;
+            var bufferSpan = memoryOwner.AsSpan();
 
             // write payload size
             BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
@@ -61,12 +62,14 @@ namespace MessageBroker.Core.Serialize
 
             // write id
             ack.Id.TryWriteBytes(bufferSpan.Slice(9, 16));
+            memory.
 
-            return new SendPayload
+
+            return memory
             {
                 Id = ack.Id,
-                Data = memoryOwner.Memory.Slice(0, payloadSize),
-                MemoryOwner = memoryOwner
+                OriginalData = memoryOwner,
+                PayloadSize = payloadSize,
             };
         }
 
@@ -74,7 +77,7 @@ namespace MessageBroker.Core.Serialize
         {
             var payloadSize = 4 + 4 + 1 + 16 + 1 + msg.Route.Length + 1 + msg.Data.Length + 1;
             var memoryOwner = _bufferPool.Rent(payloadSize);
-            var bufferSpan = memoryOwner.Memory.Span;
+            var bufferSpan = memoryOwner.AsSpan();
 
             // write payload size
             BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
@@ -99,13 +102,13 @@ namespace MessageBroker.Core.Serialize
             BitConverter.TryWriteBytes(bufferSpan.Slice(26 + routeB.Length, 1), '\n');
 
             // write data 
-            msg.Data.CopyTo(memoryOwner.Memory.Slice(26 + routeB.Length + 1, msg.Data.Length));
+            msg.Data.CopyTo(memoryOwner.AsMemory().Slice(26 + routeB.Length + 1, msg.Data.Length));
 
             return new SendPayload
             {
                 Id = msg.Id,
-                Data = memoryOwner.Memory.Slice(0, payloadSize),
-                MemoryOwner = memoryOwner
+                OriginalData = memoryOwner,
+                PayloadSize = payloadSize,
             };
 
         }
@@ -114,7 +117,7 @@ namespace MessageBroker.Core.Serialize
         {
             var payloadSize = 4 + 4 + 1 + 16 + 1 + 4 + 1;
             var memoryOwner = _bufferPool.Rent(payloadSize);
-            var bufferSpan = memoryOwner.Memory.Span;
+            var bufferSpan = memoryOwner.AsSpan();
 
             // write payload size
             BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
@@ -137,8 +140,8 @@ namespace MessageBroker.Core.Serialize
             return new SendPayload
             {
                 Id = sub.Id,
-                Data = memoryOwner.Memory.Slice(0, payloadSize),
-                MemoryOwner = memoryOwner
+                OriginalData = memoryOwner,
+                PayloadSize = payloadSize,
             };
 
         }
@@ -147,7 +150,7 @@ namespace MessageBroker.Core.Serialize
         {
             var payloadSize = 4 + 4 + 1 + 16 + 1 + listen.Route.Length + 1;
             var memoryOwner = _bufferPool.Rent(payloadSize);
-            var bufferSpan = memoryOwner.Memory.Span;
+            var bufferSpan = memoryOwner.AsSpan();
 
             // write payload size
             BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
@@ -171,8 +174,8 @@ namespace MessageBroker.Core.Serialize
             return new SendPayload
             {
                 Id = listen.Id,
-                Data = memoryOwner.Memory.Slice(0, payloadSize),
-                MemoryOwner = memoryOwner
+                OriginalData = memoryOwner,
+                PayloadSize = payloadSize,
             };
         }
 
@@ -206,15 +209,15 @@ namespace MessageBroker.Core.Serialize
 
                 var messageMemoryOwner = _bufferPool.Rent(data.Length - (18 + indexOfRouteDelimiter));
 
-                data.Slice(18 + indexOfRouteDelimiter).CopyTo(messageMemoryOwner.Memory.Span);
+                data.Slice(18 + indexOfRouteDelimiter).CopyTo(messageMemoryOwner.AsSpan());
 
                 return new Message
                 {
 
                     Id = messageId,
                     Route = route,
-                    Data = messageMemoryOwner.Memory,
-                    OriginalMessageMemoryOwner = messageMemoryOwner
+                    Data = messageMemoryOwner,
+                    OriginalMessageData = messageMemoryOwner
                 };
             }
             catch

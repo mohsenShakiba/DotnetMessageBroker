@@ -12,6 +12,6 @@ namespace MessageBroker.Core.Models
         public Guid Id { get; init; }
         public string Route { get; init; }
         public Memory<byte> Data { get; init; }
-        public IMemoryOwner<byte> OriginalMessageMemoryOwner { get; init; }
+        public byte[] OriginalMessageData { get; init; }
     }
 }

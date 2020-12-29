@@ -16,10 +16,15 @@ namespace MessageBroker.Core.BufferPool
         {
         }
 
-        public IMemoryOwner<byte> Rent(int size)
+        public byte[] Rent(int size)
         {
-            var memoryOwner = MemoryPool<byte>.Shared.Rent(size);
+            var memoryOwner = ArrayPool<byte>.Shared.Rent(size);
             return memoryOwner;
+        }
+
+        public void Return(byte[] data)
+        {
+            ArrayPool<byte>.Shared.Return(data);
         }
     }
 }
