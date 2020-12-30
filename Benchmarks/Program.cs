@@ -13,12 +13,13 @@ namespace Benchmarks
     public class TestMessageConversion
     {
 
+        private readonly IBufferPool _bufferPool;
         private readonly ISerializer _serializer;
 
         public TestMessageConversion()
         {
-            var bufferPool = new DefaultBufferPool();
-            _serializer = new DefaultSerializer(bufferPool);
+            _bufferPool = new DefaultBufferPool();
+            _serializer = new DefaultSerializer(_bufferPool);
         }
 
         [Benchmark]
@@ -34,6 +35,7 @@ namespace Benchmarks
             var ack = new Ack { Id = Guid.NewGuid() };
             var res = _serializer.ToSendPayload(ack);
             ArrayPool<byte>.Shared.Return(res.OriginalData);
+            _bufferPool.ReturnSendPayload(res);
         }
 
     }

@@ -47,6 +47,7 @@ namespace MessageBroker.Core.Serialize
 
         public SendPayload ToSendPayload(Ack ack)
         {
+            var sendPayload = _bufferPool.RendSendPayload();
             var payloadSize = 4 + 4 + 1 + 16 + 1;
             var memoryOwner = _bufferPool.Rent(payloadSize);
             var bufferSpan = memoryOwner.AsSpan();
@@ -62,15 +63,11 @@ namespace MessageBroker.Core.Serialize
 
             // write id
             ack.Id.TryWriteBytes(bufferSpan.Slice(9, 16));
-            memory.
+            sendPayload.Id = ack.Id;
+            sendPayload.OriginalData = memoryOwner;
+            sendPayload.PayloadSize = payloadSize;
 
-
-            return memory
-            {
-                Id = ack.Id,
-                OriginalData = memoryOwner,
-                PayloadSize = payloadSize,
-            };
+            return sendPayload;
         }
 
         public SendPayload ToSendPayload(Message msg)

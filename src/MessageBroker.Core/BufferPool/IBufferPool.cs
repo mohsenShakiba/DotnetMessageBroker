@@ -11,5 +11,7 @@ namespace MessageBroker.Core.BufferPool
     {
         byte[] Rent(int size);
         void Return(byte[] data);
+        SendPayload RendSendPayload();
+        void ReturnSendPayload(SendPayload payload);
     }
 }
