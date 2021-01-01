@@ -71,12 +71,20 @@ namespace MessageBroker.Core
         /// <param name="destinations">Array of Guids that the message must be dispatched to</param>
         public void Dispatch(Message msg, IEnumerable<Guid> destinations)
         {
-            foreach(var destination in destinations)
+            foreach (var destination in destinations)
             {
                 if (_sendQueues.TryGetValue(destination, out var sendQueue))
                 {
                     sendQueue.Enqueue(msg);
                 }
+            }
+        }
+
+        public void Dispatch(Ack ack, Guid destination)
+        {
+            if (_sendQueues.TryGetValue(destination, out var sendQueue))
+            {
+                sendQueue.Enqueue(ack);
             }
         }
 
@@ -87,7 +95,7 @@ namespace MessageBroker.Core
         /// <param name="destinations">SenQueues that must receive this message id</param>
         public void Release(Guid messageId, Guid[] destinations)
         {
-            foreach(var destination in destinations)
+            foreach (var destination in destinations)
             {
                 if (_sendQueues.TryGetValue(destination, out var sendQueue))
                 {

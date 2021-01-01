@@ -1,10 +1,7 @@
 ﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.Extensions;
 using MessageBroker.Core.Models;
 using MessageBroker.Messages;
-using Microsoft.Extensions.ObjectPool;
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,17 +9,9 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Serialize
 {
-    public class DefaultSerializer : ISerializer
+    public class DefaultSerializer: ISerializer
     {
-
         private readonly IBufferPool _bufferPool;
-        private const int GuidSize = 16;
-        private const int PayloadTypeSize = 4;
-
-        public DefaultSerializer(IBufferPool bufferPool)
-        {
-            _bufferPool = bufferPool;
-        }
 
         private static byte[] _delimiter;
 
@@ -35,150 +24,61 @@ namespace MessageBroker.Core.Serialize
                     return _delimiter.AsSpan();
                 }
 
-                var delimiter = "\0";
+                var delimiter = "\n";
                 var delimiterB = Encoding.ASCII.GetBytes(delimiter);
                 _delimiter = delimiterB;
                 return delimiterB;
             }
         }
 
-        #region Serialize
-
+        public DefaultSerializer(IBufferPool bufferPool)
+        {
+            _bufferPool = bufferPool;
+        }
 
         public SendPayload ToSendPayload(Ack ack)
         {
             var sendPayload = _bufferPool.RendSendPayload();
-            var payloadSize = 4 + 4 + 1 + 16 + 1;
-            var memoryOwner = _bufferPool.Rent(payloadSize);
-            var bufferSpan = memoryOwner.AsSpan();
 
-            // write payload size
-            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
-
-            // write payload type
-            BitConverter.TryWriteBytes(bufferSpan.Slice(4, 4), (int)PayloadType.Ack);
-
-            // write separator
-            BitConverter.TryWriteBytes(bufferSpan.Slice(8, 1), '\n');
-
-            // write id
-            ack.Id.TryWriteBytes(bufferSpan.Slice(9, 16));
-            sendPayload.Id = ack.Id;
-            sendPayload.OriginalData = memoryOwner;
-            sendPayload.PayloadSize = payloadSize;
-
-            return sendPayload;
+            return sendPayload
+                .WriteType(PayloadType.Ack)
+                .WriteId(ack.Id)
+                .Build();
         }
 
         public SendPayload ToSendPayload(Message msg)
         {
-            var payloadSize = 4 + 4 + 1 + 16 + 1 + msg.Route.Length + 1 + msg.Data.Length + 1;
-            var memoryOwner = _bufferPool.Rent(payloadSize);
-            var bufferSpan = memoryOwner.AsSpan();
+            var sendPayload = _bufferPool.RendSendPayload();
 
-            // write payload size
-            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
-
-            // write payload type
-            BitConverter.TryWriteBytes(bufferSpan.Slice(4, 4), (int)PayloadType.Msg);
-
-            // write separator
-            BitConverter.TryWriteBytes(bufferSpan.Slice(8, 1), '\n');
-
-            // write id
-            msg.Id.TryWriteBytes(bufferSpan.Slice(9, 16));
-
-            // write separator
-            BitConverter.TryWriteBytes(bufferSpan.Slice(25, 1), '\n');
-
-            // write the route
-            var routeB = Encoding.UTF8.GetBytes(msg.Route);
-            routeB.CopyTo(bufferSpan.Slice(26, routeB.Length));
-
-            // write separator
-            BitConverter.TryWriteBytes(bufferSpan.Slice(26 + routeB.Length, 1), '\n');
-
-            // write data 
-            msg.Data.CopyTo(memoryOwner.AsMemory().Slice(26 + routeB.Length + 1, msg.Data.Length));
-
-            return new SendPayload
-            {
-                Id = msg.Id,
-                OriginalData = memoryOwner,
-                PayloadSize = payloadSize,
-            };
-
+            return sendPayload
+                .WriteType(PayloadType.Msg)
+                .WriteId(msg.Id)
+                .WriteStr(msg.Route)
+                .WriteMemory(msg.Data)
+                .Build();
         }
 
-        public SendPayload ToSendPayload(Subscribe sub)
+        public SendPayload ToSendPayload(Subscribe subscribe)
         {
-            var payloadSize = 4 + 4 + 1 + 16 + 1 + 4 + 1;
-            var memoryOwner = _bufferPool.Rent(payloadSize);
-            var bufferSpan = memoryOwner.AsSpan();
+            var sendPayload = _bufferPool.RendSendPayload();
 
-            // write payload size
-            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
-
-            // write payload type
-            BitConverter.TryWriteBytes(bufferSpan.Slice(4, 4), (int)PayloadType.Subscribe);
-
-            // write separator
-            BitConverter.TryWriteBytes(bufferSpan.Slice(8, 1), '\n');
-
-            // write id
-            sub.Id.TryWriteBytes(bufferSpan.Slice(9, 16));
-
-            // write separator
-            BitConverter.TryWriteBytes(bufferSpan.Slice(25, 1), '\n');
-
-            // write concurrency
-            BitConverter.TryWriteBytes(bufferSpan.Slice(26, 4), sub.Concurrency);
-
-            return new SendPayload
-            {
-                Id = sub.Id,
-                OriginalData = memoryOwner,
-                PayloadSize = payloadSize,
-            };
-
+            return sendPayload
+                .WriteType(PayloadType.Subscribe)
+                .WriteId(subscribe.Id)
+                .WriteInt(subscribe.Concurrency)
+                .Build();
         }
 
         public SendPayload ToSendPayload(Listen listen)
         {
-            var payloadSize = 4 + 4 + 1 + 16 + 1 + listen.Route.Length + 1;
-            var memoryOwner = _bufferPool.Rent(payloadSize);
-            var bufferSpan = memoryOwner.AsSpan();
+            var sendPayload = _bufferPool.RendSendPayload();
 
-            // write payload size
-            BitConverter.TryWriteBytes(bufferSpan.Slice(0, 4), payloadSize - 4);
-
-            // write payload type
-            BitConverter.TryWriteBytes(bufferSpan.Slice(4, 4), (int)PayloadType.Listen);
-
-            // write separator
-            BitConverter.TryWriteBytes(bufferSpan.Slice(8, 1), '\n');
-
-            // write id
-            listen.Id.TryWriteBytes(bufferSpan.Slice(9, 16));
-
-            // write separator
-            BitConverter.TryWriteBytes(bufferSpan.Slice(25, 1), '\n');
-
-            // write route
-            var routeB = Encoding.UTF8.GetBytes(listen.Route);
-            routeB.CopyTo(bufferSpan.Slice(26));
-
-            return new SendPayload
-            {
-                Id = listen.Id,
-                OriginalData = memoryOwner,
-                PayloadSize = payloadSize,
-            };
+            return sendPayload
+                .WriteType(PayloadType.Listen)
+                .WriteId(listen.Id)
+                .WriteStr(listen.Route)
+                .Build();
         }
-
-        #endregion
-
-        #region Deserialize
 
         public PayloadType ParsePayloadType(Memory<byte> b)
         {
@@ -221,7 +121,7 @@ namespace MessageBroker.Core.Serialize
             {
                 throw;
             }
-            
+
         }
 
         public Listen ToListenRoute(Span<byte> data)
@@ -250,8 +150,5 @@ namespace MessageBroker.Core.Serialize
                 Concurrency = concurrency
             };
         }
-
-        #endregion
-
     }
 }

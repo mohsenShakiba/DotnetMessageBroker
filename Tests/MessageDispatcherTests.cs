@@ -50,7 +50,7 @@ namespace Tests
             sessionResolver.Verify(sr => sr.Resolve(It.IsAny<Guid>()));
 
             // make sure the send method of session was called
-            session.Verify(s => s.Send(It.IsAny<Memory<byte>>()));
+            session.Verify(s => s.SendAsync(It.IsAny<Memory<byte>>()));
         }
 
     }

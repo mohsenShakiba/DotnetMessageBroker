@@ -47,7 +47,7 @@ namespace Tests
 
             Assert.Equal(msg.Id, convertedMsg.Id);
             Assert.Equal(msg.Route, convertedMsg.Route);
-            Assert.Equal(Encoding.UTF8.GetString(msg.Data.ToArray()), Encoding.UTF8.GetString(convertedMsg.Data.Trim(Encoding.UTF8.GetBytes("\0")).ToArray()));
+            Assert.Equal(Encoding.UTF8.GetString(msg.Data.ToArray()), Encoding.UTF8.GetString(convertedMsg.Data.Trim(Encoding.UTF8.GetBytes("\0")).Trim(Encoding.UTF8.GetBytes("\n")).ToArray()));
         }
 
         [Fact]

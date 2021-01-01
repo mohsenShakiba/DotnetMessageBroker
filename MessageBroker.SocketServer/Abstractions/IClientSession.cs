@@ -10,9 +10,9 @@ namespace MessageBroker.SocketServer.Abstractions
     {
 
         Guid SessionId { get; }
-
+        void SetupSendCompletedHandler(Action onSendCompleted);
         void Send(Memory<byte> payload);
-        void SendAsync(byte[] payload);
+        bool SendAsync(Memory<byte> payload);
         void Close();
         void Dispose();
     }

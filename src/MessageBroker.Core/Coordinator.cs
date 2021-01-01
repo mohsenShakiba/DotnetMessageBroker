@@ -40,7 +40,8 @@ namespace MessageBroker.Core
 
         public void ClientConnected(Guid sessionId)
         {
-            // nothing
+            // remove this
+            _messageDispatcher.AddSendQueue(sessionId, 1000);
         }
 
         public void ClientDisconnected(Guid sessionId)
@@ -163,25 +164,12 @@ namespace MessageBroker.Core
         /// <param name="payloadId"></param>
         private void SendRecievedPayloadAck(Guid sessionId, Guid payloadId)
         {
-            var session = _sessionResolver.Resolve(sessionId);
-
-            if (session == null)
-            {
-                _logger.LogError($"failed to find a publisher with id: {sessionId}");
-                return;
-            }
-
             var ack = new Ack
             {
                 Id = payloadId
             };
 
-            var ackData = _serializer.ToSendPayload(ack);
-
-            session.Send(ackData.Data);
-
+            _messageDispatcher.Dispatch(ack, sessionId);
         }
-
-
     }
 }

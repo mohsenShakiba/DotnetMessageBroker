@@ -33,6 +33,7 @@ namespace MessageBroker.Core
         public IReadOnlyList<Guid> PendingMessages => _pendingMessages;
         public IClientSession Session => _session;
         private bool IsQueueFull => _currentConcurrency >= _maxConcurrency;
+        private bool IsSending = false;
 
 
         public SendQueue(IClientSession session, ISerializer serializer, IMessageRefStore messageRefStore, int maxConcurrency, int currentConcurrency = 0)
@@ -44,6 +45,7 @@ namespace MessageBroker.Core
             _messageRefStore = messageRefStore;
             _queue = new();
             _pendingMessages = new();
+            _session.SetupSendCompletedHandler(SendPendingMessagesIfQueueNotFull);
         }
 
         /// <summary>
@@ -55,7 +57,21 @@ namespace MessageBroker.Core
         {
             var sendPayload = _serializer.ToSendPayload(message);
 
-            if (IsQueueFull)
+            if (IsSending)
+            {
+                _queue.Enqueue(sendPayload);
+            }
+            else
+            {
+                Send(sendPayload);
+            }
+        }
+
+        public void Enqueue(Ack ack)
+        {
+            var sendPayload = _serializer.ToSendPayload(ack);
+
+            if (IsSending)
             {
                 _queue.Enqueue(sendPayload);
             }
@@ -74,7 +90,7 @@ namespace MessageBroker.Core
             if (_pendingMessages.Contains(messageId))
             {
                 Interlocked.Decrement(ref _currentConcurrency);
-                SendPendingMessagesIfQueueNotFull();
+                //SendPendingMessagesIfQueueNotFull();
             }
         }
 
@@ -84,6 +100,8 @@ namespace MessageBroker.Core
         /// </summary>
         private void SendPendingMessagesIfQueueNotFull()
         {
+            IsSending = false;
+
             if (IsQueueFull)
                 return;
 
@@ -98,16 +116,17 @@ namespace MessageBroker.Core
         /// <param name="msg"></param>
         public void Send(SendPayload sendPayload)
         {
-            
-            Interlocked.Increment(ref _currentConcurrency);
-            _pendingMessages.Add(sendPayload.Id);
-            _session.Send(sendPayload.Data);
-
-            // update ref store
-            if (_messageRefStore.ReleaseOne(sendPayload.Id))
+            //Interlocked.Increment(ref _currentConcurrency);
+            //_pendingMessages.Add(sendPayload.Id);
+            //_session.Send(sendPayload.Data);
+            var sendAsync = _session.SendAsync(sendPayload.Data);
+            if (!sendAsync)
             {
-                // if the ref store is clear, return the buffer to pool
-                ArrayPool<byte>.Shared.Return(sendPayload.OriginalData);
+                SendPendingMessagesIfQueueNotFull();
+            }
+            else
+            {
+                IsSending = true;
             }
         }
 

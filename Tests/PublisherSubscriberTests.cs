@@ -23,7 +23,7 @@ namespace Tests
     public class PublisherSubscriberTests
     {
         [Theory]
-        [InlineData(100_000)]
+        [InlineData(10_000)]
         public void TestPublishSubscribe(int count)
         {
             var resetEvent = new ManualResetEvent(false);
@@ -130,17 +130,10 @@ namespace Tests
             {
                 for (var i = 0; i < count; i++)
                 {
-                    try
-                    {
-                        var guid = Guid.NewGuid();
-                        var message = new Message { Id = guid, Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
-                        var messageB = serializer.ToSendPayload(message);
-                        publisher.Send(messageB.Data);
-                    }
-                    catch (Exception)
-                    {
-                        throw;
-                    }
+                    var guid = Guid.NewGuid();
+                    var message = new Message { Id = guid, Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
+                    var messageB = serializer.ToSendPayload(message);
+                    publisher.Send(messageB.Data);
                 }
             });
 
@@ -152,6 +145,8 @@ namespace Tests
 
             resetEvent.WaitOne();
             publisherAck.WaitOne();
+
+            server.Stop();
 
             Console.WriteLine("done");
         }

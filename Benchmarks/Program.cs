@@ -34,9 +34,9 @@ namespace Benchmarks
         {
             var ack = new Ack { Id = Guid.NewGuid() };
             var res = _serializer.ToSendPayload(ack);
-            ArrayPool<byte>.Shared.Return(res.OriginalData);
             _bufferPool.ReturnSendPayload(res);
         }
+    
 
     }
 

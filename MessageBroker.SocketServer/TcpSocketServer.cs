@@ -66,6 +66,7 @@ namespace MessageBroker.SocketServer
             RemoveAllSessions();
         }
 
+
         /// <summary>
         /// this method will be called by the session when a new message has been received
         /// </summary>

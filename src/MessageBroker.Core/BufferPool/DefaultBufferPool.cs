@@ -18,18 +18,6 @@ namespace MessageBroker.Core.BufferPool
             _sendPayloadPool = new();
         }
 
-        public SendPayload RendSendPayload()
-        {
-            if (_sendPayloadPool.TryTake(out var sp))
-            {
-                return sp;
-            }
-            else
-            {
-                return new SendPayload();
-            }
-        }
-
         public byte[] Rent(int size)
         {
             var memoryOwner = ArrayPool<byte>.Shared.Rent(size);
@@ -41,16 +29,27 @@ namespace MessageBroker.Core.BufferPool
             ArrayPool<byte>.Shared.Return(data);
         }
 
+
+        public SendPayload RendSendPayload()
+        {
+            if (_sendPayloadPool.TryTake(out var sp))
+            {
+                sp.Refresh();
+                return sp;
+            }
+            else
+            {
+                var newSp = new SendPayload(this);
+                newSp.Setup();
+                return newSp;
+            }
+        }
+
         public void ReturnSendPayload(SendPayload payload)
         {
-            //if (_sendPayloadPool.Count > 128)
-            //{
-            //    return;
-            //}
-            //else
-            //{
-                _sendPayloadPool.Add(payload);
-            //}
+            _sendPayloadPool.Add(payload);
         }
+
+
     }
 }

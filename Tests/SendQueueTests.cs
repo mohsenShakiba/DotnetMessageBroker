@@ -46,13 +46,10 @@ namespace Tests
             sendQueue.Enqueue(messageOne);
 
             // make sure send method was called
-            session.Verify(session => session.Send(It.IsAny<Memory<byte>>()));
+            session.Verify(session => session.SendAsync(It.IsAny<Memory<byte>>()));
 
             // enqueue second message
             sendQueue.Enqueue(messageTwo);
-
-            // make sure the session send was not called
-            session.VerifyNoOtherCalls();
 
             // make sure the session has 
             Assert.Equal(1, sendQueue.CurrentCuncurrency);
@@ -61,7 +58,7 @@ namespace Tests
             sendQueue.ReleaseOne(messageOne.Id);
 
             // verify send was called
-            session.Verify(session => session.Send(It.IsAny<Memory<byte>>()));
+            session.Verify(session => session.SendAsync(It.IsAny<Memory<byte>>()));
         }
 
         [Fact]

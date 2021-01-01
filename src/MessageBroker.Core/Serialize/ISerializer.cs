@@ -14,6 +14,8 @@ namespace MessageBroker.Core.Serialize
         SendPayload ToSendPayload(Ack ack);
 
         SendPayload ToSendPayload(Message msg);
+        SendPayload ToSendPayload(Subscribe subscribe);
+        SendPayload ToSendPayload(Listen listen);
 
         PayloadType ParsePayloadType(Memory<byte> b);
 

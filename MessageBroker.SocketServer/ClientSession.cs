@@ -67,7 +67,6 @@ namespace MessageBroker.SocketServer
         {
             _sizeEventArgs.Completed += OnMessageSizeReceived;
             _receiveEventArgs.Completed += OnMessageReceived;
-            _sendEventArgs.Completed += OnSendCompleted;
         }
 
         /// <summary>
@@ -80,8 +79,8 @@ namespace MessageBroker.SocketServer
                 while (_connected)
                 {
                     ReceiveMessageSize();
-
                     _receiveResetEvent.WaitOne();
+
                 }
             }, TaskCreationOptions.LongRunning);
         }
@@ -195,38 +194,27 @@ namespace MessageBroker.SocketServer
 
         #endregion
 
-        #region Send    
+        #region Send   
+
+        public void SetupSendCompletedHandler(Action onSendCompleted)
+        {
+            _sendEventArgs.Completed += (_, _) =>
+            {
+                onSendCompleted();
+            };
+        }
 
         public void Send(Memory<byte> payload)
         {
             _socket.Send(payload.Span);
         }
 
-        public void SendAsync(byte[] payload)
+        public bool SendAsync(Memory<byte> payload)
         {
-            _sendResetEvent.WaitOne();
-
             _sendEventArgs.SetBuffer(payload);
-
-            if (!_socket.SendAsync(_sendEventArgs))
-                OnSendCompleted(null, _sendEventArgs);
-
+            return _socket.SendAsync(_sendEventArgs);
         }
 
-        private void OnSendCompleted(object _, SocketAsyncEventArgs args)
-        {
-            if (!_connected)
-                return;
-
-            if (args.SocketError != SocketError.Success)
-            {
-                _logger.LogError($"the send operation failed with error {args.SocketError}");
-                Close();
-                return;
-            }
-
-            _sendResetEvent.Set();
-        }
 
         #endregion
 
@@ -240,8 +228,6 @@ namespace MessageBroker.SocketServer
         public void Close()
         {
             _connected = false;
-
-            _sendEventArgs.Completed -= OnSendCompleted;
             _receiveEventArgs.Completed -= OnMessageReceived;
             _sizeEventArgs.Completed -= OnMessageSizeReceived;
 
