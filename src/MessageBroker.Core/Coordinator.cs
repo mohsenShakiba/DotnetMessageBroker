@@ -104,6 +104,7 @@ namespace MessageBroker.Core
 
             // send received ack to publisher
             SendRecievedPayloadAck(sessionId, message.Id);
+
         }
 
         public void OnAck(Guid sessionId, Ack ack)

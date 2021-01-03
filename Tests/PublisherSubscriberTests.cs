@@ -9,6 +9,7 @@ using MessageBroker.Messages;
 using MessageBroker.SocketServer;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -23,7 +24,7 @@ namespace Tests
     public class PublisherSubscriberTests
     {
         [Theory]
-        [InlineData(10_000)]
+        [InlineData(100_000)]
         public void TestPublishSubscribe(int count)
         {
             var resetEvent = new ManualResetEvent(false);
@@ -134,6 +135,7 @@ namespace Tests
                     var message = new Message { Id = guid, Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
                     var messageB = serializer.ToSendPayload(message);
                     publisher.Send(messageB.Data);
+                    bufferPool.ReturnSendPayload(messageB);
                 }
             });
 
