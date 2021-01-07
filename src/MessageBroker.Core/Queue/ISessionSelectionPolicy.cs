@@ -10,6 +10,6 @@ namespace MessageBroker.Core.Queue
     {
         void AddSession(Guid sessionId);
         void RemoveSession(Guid sessionId);
-        Guid GetNextSession(string route);
+        Guid? GetNextSession(string route);
     }
 }
