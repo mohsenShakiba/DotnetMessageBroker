@@ -16,6 +16,8 @@ namespace MessageBroker.Core.Serialize
         SendPayload ToSendPayload(Message msg);
         SendPayload ToSendPayload(Subscribe subscribe);
         SendPayload ToSendPayload(Listen listen);
+        SendPayload ToSendPayload(QueueDeclare queue);
+        SendPayload ToSendPayload(QueueDelete queue);
 
         PayloadType ParsePayloadType(Memory<byte> b);
 
@@ -26,5 +28,7 @@ namespace MessageBroker.Core.Serialize
         Listen ToListenRoute(Span<byte> data);
 
         Subscribe ToSubscribe(Span<byte> data);
+        QueueDeclare ToQueueDeclareModel(Span<byte> data);
+        QueueDelete ToQueueDeleteModel(Span<byte> data);
     }
 }

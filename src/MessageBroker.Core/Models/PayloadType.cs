@@ -13,6 +13,8 @@ namespace MessageBroker.Messages
         Nack = 3,
         Listen = 4,
         Unlisten = 5,
-        Subscribe = 6
+        Subscribe = 6,
+        QueueCreate = 7,
+        QueueDelete = 8
     }
 }

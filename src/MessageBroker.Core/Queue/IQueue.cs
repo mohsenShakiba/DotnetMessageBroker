@@ -13,8 +13,8 @@ namespace MessageBroker.Core.Queue
         void OnMessage(Message message);
         void OnAck(Ack ack);
         void OnNack(Ack nack);
-        void SessionSubscribed(string route, Guid sessionId);
-        void SessionUnSubscribed(string route, Guid sessionId);
+        void SessionSubscribed(Guid sessionId);
+        void SessionUnSubscribed(Guid sessionId);
         void SessionDisconnected(Guid sessionId);
         bool MessageRouteMatch(string messageRoute);
     }

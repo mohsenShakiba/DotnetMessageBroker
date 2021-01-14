@@ -76,7 +76,30 @@ namespace MessageBroker.Core.Serialize
             return sendPayload
                 .WriteType(PayloadType.Listen)
                 .WriteId(listen.Id)
-                .WriteStr(listen.Route)
+                .WriteStr(listen.QueueName)
+                .Build();
+        }
+
+        public SendPayload ToSendPayload(QueueDeclare queue)
+        {
+            var sendPayload = _bufferPool.RendSendPayload();
+
+            return sendPayload
+                .WriteType(PayloadType.QueueCreate)
+                .WriteId(queue.Id)
+                .WriteStr(queue.Name)
+                .WriteStr(queue.Route)
+                .Build();
+        }
+
+        public SendPayload ToSendPayload(QueueDelete queue)
+        {
+            var sendPayload = _bufferPool.RendSendPayload();
+
+            return sendPayload
+                .WriteType(PayloadType.QueueDelete)
+                .WriteId(queue.Id)
+                .WriteStr(queue.Name)
                 .Build();
         }
 
@@ -128,12 +151,12 @@ namespace MessageBroker.Core.Serialize
         {
             data = data.Slice(5);
             var id = new Guid(data.Slice(0, 16));
-            var route = Encoding.UTF8.GetString(data.Slice(17, data.Length - 18));
+            var queueName = Encoding.UTF8.GetString(data.Slice(17, data.Length - 18));
 
             return new Listen
             {
                 Id = id,
-                Route = route
+                QueueName = queueName
             };
         }
 
@@ -148,6 +171,35 @@ namespace MessageBroker.Core.Serialize
             {
                 Id = id,
                 Concurrency = concurrency
+            };
+        }
+
+        public QueueDeclare ToQueueDeclareModel(Span<byte> data)
+        {
+            data = data.Slice(5);
+            var id = new Guid(data.Slice(0, 16));
+            var indexOfNameDelimiter = data.Slice(17).IndexOf(Delimiter);
+            var queueName = Encoding.UTF8.GetString(data.Slice(17, indexOfNameDelimiter));
+            var route = Encoding.UTF8.GetString(data.Slice(18 + indexOfNameDelimiter, data.Length - 1 - (18 + indexOfNameDelimiter)));
+
+            return new QueueDeclare
+            {
+                Id = id,
+                Name = queueName,
+                Route = route
+            };
+        }
+
+        public QueueDelete ToQueueDeleteModel(Span<byte> data)
+        {
+            data = data.Slice(5);
+            var id = new Guid(data.Slice(0, 16));
+            var queueName = Encoding.UTF8.GetString(data.Slice(17, data.Length - 18));
+
+            return new QueueDelete
+            {
+                Id = id,
+                Name = queueName,
             };
         }
     }

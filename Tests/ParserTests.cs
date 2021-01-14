@@ -53,14 +53,14 @@ namespace Tests
         [Fact]
         public void TestParseListen()
         {
-            var listen = new Listen { Id = Guid.NewGuid(), Route = "TEST" };
+            var listen = new Listen { Id = Guid.NewGuid(), QueueName = "TEST" };
 
             var b = _serializer.ToSendPayload(listen);
 
             var convertedListen = _serializer.ToListenRoute(b.DataWithoutSize.Span);
 
             Assert.Equal(listen.Id, convertedListen.Id);
-            Assert.Equal(listen.Route, convertedListen.Route);
+            Assert.Equal(listen.QueueName, convertedListen.QueueName);
         }
 
 
@@ -75,6 +75,33 @@ namespace Tests
 
             Assert.Equal(subscribe.Id, convertedSubscribe.Id);
             Assert.Equal(subscribe.Concurrency, convertedSubscribe.Concurrency);
+        }
+
+        [Fact]
+        public void TestParseQueueDeclare()
+        {
+            var queue = new QueueDeclare { Id = Guid.NewGuid(), Name = "TEST_QUEUE", Route = "TEST_PATH"};
+
+            var b = _serializer.ToSendPayload(queue);
+
+            var convertedQueueDeclare = _serializer.ToQueueDeclareModel(b.DataWithoutSize.Span);
+
+            Assert.Equal(queue.Id, convertedQueueDeclare.Id);
+            Assert.Equal(queue.Name, convertedQueueDeclare.Name);
+            Assert.Equal(queue.Route, convertedQueueDeclare.Route);
+        }
+
+        [Fact]
+        public void TestParseQueueDelete()
+        {
+            var queue = new QueueDelete { Id = Guid.NewGuid(), Name = "TEST_QUEUE" };
+
+            var b = _serializer.ToSendPayload(queue);
+
+            var convertedQueueDelete = _serializer.ToQueueDeleteModel(b.DataWithoutSize.Span);
+
+            Assert.Equal(queue.Id, convertedQueueDelete.Id);
+            Assert.Equal(queue.Name, convertedQueueDelete.Name);
         }
 
     }

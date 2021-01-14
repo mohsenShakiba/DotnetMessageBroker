@@ -64,6 +64,13 @@ namespace Tests
             subscriberSocket.Connect(ipEndPoint);
             var subscriber = new ClientSession(subscriberEventListener, subscriberSocket, sessionConfiguration, loggerFactory.CreateLogger<ClientSession>());
 
+            // send declare queue 
+            var queueDeclare = new QueueDeclare { Id = Guid.NewGuid(), Name = "TEST", Route = "TEST" };
+            var queueDeclareB = serializer.ToSendPayload(queueDeclare);
+            subscriber.Send(queueDeclareB.Data);
+
+            Thread.Sleep(1000);
+
             // send subscribe
             var subscribe = new Subscribe { Id = Guid.NewGuid(), Concurrency = 10 };
             var subscribeB = serializer.ToSendPayload(subscribe);
@@ -72,7 +79,7 @@ namespace Tests
             Thread.Sleep(1000);
 
             // send listen
-            var listen = new Listen { Id = Guid.NewGuid(), Route = "TEST" };
+            var listen = new Listen { Id = Guid.NewGuid(), QueueName = "TEST" };
             var listenB = serializer.ToSendPayload(listen);
             subscriber.Send(listenB.Data);
 

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Queue
 {
-    class MesssageQueue : IQueue, IDisposable
+    class MessageQueue : IQueue, IDisposable
     {
         private readonly MessageDispatcher _dispatcher;
         private readonly ISessionSelectionPolicy _sessionSelectionPolicy;
@@ -19,7 +19,7 @@ namespace MessageBroker.Core.Queue
         private string _name;
         private string _route;
 
-        public MesssageQueue(MessageDispatcher dispatcher, ISessionSelectionPolicy sessionSelectionPolicy, IMessageStore messageStore, 
+        public MessageQueue(MessageDispatcher dispatcher, ISessionSelectionPolicy sessionSelectionPolicy, IMessageStore messageStore, 
             IRouteMatcher routeMatcher)
         {
             _dispatcher = dispatcher;
@@ -56,12 +56,12 @@ namespace MessageBroker.Core.Queue
             _sessionSelectionPolicy.RemoveSession(sessionId);
         }
 
-        public void SessionSubscribed(string route, Guid sessionId)
+        public void SessionSubscribed(Guid sessionId)
         {
             _sessionSelectionPolicy.AddSession(sessionId);
         }
 
-        public void SessionUnSubscribed(string route, Guid sessionId)
+        public void SessionUnSubscribed(Guid sessionId)
         {
             SessionDisconnected(sessionId);
         }

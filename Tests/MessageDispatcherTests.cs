@@ -40,7 +40,7 @@ namespace Tests
 
             var message = serializer.ToMessage(originalMessageSendData.Data.Span);
 
-            dispatcher.Dispatch(message, new Guid[] { session.Object.SessionId });
+            dispatcher.Dispatch(message, session.Object.SessionId);
 
             // make sure the send queue is created and it's the same as session
             var sendQueue = dispatcher.GetSendQueue(sessionId);

@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Models
 {
-    public ref struct Listen
+    public ref struct QueueDeclare
     {
         public Guid Id { get; init; }
-        public string QueueName { get; init; }
-    };
+        public string Name { get; init; }
+        public string Route { get; init; }
+    }
 }
