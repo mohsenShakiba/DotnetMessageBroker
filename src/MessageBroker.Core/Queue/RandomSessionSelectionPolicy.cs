@@ -35,7 +35,7 @@ namespace MessageBroker.Core.Queue
 
         }
 
-        public Guid? GetNextSession(string route)
+        public Guid? GetNextSession()
         {
             try
             {

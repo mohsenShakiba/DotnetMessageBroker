@@ -69,14 +69,11 @@ namespace MessageBroker.Core
         /// </summary>
         /// <param name="msg">The message that must be dispatched</param>
         /// <param name="destinations">Array of Guids that the message must be dispatched to</param>
-        public void Dispatch(Message msg, IEnumerable<Guid> destinations)
+        public void Dispatch(Message msg, Guid destination)
         {
-            foreach (var destination in destinations)
+            if (_sendQueues.TryGetValue(destination, out var sendQueue))
             {
-                if (_sendQueues.TryGetValue(destination, out var sendQueue))
-                {
-                    sendQueue.Enqueue(msg);
-                }
+                sendQueue.Enqueue(msg);
             }
         }
 
