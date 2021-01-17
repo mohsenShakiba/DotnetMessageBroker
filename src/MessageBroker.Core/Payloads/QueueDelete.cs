@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Models
 {
+    /// <summary>
+    /// will delete the queue if exists
+    /// </summary>
     public ref struct QueueDelete
     {
         public Guid Id { get; init; }

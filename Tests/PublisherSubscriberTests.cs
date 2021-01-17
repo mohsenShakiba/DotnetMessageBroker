@@ -5,7 +5,6 @@ using MessageBroker.Core.Models;
 using MessageBroker.Core.Persistance;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Serialize;
-using MessageBroker.Messages;
 using MessageBroker.SocketServer;
 using Microsoft.Extensions.Logging;
 using System;
@@ -24,7 +23,7 @@ namespace Tests
     public class PublisherSubscriberTests
     {
         [Theory]
-        [InlineData(100_000)]
+        [InlineData(1_000_000)]
         public void TestPublishSubscribe(int count)
         {
             var resetEvent = new ManualResetEvent(false);
@@ -33,20 +32,20 @@ namespace Tests
 
             var loggerFactory = LoggerFactory.Create(builder =>
             {
-                builder.AddConsole();
+                // builder.AddConsole();
             });
 
             var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
             var messageRefStore = new DefaultMessageRefStore();
-            var bufferPool = new DefaultBufferPool();
+            var bufferPool = new ObjectPool();
             var messageStore = new InMemoryMessageStore();
-            var serializer = new DefaultSerializer(bufferPool);
+            var serializer = new DefaultSerializer();
             var dispatcher = new MessageDispatcher(resolver, serializer, messageRefStore);
             var routeMatching = new DefaultRouteMatching();
             var publisherEventListener = new TestEventListener();
             var subscriberEventListener = new TestEventListener();
-            var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, messageStore, messageRefStore, loggerFactory.CreateLogger<Coordinator>());
+            var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, messageStore, messageRefStore,  loggerFactory.CreateLogger<Coordinator>());
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
@@ -79,7 +78,7 @@ namespace Tests
             Thread.Sleep(1000);
 
             // send listen
-            var listen = new Listen { Id = Guid.NewGuid(), QueueName = "TEST" };
+            var listen = new SubscribeQueue { Id = Guid.NewGuid(), QueueName = "TEST" };
             var listenB = serializer.ToSendPayload(listen);
             subscriber.Send(listenB.Data);
 
@@ -97,7 +96,7 @@ namespace Tests
                     switch (payloadType)
                     {
                         case PayloadType.Msg:
-                            var receivedMessage = serializer.ToMessage(d.Span);
+                            var receivedMessage = serializer.ToMessage(d);
                             Interlocked.Increment(ref receivedMessageCount);
                             if (receivedMessageCount == count)
                                 resetEvent.Set();
@@ -123,13 +122,14 @@ namespace Tests
                     switch (payloadType)
                     {
                         case PayloadType.Ack:
-                            var receivedMessage = serializer.ToAck(d.Span);
+                            var receivedMessage = serializer.ToAck(d);
                             Interlocked.Increment(ref receivedAckCount);
                             if (receivedAckCount == count)
                                 publisherAck.Set();
                             break;
                         default:
-                            throw new Exception("test");
+                            Console.WriteLine("incorrect msg");
+                            break;
                     }
                 };
             });
@@ -142,7 +142,7 @@ namespace Tests
                     var message = new Message { Id = guid, Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
                     var messageB = serializer.ToSendPayload(message);
                     publisher.Send(messageB.Data);
-                    bufferPool.ReturnSendPayload(messageB);
+                    bufferPool.Return(messageB);
                 }
             });
 

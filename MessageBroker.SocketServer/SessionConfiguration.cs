@@ -13,7 +13,7 @@
             return new SessionConfiguration
             {
                 DefaultHeaderSize = 4,
-                DefaultMaxBodySize = 1024
+                DefaultMaxBodySize = 1
             };
         }
     }

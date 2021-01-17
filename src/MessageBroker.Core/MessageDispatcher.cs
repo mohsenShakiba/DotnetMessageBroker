@@ -1,7 +1,7 @@
-﻿using MessageBroker.Core.MessageRefStore;
+﻿using MessageBroker.Core.BufferPool;
+using MessageBroker.Core.MessageRefStore;
 using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
-using MessageBroker.Messages;
 using MessageBroker.SocketServer.Abstractions;
 using System;
 using System.Collections.Concurrent;
@@ -57,7 +57,7 @@ namespace MessageBroker.Core
             var session = _sessionResolver.Resolve(sessionId);
             if (session != null)
             {
-                var sendQueue = new SendQueue(session, _serializer, _messageRefStore, concurrency);
+                var sendQueue = new SendQueue(session, _serializer, _messageRefStore,  concurrency);
                 _sendQueues[sessionId] = sendQueue;
             }
         }

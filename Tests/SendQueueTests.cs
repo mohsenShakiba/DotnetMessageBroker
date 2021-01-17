@@ -3,7 +3,6 @@ using MessageBroker.Core.BufferPool;
 using MessageBroker.Core.MessageRefStore;
 using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
-using MessageBroker.Messages;
 using MessageBroker.SocketServer.Abstractions;
 using Moq;
 using System;
@@ -22,8 +21,7 @@ namespace Tests
         public void TestEnqueuWhenFull()
         {
             var messageRefStore = new DefaultMessageRefStore();
-            var bufferPool = new DefaultBufferPool();
-            var serializer = new DefaultSerializer(bufferPool);
+            var serializer = new DefaultSerializer();
             var session = new Mock<IClientSession>();
 
             var messageOne = new Message
@@ -40,7 +38,7 @@ namespace Tests
                 Data = Encoding.UTF8.GetBytes("TEST")
             };
 
-            var sendQueue = new SendQueue(session.Object, serializer, messageRefStore, 1, 0);
+            var sendQueue = new SendQueue(session.Object, serializer, messageRefStore,  1, 0);
 
             // enqueu first message
             sendQueue.Enqueue(messageOne);
@@ -65,10 +63,9 @@ namespace Tests
         public void TestReleaseWhenMessageDoesNotExists()
         {
             var messageRefStore = new DefaultMessageRefStore();
-            var bufferPool = new DefaultBufferPool();
-            var serializer = new DefaultSerializer(bufferPool);
+            var serializer = new DefaultSerializer();
             var session = new Mock<IClientSession>();
-            var sendQueue = new SendQueue(session.Object, serializer, messageRefStore, 1, 1);
+            var sendQueue = new SendQueue(session.Object, serializer, messageRefStore,  1, 1);
             var randomId = Guid.NewGuid();
 
             sendQueue.ReleaseOne(randomId);

@@ -28,8 +28,7 @@ namespace Tests
             var resetEvent = new ManualResetEvent(false);
             var messageReceivedCount = count;
 
-            var bufferPool = new DefaultBufferPool();
-            var serializer = new DefaultSerializer(bufferPool);
+            var serializer = new DefaultSerializer();
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new TestMessageProcessor();
             var resolver = new SessionResolver();
@@ -84,8 +83,7 @@ namespace Tests
             var messageReceivedCount = count;
             Guid sessionId = new();
 
-            var bufferPool = new DefaultBufferPool();
-            var serializer = new DefaultSerializer(bufferPool);
+            var serializer = new DefaultSerializer();
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new TestMessageProcessor();
             var resolver = new SessionResolver();
@@ -129,7 +127,7 @@ namespace Tests
                 {
                     var len = client.Receive(buffer);
 
-                    var msg = serializer.ToMessage(buffer.AsSpan(4));
+                    var msg = serializer.ToMessage(buffer.AsMemory(4));
 
                     Assert.Equal(messagePayload, Encoding.UTF8.GetString(msg.Data.Slice(0, msgSize).Span));
                 }

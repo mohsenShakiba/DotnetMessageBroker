@@ -1,14 +1,15 @@
-﻿using MessageBroker.Core.MessageProcessor;
+﻿using MessageBroker.Core.BufferPool;
+using MessageBroker.Core.MessageProcessor;
 using MessageBroker.Core.MessageRefStore;
 using MessageBroker.Core.Models;
 using MessageBroker.Core.Persistance;
 using MessageBroker.Core.Queue;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Serialize;
-using MessageBroker.Messages;
 using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
@@ -23,11 +24,12 @@ namespace MessageBroker.Core
         private readonly IMessageStore _messageStore;
         private readonly IMessageRefStore _messageRefStore;
         private readonly ILogger<Coordinator> _logger;
-        private readonly ConcurrentDictionary<string, IQueue> _subscribers;
+        private readonly Dictionary<string, IQueue> _queues;
+        private readonly List<IQueue> _queueArr;
         public int _stat;
 
         public Coordinator(ISessionResolver sessionResolver, ISerializer serializer, MessageDispatcher messageDispatcher, 
-            IRouteMatcher routeMatcher, IMessageStore messageStore, IMessageRefStore messageRefStore, ILogger<Coordinator> logger)
+            IRouteMatcher routeMatcher, IMessageStore messageStore, IMessageRefStore messageRefStore,  ILogger<Coordinator> logger)
         {
             _sessionResolver = sessionResolver;
             _serializer = serializer;
@@ -36,7 +38,8 @@ namespace MessageBroker.Core
             _messageStore = messageStore;
             _messageRefStore = messageRefStore;
             _logger = logger;
-            _subscribers = new();
+            _queues = new();
+            _queueArr = new();
         }
 
         public void ClientConnected(Guid sessionId)
@@ -47,15 +50,14 @@ namespace MessageBroker.Core
 
         public void ClientDisconnected(Guid sessionId)
         {
-            foreach(var (_, queue) in _subscribers) {
+            foreach(var (_, queue) in _queues) {
                 queue.SessionDisconnected(sessionId);
             }
         }
 
-        public void DataReceived(Guid sessionId, Memory<byte> data)
+        public void DataReceived(Guid sessionId, Memory<byte> payloadData)
         {
-            var type = _serializer.ParsePayloadType(data);
-            var payloadData = data.Span;
+            var type = _serializer.ParsePayloadType(payloadData);
 
             switch (type)
             {
@@ -72,15 +74,15 @@ namespace MessageBroker.Core
                     var nack = _serializer.ToAck(payloadData);
                     OnNack(sessionId, nack);
                     break;
-                case PayloadType.Listen:
+                case PayloadType.SubscribeQueue:
                     var listen = _serializer.ToListenRoute(payloadData);
                     OnListen(sessionId, listen);
                     break;
-                case PayloadType.Unlisten:
+                case PayloadType.UnSubscribeQueue:
                     var unListen = _serializer.ToListenRoute(payloadData);
                     OnUnListen(sessionId, unListen);
                     break;
-                case PayloadType.Subscribe:
+                case PayloadType.Register:
                     var subscribe = _serializer.ToSubscribe(payloadData);
                     OnSubscribe(sessionId, subscribe);
                     break;
@@ -98,13 +100,20 @@ namespace MessageBroker.Core
         public void OnMessage(Guid sessionId, Message message)
         {
             // send message to all the queues that match this message route
-            foreach (var (_, queue) in _subscribers)
+            foreach (var (_, queue) in _queues)
+            {
                 if (queue.MessageRouteMatch(message.Route))
+                {
                     queue.OnMessage(message);
+                }
+            }
 
             // send received ack to publisher
             SendRecievedPayloadAck(sessionId, message.Id);
 
+            
+            // 
+            ArrayPool<byte>.Shared.Return(message.OriginalMessageData);
         }
 
         public void OnAck(Guid sessionId, Ack ack)
@@ -117,22 +126,22 @@ namespace MessageBroker.Core
             _messageDispatcher.Release(nack.Id, new Guid[1] { sessionId });
         }
 
-        public void OnListen(Guid sessionId, Listen listen)
+        public void OnListen(Guid sessionId, SubscribeQueue subscribeQueue)
         {
-            if (_subscribers.TryGetValue(listen.QueueName, out var queue))
+            if (_queues.TryGetValue(subscribeQueue.QueueName, out var queue))
             {
                 queue.SessionSubscribed(sessionId);
-                SendRecievedPayloadAck(sessionId, listen.Id);
+                SendRecievedPayloadAck(sessionId, subscribeQueue.Id);
             }
             else
             {
-                SendRecievedPayloadNack(sessionId, listen.Id);
+                SendRecievedPayloadNack(sessionId, subscribeQueue.Id);
             }
         }
 
-        public void OnUnListen(Guid sessionId, Listen unlisten)
+        public void OnUnListen(Guid sessionId, SubscribeQueue unlisten)
         {
-            if (_subscribers.TryGetValue(unlisten.QueueName, out var queue))
+            if (_queues.TryGetValue(unlisten.QueueName, out var queue))
             {
                 queue.SessionUnSubscribed(sessionId);
                 SendRecievedPayloadAck(sessionId, unlisten.Id);
@@ -153,7 +162,7 @@ namespace MessageBroker.Core
         private void DeclareQueue(Guid sessionId, QueueDeclare queueDeclare)
         {
             // check if queue exists 
-            if (_subscribers.TryGetValue(queueDeclare.Name, out var queue))
+            if (_queues.TryGetValue(queueDeclare.Name, out var queue))
             {
                 SendRecievedPayloadAck(sessionId, queueDeclare.Id);
                 return;
@@ -163,14 +172,14 @@ namespace MessageBroker.Core
             queue = new MessageQueue(_messageDispatcher, sessionSelectionPolicy, _messageStore, _routeMatcher);
             queue.Setup(queueDeclare.Name, queueDeclare.Route);
 
-            _subscribers[queueDeclare.Name] = queue;
+            _queues[queueDeclare.Name] = queue;
 
             SendRecievedPayloadAck(sessionId, queueDeclare.Id);
         }
 
         private void DeleteQueue(Guid sessionId, QueueDelete queueDelete)
         {
-            _subscribers.TryRemove(queueDelete.Name, out var _);
+            _queues.Remove(queueDelete.Name, out var _);
             SendRecievedPayloadAck(sessionId, queueDelete.Id);
         }
 

@@ -1,7 +1,6 @@
 ﻿using MessageBroker.Core.BufferPool;
 using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
-using MessageBroker.Messages;
 using System;
 using System.Text;
 using Xunit;
@@ -15,8 +14,7 @@ namespace Tests
 
         public ParserTests()
         {
-            var bufferPool = new DefaultBufferPool();
-            _serializer = new DefaultSerializer(bufferPool);
+            _serializer = new DefaultSerializer();
         }
 
         [Fact]
@@ -26,7 +24,7 @@ namespace Tests
 
             var b = _serializer.ToSendPayload(ack);
 
-            var convertedAck = _serializer.ToAck(b.DataWithoutSize.Span);
+            var convertedAck = _serializer.ToAck(b.DataWithoutSize);
 
             Assert.Equal(ack.Id, convertedAck.Id);
         }
@@ -43,7 +41,7 @@ namespace Tests
 
             var b = _serializer.ToSendPayload(msg);
 
-            var convertedMsg = _serializer.ToMessage(b.DataWithoutSize.Span);
+            var convertedMsg = _serializer.ToMessage(b.DataWithoutSize);
 
             Assert.Equal(msg.Id, convertedMsg.Id);
             Assert.Equal(msg.Route, convertedMsg.Route);
@@ -53,11 +51,11 @@ namespace Tests
         [Fact]
         public void TestParseListen()
         {
-            var listen = new Listen { Id = Guid.NewGuid(), QueueName = "TEST" };
+            var listen = new SubscribeQueue { Id = Guid.NewGuid(), QueueName = "TEST" };
 
             var b = _serializer.ToSendPayload(listen);
 
-            var convertedListen = _serializer.ToListenRoute(b.DataWithoutSize.Span);
+            var convertedListen = _serializer.ToListenRoute(b.DataWithoutSize);
 
             Assert.Equal(listen.Id, convertedListen.Id);
             Assert.Equal(listen.QueueName, convertedListen.QueueName);
@@ -71,7 +69,7 @@ namespace Tests
 
             var b = _serializer.ToSendPayload(subscribe);
 
-            var convertedSubscribe = _serializer.ToSubscribe(b.DataWithoutSize.Span);
+            var convertedSubscribe = _serializer.ToSubscribe(b.DataWithoutSize);
 
             Assert.Equal(subscribe.Id, convertedSubscribe.Id);
             Assert.Equal(subscribe.Concurrency, convertedSubscribe.Concurrency);
@@ -84,7 +82,7 @@ namespace Tests
 
             var b = _serializer.ToSendPayload(queue);
 
-            var convertedQueueDeclare = _serializer.ToQueueDeclareModel(b.DataWithoutSize.Span);
+            var convertedQueueDeclare = _serializer.ToQueueDeclareModel(b.DataWithoutSize);
 
             Assert.Equal(queue.Id, convertedQueueDeclare.Id);
             Assert.Equal(queue.Name, convertedQueueDeclare.Name);
@@ -98,7 +96,7 @@ namespace Tests
 
             var b = _serializer.ToSendPayload(queue);
 
-            var convertedQueueDelete = _serializer.ToQueueDeleteModel(b.DataWithoutSize.Span);
+            var convertedQueueDelete = _serializer.ToQueueDeleteModel(b.DataWithoutSize);
 
             Assert.Equal(queue.Id, convertedQueueDelete.Id);
             Assert.Equal(queue.Name, convertedQueueDelete.Name);

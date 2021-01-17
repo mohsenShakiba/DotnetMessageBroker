@@ -1,6 +1,7 @@
 ﻿using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Buffers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -47,20 +48,9 @@ namespace MessageBroker.SocketServer
 
             SetupEventArgs();
 
-            SetupBuffers();
+            SetupReceiveBufferWithSize();
 
             Receive();
-        }
-
-        private void SetupBuffers()
-        {
-            _receiveBuff = new byte[_config.DefaultHeaderSize + _config.DefaultMaxBodySize];
-        }
-
-        private void IncreaseReceiveBuffer(int size)
-        {
-            _config.DefaultMaxBodySize = size;
-            SetupBuffers();
         }
 
         private void SetupEventArgs()
@@ -154,12 +144,10 @@ namespace MessageBroker.SocketServer
             if (!_connected)
                 return;
 
-            if (msgSize > _config.DefaultMaxBodySize)
-                IncreaseReceiveBuffer(msgSize);
+            if (msgSize > _receiveBuff.Length - _config.DefaultHeaderSize)
+                SetupReceiveBufferWithSize(msgSize);
 
-            var sizeToReceive = msgSize > _receiveBuff.Length ? _receiveBuff.Length : msgSize;
-
-            _receiveEventArgs.SetBuffer(_receiveBuff, 0, sizeToReceive);
+            _receiveEventArgs.SetBuffer(_receiveBuff, 0, msgSize);
 
             if (!_socket.ReceiveAsync(_receiveEventArgs))
                 OnMessageReceived(null, _receiveEventArgs);
@@ -241,5 +229,17 @@ namespace MessageBroker.SocketServer
         {
             Close();
         }
+
+        private void SetupReceiveBufferWithSize(int? desiredSize = null)
+        {
+            var size = desiredSize ?? _config.DefaultMaxBodySize;
+            var newBuffer = ArrayPool<byte>.Shared.Rent(size + _config.DefaultHeaderSize);
+            if (_receiveBuff != null)
+            {
+                ArrayPool<byte>.Shared.Return(_receiveBuff);
+            }
+            _receiveBuff = newBuffer;
+        }
+    
     }
 }

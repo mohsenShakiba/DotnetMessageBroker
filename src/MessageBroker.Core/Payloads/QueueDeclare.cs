@@ -6,9 +6,13 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Models
 {
-    public ref struct Subscribe
+    /// <summary>
+    /// will create a new queue, if not exists
+    /// </summary>
+    public ref struct QueueDeclare
     {
         public Guid Id { get; init; }
-        public int Concurrency { get; init; }
+        public string Name { get; init; }
+        public string Route { get; init; }
     }
 }

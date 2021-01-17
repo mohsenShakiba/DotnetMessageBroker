@@ -1,14 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Models
 {
-    public ref struct Listen
+    /// <summary>
+    /// will unsubscribe the queue if possible
+    /// </summary>
+    public ref struct UnSubscribeQueue
     {
         public Guid Id { get; init; }
         public string QueueName { get; init; }
-    };
+    }
 }

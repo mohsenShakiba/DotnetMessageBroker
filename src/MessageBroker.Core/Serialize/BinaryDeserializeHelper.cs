@@ -1,12 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Buffers;
 using System.Text;
-using System.Threading.Tasks;
+using MessageBroker.Core.BufferPool;
 
-namespace MessageBroker.Core.BufferPool
+namespace MessageBroker.Core.Serialize
 {
-    public class ReceivePayload
+    /// <summary>
+    /// BinaryDeserializeHelper is a utility class to that provides helper methods to deserialize binary to payload 
+    /// </summary>
+    public class BinaryDeserializeHelper
     {
         private static byte[] _delimiter;
 
@@ -39,20 +41,34 @@ namespace MessageBroker.Core.BufferPool
         public Guid ReadNextGuid()
         {
             var data = _receivedData.Span.Slice(_currentOffset, 16);
-            var guid = new Guid(data);
             _currentOffset += 16 + 1;
-            return guid;
+            return new Guid(data);
         }
 
         public string ReadNextString()
         {
             var data = _receivedData.Span.Slice(_currentOffset);
             var indexOfDelimiter = data.IndexOf(Delimiter);
-
+            _currentOffset += indexOfDelimiter + 1;
+            return StringPool.Shared.GetStringForBytes(data.Slice(0, indexOfDelimiter));
         }
 
+        public int ReadNextInt()
+        {
+            var data = _receivedData.Span.Slice(_currentOffset, 4);
+            _currentOffset += 4 + 1;
+            return BitConverter.ToInt32(data);
+        }
 
-
+        public byte[] ReadNextBytes()
+        {
+            var data = _receivedData.Span.Slice(_currentOffset);
+            var indexOfDelimiter = data.IndexOf(Delimiter);
+            _currentOffset += indexOfDelimiter + 1;
+            var arr = ArrayPool<byte>.Shared.Rent(indexOfDelimiter);
+            data.Slice(0, indexOfDelimiter).CopyTo(arr);
+            return arr;
+        }
 
     }
 }

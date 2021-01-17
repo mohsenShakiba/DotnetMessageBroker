@@ -1,44 +1,29 @@
 ﻿using MessageBroker.Core.BufferPool;
 using MessageBroker.Core.Models;
-using MessageBroker.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MessageBroker.Core.Payloads;
 
 namespace MessageBroker.Core.Serialize
 {
     public class DefaultSerializer: ISerializer
     {
-        private readonly IBufferPool _bufferPool;
 
-        private static byte[] _delimiter;
-
-        public static Span<byte> Delimiter
+        public PayloadType ParsePayloadType(Memory<byte> b)
         {
-            get
-            {
-                if (_delimiter != null)
-                {
-                    return _delimiter.AsSpan();
-                }
-
-                var delimiter = "\n";
-                var delimiterB = Encoding.ASCII.GetBytes(delimiter);
-                _delimiter = delimiterB;
-                return delimiterB;
-            }
+            var messageType = (PayloadType)BitConverter.ToInt32(b.Slice(0, 4).Span);
+            return messageType;
         }
 
-        public DefaultSerializer(IBufferPool bufferPool)
-        {
-            _bufferPool = bufferPool;
-        }
+        #region Serialize
+
 
         public SendPayload ToSendPayload(Ack ack)
         {
-            var sendPayload = _bufferPool.RendSendPayload();
+            var sendPayload = ObjectPool.Shared.RentBinarySerializeHelper();
 
             return sendPayload
                 .WriteType(PayloadType.Ack)
@@ -48,7 +33,7 @@ namespace MessageBroker.Core.Serialize
 
         public SendPayload ToSendPayload(Message msg)
         {
-            var sendPayload = _bufferPool.RendSendPayload();
+            var sendPayload = ObjectPool.Shared.RentBinarySerializeHelper();
 
             return sendPayload
                 .WriteType(PayloadType.Msg)
@@ -60,29 +45,29 @@ namespace MessageBroker.Core.Serialize
 
         public SendPayload ToSendPayload(Subscribe subscribe)
         {
-            var sendPayload = _bufferPool.RendSendPayload();
+            var sendPayload = ObjectPool.Shared.RentBinarySerializeHelper();
 
             return sendPayload
-                .WriteType(PayloadType.Subscribe)
+                .WriteType(PayloadType.Register)
                 .WriteId(subscribe.Id)
                 .WriteInt(subscribe.Concurrency)
                 .Build();
         }
 
-        public SendPayload ToSendPayload(Listen listen)
+        public SendPayload ToSendPayload(SubscribeQueue subscribeQueue)
         {
-            var sendPayload = _bufferPool.RendSendPayload();
+            var sendPayload = ObjectPool.Shared.RentBinarySerializeHelper();
 
             return sendPayload
-                .WriteType(PayloadType.Listen)
-                .WriteId(listen.Id)
-                .WriteStr(listen.QueueName)
+                .WriteType(PayloadType.SubscribeQueue)
+                .WriteId(subscribeQueue.Id)
+                .WriteStr(subscribeQueue.QueueName)
                 .Build();
         }
 
         public SendPayload ToSendPayload(QueueDeclare queue)
         {
-            var sendPayload = _bufferPool.RendSendPayload();
+            var sendPayload = ObjectPool.Shared.RentBinarySerializeHelper();
 
             return sendPayload
                 .WriteType(PayloadType.QueueCreate)
@@ -94,7 +79,7 @@ namespace MessageBroker.Core.Serialize
 
         public SendPayload ToSendPayload(QueueDelete queue)
         {
-            var sendPayload = _bufferPool.RendSendPayload();
+            var sendPayload = ObjectPool.Shared.RentBinarySerializeHelper();
 
             return sendPayload
                 .WriteType(PayloadType.QueueDelete)
@@ -103,57 +88,49 @@ namespace MessageBroker.Core.Serialize
                 .Build();
         }
 
-        public PayloadType ParsePayloadType(Memory<byte> b)
-        {
-            var messageType = (PayloadType)BitConverter.ToInt32(b.Slice(0, 4).Span);
-            return messageType;
-        }
+        
+        #endregion
 
+        #region Deserialize
 
-        public Ack ToAck(Span<byte> data)
+        public Ack ToAck(Memory<byte> data)
         {
-            var messageId = new Guid(data.Slice(5, 16));
+            var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
+            receivePayload.Setup(data);
+            
+            var messageId = receivePayload.ReadNextGuid();
+            
             return new Ack { Id = messageId };
         }
 
 
-        public Message ToMessage(Span<byte> data)
+        public Message ToMessage(Memory<byte> data)
         {
-            try
+            var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
+            receivePayload.Setup(data);
+
+            var messageId = receivePayload.ReadNextGuid();
+            var route = receivePayload.ReadNextString();
+            var messageMemoryOwner = receivePayload.ReadNextBytes();
+
+            return new Message
             {
-                data = data.Slice(5);
-
-                var messageId = new Guid(data.Slice(0, 16));
-                var indexOfRouteDelimiter = data.Slice(17).IndexOf(Delimiter);
-                var route = Encoding.UTF8.GetString(data.Slice(17, indexOfRouteDelimiter));
-
-                var messageMemoryOwner = _bufferPool.Rent(data.Length - (18 + indexOfRouteDelimiter));
-
-                data.Slice(18 + indexOfRouteDelimiter).CopyTo(messageMemoryOwner.AsSpan());
-
-                return new Message
-                {
-
-                    Id = messageId,
-                    Route = route,
-                    Data = messageMemoryOwner,
-                    OriginalMessageData = messageMemoryOwner
-                };
-            }
-            catch
-            {
-                throw;
-            }
-
+                Id = messageId,
+                Route = route,
+                Data = messageMemoryOwner,
+                OriginalMessageData = messageMemoryOwner
+            };
         }
 
-        public Listen ToListenRoute(Span<byte> data)
+        public SubscribeQueue ToListenRoute(Memory<byte> data)
         {
-            data = data.Slice(5);
-            var id = new Guid(data.Slice(0, 16));
-            var queueName = Encoding.UTF8.GetString(data.Slice(17, data.Length - 18));
+            var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
+            receivePayload.Setup(data);
+            
+            var id = receivePayload.ReadNextGuid();
+            var queueName = receivePayload.ReadNextString();
 
-            return new Listen
+            return new SubscribeQueue
             {
                 Id = id,
                 QueueName = queueName
@@ -161,11 +138,13 @@ namespace MessageBroker.Core.Serialize
         }
 
 
-        public Subscribe ToSubscribe(Span<byte> data)
+        public Subscribe ToSubscribe(Memory<byte> data)
         {
-            data = data.Slice(5);
-            var id = new Guid(data.Slice(0, 16));
-            var concurrency = BitConverter.ToInt32(data.Slice(17, 4));
+            var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
+            receivePayload.Setup(data);
+            
+            var id = receivePayload.ReadNextGuid();
+            var concurrency = receivePayload.ReadNextInt();
 
             return new Subscribe
             {
@@ -174,13 +153,14 @@ namespace MessageBroker.Core.Serialize
             };
         }
 
-        public QueueDeclare ToQueueDeclareModel(Span<byte> data)
+        public QueueDeclare ToQueueDeclareModel(Memory<byte> data)
         {
-            data = data.Slice(5);
-            var id = new Guid(data.Slice(0, 16));
-            var indexOfNameDelimiter = data.Slice(17).IndexOf(Delimiter);
-            var queueName = Encoding.UTF8.GetString(data.Slice(17, indexOfNameDelimiter));
-            var route = Encoding.UTF8.GetString(data.Slice(18 + indexOfNameDelimiter, data.Length - 1 - (18 + indexOfNameDelimiter)));
+            var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
+            receivePayload.Setup(data);
+            
+            var id = receivePayload.ReadNextGuid();
+            var queueName = receivePayload.ReadNextString();
+            var route = receivePayload.ReadNextString();
 
             return new QueueDeclare
             {
@@ -190,11 +170,13 @@ namespace MessageBroker.Core.Serialize
             };
         }
 
-        public QueueDelete ToQueueDeleteModel(Span<byte> data)
+        public QueueDelete ToQueueDeleteModel(Memory<byte> data)
         {
-            data = data.Slice(5);
-            var id = new Guid(data.Slice(0, 16));
-            var queueName = Encoding.UTF8.GetString(data.Slice(17, data.Length - 18));
+            var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
+            receivePayload.Setup(data);
+            
+            var id = receivePayload.ReadNextGuid();
+            var queueName = receivePayload.ReadNextString();
 
             return new QueueDelete
             {
@@ -202,5 +184,8 @@ namespace MessageBroker.Core.Serialize
                 Name = queueName,
             };
         }
+        
+        
+        #endregion
     }
 }

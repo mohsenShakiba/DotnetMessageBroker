@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,8 +6,12 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Models
 {
-    public ref struct Ack
+    /// <summary>
+    /// will subscribe the queue if exists
+    /// </summary>
+    public ref struct SubscribeQueue
     {
         public Guid Id { get; init; }
-    }
+        public string QueueName { get; init; }
+    };
 }

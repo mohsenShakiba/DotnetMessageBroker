@@ -3,7 +3,6 @@ using MessageBroker.Core.BufferPool;
 using MessageBroker.Core.MessageRefStore;
 using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
-using MessageBroker.Messages;
 using MessageBroker.SocketServer.Abstractions;
 using Moq;
 using System;
@@ -20,12 +19,11 @@ namespace Tests
         [Fact]
         public void TestDispatchMessage()
         {
-            var bufferPool = new DefaultBufferPool();
             var messageRefStore = new DefaultMessageRefStore();
             var sessionId = Guid.NewGuid();
             var session = new Mock<IClientSession>(); 
             var sessionResolver = new Mock<ISessionResolver>();
-            var serializer = new DefaultSerializer(bufferPool);
+            var serializer = new DefaultSerializer();
 
             session.Setup(s => s.SessionId).Returns(sessionId);
             sessionResolver.Setup(sr => sr.Resolve(It.IsAny<Guid>())).Returns(session.Object);
@@ -38,7 +36,7 @@ namespace Tests
 
             var originalMessageSendData = serializer.ToSendPayload(originalMessage);
 
-            var message = serializer.ToMessage(originalMessageSendData.Data.Span);
+            var message = serializer.ToMessage(originalMessageSendData.Data);
 
             dispatcher.Dispatch(message, session.Object.SessionId);
 

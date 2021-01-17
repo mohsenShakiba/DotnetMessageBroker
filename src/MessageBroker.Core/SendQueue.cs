@@ -2,7 +2,6 @@
 using MessageBroker.Core.MessageRefStore;
 using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
-using MessageBroker.Messages;
 using MessageBroker.SocketServer.Abstractions;
 using System;
 using System.Buffers;
@@ -12,6 +11,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MessageBroker.Core.Payloads;
 
 namespace MessageBroker.Core
 {
@@ -34,6 +34,7 @@ namespace MessageBroker.Core
         public IClientSession Session => _session;
         private bool IsQueueFull => _currentConcurrency >= _maxConcurrency;
         private bool IsSending = false;
+        private SendPayload _sendPayloadToReelease;
 
 
         public SendQueue(IClientSession session, ISerializer serializer, IMessageRefStore messageRefStore, int maxConcurrency, int currentConcurrency = 0)
@@ -100,6 +101,12 @@ namespace MessageBroker.Core
         /// </summary>
         private void SendPendingMessagesIfQueueNotFull()
         {
+            if (_sendPayloadToReelease != null)
+            {
+                ObjectPool.Shared.Return(_sendPayloadToReelease);
+                _sendPayloadToReelease = null;
+            }
+
             IsSending = false;
 
             if (IsQueueFull)
@@ -118,14 +125,15 @@ namespace MessageBroker.Core
         {
             //Interlocked.Increment(ref _currentConcurrency);
             //_pendingMessages.Add(sendPayload.Id);
-            //_session.Send(sendPayload.Data);
             var sendAsync = _session.SendAsync(sendPayload.Data);
             if (!sendAsync)
             {
+                ObjectPool.Shared.Return(sendPayload);
                 SendPendingMessagesIfQueueNotFull();
             }
             else
             {
+                _sendPayloadToReelease = sendPayload;
                 IsSending = true;
             }
         }
