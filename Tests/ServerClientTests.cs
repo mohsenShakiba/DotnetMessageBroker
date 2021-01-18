@@ -1,5 +1,4 @@
 ﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer;
 using Microsoft.Extensions.Logging;
@@ -10,6 +9,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MessageBroker.Core.Payloads;
 using Tests.Classes;
 using Xunit;
 
@@ -30,7 +30,7 @@ namespace Tests
 
             var serializer = new DefaultSerializer();
             var loggerFactory = new LoggerFactory();
-            var messageProcessor = new TestMessageProcessor();
+            var messageProcessor = new TestSocketEventProcessor();
             var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
 
@@ -85,7 +85,7 @@ namespace Tests
 
             var serializer = new DefaultSerializer();
             var loggerFactory = new LoggerFactory();
-            var messageProcessor = new TestMessageProcessor();
+            var messageProcessor = new TestSocketEventProcessor();
             var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
             var eventListener = new TestEventListener();

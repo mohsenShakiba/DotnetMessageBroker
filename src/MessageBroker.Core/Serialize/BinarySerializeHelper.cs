@@ -3,7 +3,6 @@ using System.Buffers;
 using System.Text;
 using MessageBroker.Core.BufferPool;
 using MessageBroker.Core.Configurations;
-using MessageBroker.Core.Models;
 using MessageBroker.Core.Payloads;
 
 namespace MessageBroker.Core.Serialize
@@ -11,19 +10,23 @@ namespace MessageBroker.Core.Serialize
     /// <summary>
     /// BinarySerializeHelper is a utility class that provides method for serialize a payload to binary 
     /// </summary>
-    public class BinarySerializeHelper: IDisposable
+    public class BinarySerializeHelper : IDisposable
     {
         private byte[] _buffer;
         private int _currentBufferOffset;
+        private Guid _id;
+        private PayloadType _type;
 
         public BinarySerializeHelper WriteType(PayloadType type)
         {
-            return WriteInt((int)type);
+            _type = type;
+            return WriteInt((int) type);
         }
 
         public BinarySerializeHelper WriteId(Guid id)
         {
-            const int requiredSizeForGuid = 16 + 1; 
+            _id = id;
+            const int requiredSizeForGuid = 16 + 1;
             MakeSureBufferSizeHasRoomForSize(requiredSizeForGuid);
             var bufferSpan = _buffer.AsSpan(_currentBufferOffset);
             id.TryWriteBytes(bufferSpan);
@@ -34,7 +37,7 @@ namespace MessageBroker.Core.Serialize
 
         public BinarySerializeHelper WriteInt(int i)
         {
-            const int requiredSizeForInt = 4 + 1; 
+            const int requiredSizeForInt = 4 + 1;
             MakeSureBufferSizeHasRoomForSize(requiredSizeForInt);
             var bufferSpan = _buffer.AsSpan(_currentBufferOffset);
             BitConverter.TryWriteBytes(bufferSpan, i);
@@ -67,16 +70,21 @@ namespace MessageBroker.Core.Serialize
 
         public SendPayload Build()
         {
-            var bufferSpan = _buffer.AsSpan();
-            var headerSize = ConfigurationProvider.Shared.BaseConfiguration.MessageHeaderSize;
-            BitConverter.TryWriteBytes(bufferSpan, _currentBufferOffset - headerSize);
-            
-            var sendPayload = ObjectPool.Shared.RentSendPayload();
-            sendPayload.FillFrom(_buffer, _currentBufferOffset);
-            
-            ObjectPool.Shared.Return(this);
+            try
+            {
+                var bufferSpan = _buffer.AsSpan();
+                var headerSize = ConfigurationProvider.Shared.BaseConfiguration.MessageHeaderSize;
+                BitConverter.TryWriteBytes(bufferSpan, _currentBufferOffset - headerSize);
 
-            return sendPayload;
+                var sendPayload = ObjectPool.Shared.RentSendPayload();
+                sendPayload.FillFrom(_buffer, _currentBufferOffset, _id, _type);
+
+                return sendPayload;
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(this);
+            }
         }
 
         public void Refresh()
@@ -89,12 +97,12 @@ namespace MessageBroker.Core.Serialize
         public void Setup()
         {
             var baseConfiguration = ConfigurationProvider.Shared.BaseConfiguration;
-            
+
             if (_buffer == null)
             {
                 _buffer = ArrayPool<byte>.Shared.Rent(baseConfiguration.StartMessageSize);
             }
-            
+
             _currentBufferOffset = baseConfiguration.MessageHeaderSize;
         }
 
@@ -113,9 +121,7 @@ namespace MessageBroker.Core.Serialize
                 _buffer.CopyTo(newBuffer.AsMemory());
                 ArrayPool<byte>.Shared.Return(_buffer);
                 _buffer = newBuffer;
-            } 
+            }
         }
-
     }
-
 }

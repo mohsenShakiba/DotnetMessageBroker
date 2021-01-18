@@ -1,11 +1,6 @@
 ﻿using System;
-using System.Buffers;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MessageBroker.Core.Models
+namespace MessageBroker.Core.Payloads
 {
     /// <summary>
     /// the message contains data that is sent by publisher and received by subscriber

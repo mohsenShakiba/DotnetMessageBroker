@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace MessageBroker.Core.MessageProcessor
+namespace MessageBroker.SocketServer.Abstractions
 {
-    public interface IMessageProcessor
+    public interface ISocketEventProcessor
     {
         void ClientConnected(Guid sessionId);
         void ClientDisconnected(Guid sessionId);

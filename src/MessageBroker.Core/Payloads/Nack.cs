@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace MessageBroker.Core.Models
+namespace MessageBroker.Core.Payloads
 {
     /// <summary>
     /// indicating the payload process failed

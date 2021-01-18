@@ -1,5 +1,4 @@
 ﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -43,14 +42,14 @@ namespace MessageBroker.Core.Serialize
                 .Build();
         }
 
-        public SendPayload ToSendPayload(Subscribe subscribe)
+        public SendPayload ToSendPayload(Register register)
         {
             var sendPayload = ObjectPool.Shared.RentBinarySerializeHelper();
 
             return sendPayload
                 .WriteType(PayloadType.Register)
-                .WriteId(subscribe.Id)
-                .WriteInt(subscribe.Concurrency)
+                .WriteId(register.Id)
+                .WriteInt(register.Concurrency)
                 .Build();
         }
 
@@ -97,10 +96,18 @@ namespace MessageBroker.Core.Serialize
         {
             var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
             receivePayload.Setup(data);
-            
-            var messageId = receivePayload.ReadNextGuid();
-            
-            return new Ack { Id = messageId };
+
+            try
+            {
+                var messageId = receivePayload.ReadNextGuid();
+                
+                return new Ack { Id = messageId };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+
         }
 
 
@@ -109,80 +116,123 @@ namespace MessageBroker.Core.Serialize
             var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
             receivePayload.Setup(data);
 
-            var messageId = receivePayload.ReadNextGuid();
-            var route = receivePayload.ReadNextString();
-            var messageMemoryOwner = receivePayload.ReadNextBytes();
-
-            return new Message
+            try
             {
-                Id = messageId,
-                Route = route,
-                Data = messageMemoryOwner,
-                OriginalMessageData = messageMemoryOwner
-            };
+                var messageId = receivePayload.ReadNextGuid();
+                var route = receivePayload.ReadNextString();
+                var messageMemoryOwner = receivePayload.ReadNextBytes();
+
+                return new Message
+                {
+                    Id = messageId,
+                    Route = route,
+                    Data = messageMemoryOwner,
+                    OriginalMessageData = messageMemoryOwner
+                };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+
         }
 
         public SubscribeQueue ToListenRoute(Memory<byte> data)
         {
             var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
             receivePayload.Setup(data);
-            
-            var id = receivePayload.ReadNextGuid();
-            var queueName = receivePayload.ReadNextString();
 
-            return new SubscribeQueue
+            try
             {
-                Id = id,
-                QueueName = queueName
-            };
+                var id = receivePayload.ReadNextGuid();
+                var queueName = receivePayload.ReadNextString();
+
+                return new SubscribeQueue
+                {
+                    Id = id,
+                    QueueName = queueName
+                };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+
         }
 
 
-        public Subscribe ToSubscribe(Memory<byte> data)
+        public Register ToSubscribe(Memory<byte> data)
         {
             var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
             receivePayload.Setup(data);
-            
-            var id = receivePayload.ReadNextGuid();
-            var concurrency = receivePayload.ReadNextInt();
 
-            return new Subscribe
+            try
             {
-                Id = id,
-                Concurrency = concurrency
-            };
+                var id = receivePayload.ReadNextGuid();
+                var concurrency = receivePayload.ReadNextInt();
+
+                return new Register
+                {
+                    Id = id,
+                    Concurrency = concurrency
+                };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+            
+            
         }
 
         public QueueDeclare ToQueueDeclareModel(Memory<byte> data)
         {
             var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
             receivePayload.Setup(data);
-            
-            var id = receivePayload.ReadNextGuid();
-            var queueName = receivePayload.ReadNextString();
-            var route = receivePayload.ReadNextString();
 
-            return new QueueDeclare
+            try
             {
-                Id = id,
-                Name = queueName,
-                Route = route
-            };
+                var id = receivePayload.ReadNextGuid();
+                var queueName = receivePayload.ReadNextString();
+                var route = receivePayload.ReadNextString();
+
+                return new QueueDeclare
+                {
+                    Id = id,
+                    Name = queueName,
+                    Route = route
+                };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+            
+            
         }
 
         public QueueDelete ToQueueDeleteModel(Memory<byte> data)
         {
             var receivePayload = ObjectPool.Shared.RentDeSerializeBinaryHelper();
             receivePayload.Setup(data);
-            
-            var id = receivePayload.ReadNextGuid();
-            var queueName = receivePayload.ReadNextString();
 
-            return new QueueDelete
+            try
             {
-                Id = id,
-                Name = queueName,
-            };
+                var id = receivePayload.ReadNextGuid();
+                var queueName = receivePayload.ReadNextString();
+
+                return new QueueDelete
+                {
+                    Id = id,
+                    Name = queueName,
+                };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+            
+            
         }
         
         

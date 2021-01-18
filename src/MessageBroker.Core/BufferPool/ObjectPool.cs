@@ -7,7 +7,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using MessageBroker.Core.Configurations;
-using MessageBroker.Core.Models;
 using MessageBroker.Core.Payloads;
 using MessageBroker.Core.Serialize;
 
@@ -83,7 +82,6 @@ namespace MessageBroker.Core.BufferPool
 
         public void Return(SendPayload payload)
         {
-            payload.Dispose();
             _sendPayloadPool.Add(payload);
         }
 

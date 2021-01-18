@@ -1,11 +1,11 @@
-﻿using MessageBroker.Core.Models;
-using MessageBroker.Core.Persistance;
+﻿using MessageBroker.Core.Persistance;
 using MessageBroker.Core.RouteMatching;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MessageBroker.Core.Payloads;
 
 namespace MessageBroker.Core.Queue
 {

@@ -1,13 +1,13 @@
-﻿using MessageBroker.Core.MessageProcessor;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MessageBroker.SocketServer.Abstractions;
 
 namespace Tests.Classes
 {
-    public class TestMessageProcessor : IMessageProcessor
+    public class TestSocketEventProcessor : ISocketEventProcessor
     {
 
         public event Action<Guid, Memory<byte>> OnDataReceived;

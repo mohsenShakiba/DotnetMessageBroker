@@ -1,7 +1,5 @@
 ﻿using MessageBroker.Core;
 using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.MessageRefStore;
-using MessageBroker.Core.Models;
 using MessageBroker.Core.Persistance;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Serialize;
@@ -15,6 +13,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MessageBroker.Core.Payloads;
 using Tests.Classes;
 using Xunit;
 
@@ -23,7 +22,7 @@ namespace Tests
     public class PublisherSubscriberTests
     {
         [Theory]
-        [InlineData(1_000_000)]
+        [InlineData(10_000)]
         public void TestPublishSubscribe(int count)
         {
             var resetEvent = new ManualResetEvent(false);
@@ -37,15 +36,14 @@ namespace Tests
 
             var resolver = new SessionResolver();
             var sessionConfiguration = SessionConfiguration.Default();
-            var messageRefStore = new DefaultMessageRefStore();
             var bufferPool = new ObjectPool();
             var messageStore = new InMemoryMessageStore();
             var serializer = new DefaultSerializer();
-            var dispatcher = new MessageDispatcher(resolver, serializer, messageRefStore);
+            var dispatcher = new MessageDispatcher(resolver, serializer);
             var routeMatching = new DefaultRouteMatching();
             var publisherEventListener = new TestEventListener();
             var subscriberEventListener = new TestEventListener();
-            var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, messageStore, messageRefStore,  loggerFactory.CreateLogger<Coordinator>());
+            var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, messageStore, loggerFactory.CreateLogger<Coordinator>());
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
@@ -71,7 +69,7 @@ namespace Tests
             Thread.Sleep(1000);
 
             // send subscribe
-            var subscribe = new Subscribe { Id = Guid.NewGuid(), Concurrency = 10 };
+            var subscribe = new Register { Id = Guid.NewGuid(), Concurrency = 100 };
             var subscribeB = serializer.ToSendPayload(subscribe);
             subscriber.Send(subscribeB.Data);
 

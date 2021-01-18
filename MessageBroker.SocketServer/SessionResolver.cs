@@ -6,6 +6,10 @@ using System.Linq;
 
 namespace MessageBroker.SocketServer
 {
+    /// <summary>
+    /// SessionResolver is used to retrieve sessions based on session guid
+    /// this class is used by dispatcher
+    /// </summary>
     public class SessionResolver : ISessionResolver
     {
 

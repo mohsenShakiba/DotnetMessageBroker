@@ -23,10 +23,11 @@ namespace MessageBroker.SocketServer
         private readonly SocketAsyncEventArgs _receiveEventArgs;
         private readonly SocketAsyncEventArgs _sizeEventArgs;
         private readonly AutoResetEvent _receiveResetEvent;
-        private readonly AutoResetEvent _sendResetEvent;
         private readonly ILogger<ClientSession> _logger;
 
         private byte[] _receiveBuff;
+        private byte[] _sendBuff;
+        private bool _isSending;
         private bool _connected;
 
         public ClientSession(ISessionEventListener eventListener, Socket socket, SessionConfiguration config, ILogger<ClientSession> logger)
@@ -44,11 +45,11 @@ namespace MessageBroker.SocketServer
             _sizeEventArgs = new();
 
             _receiveResetEvent = new(false);
-            _sendResetEvent = new(true);
-
+            
             SetupEventArgs();
 
             SetupReceiveBufferWithSize();
+            SetupSendBufferWithSize();
 
             Receive();
         }
@@ -98,7 +99,7 @@ namespace MessageBroker.SocketServer
 
         private void OnMessageSizeReceived(object _, SocketAsyncEventArgs args)
         {
-            // get the transfered size
+            // get the transferred size
             var size = args.BytesTransferred;
 
             // if operation fails
@@ -118,10 +119,10 @@ namespace MessageBroker.SocketServer
             }
 
             // convert the first 4 bytes of the buffer to int32
-            var msgSeize = BitConverter.ToInt32(_receiveBuff.AsSpan(0, _config.DefaultHeaderSize));
+            var msgSize = BitConverter.ToInt32(_receiveBuff.AsSpan(0, _config.DefaultHeaderSize));
 
             // receive exactly the size converted from the last step
-            ReceiveMsg(msgSeize);
+            ReceiveMsg(msgSize);
         }
 
         #endregion
@@ -155,7 +156,7 @@ namespace MessageBroker.SocketServer
 
         private void OnMessageReceived(object _, SocketAsyncEventArgs args)
         {
-            // get the transfered size
+            // get the transferred size
             var size = args.BytesTransferred;
 
             // if operation fails
@@ -184,6 +185,10 @@ namespace MessageBroker.SocketServer
 
         #region Send   
 
+        /// <summary>
+        /// sets an action for when send async finished sending data
+        /// </summary>
+        /// <param name="onSendCompleted"></param>
         public void SetupSendCompletedHandler(Action onSendCompleted)
         {
             _sendEventArgs.Completed += (_, _) =>
@@ -192,21 +197,40 @@ namespace MessageBroker.SocketServer
             };
         }
 
+        /// <summary>
+        /// Send is synchronous and will block until the message is sent
+        /// this method is only used for testing
+        /// </summary>
+        /// <param name="payload"></param>
         public void Send(Memory<byte> payload)
         {
             _socket.Send(payload.Span);
         }
 
+        /// <summary>
+        /// SendAsync will asynchronously send the message, then it will call the complete handler
+        /// </summary>
+        /// <param name="payload"></param>
+        /// <returns></returns>
         public bool SendAsync(Memory<byte> payload)
         {
+            // if (payload.Length > _sendBuff.Length)
+            //     SetupSendBufferWithSize(payload.Length);
+            //
+            // payload.CopyTo(_sendBuff);
+            
             _sendEventArgs.SetBuffer(payload);
+            
             return _socket.SendAsync(_sendEventArgs);
         }
 
-
         #endregion
 
-        protected void OnReceived(Memory<byte> buff)
+        /// <summary>
+        /// OnReceive is called when the a message is successfully received
+        /// </summary>
+        /// <param name="buff"></param>
+        private void OnReceived(Memory<byte> buff)
         {
             _logger.LogInformation($"received {buff.Length} from client");
             _eventListener.OnReceived(SessionId, buff);
@@ -230,15 +254,31 @@ namespace MessageBroker.SocketServer
             Close();
         }
 
+        /// <summary>
+        /// SetupReceiveBufferWithSize is called when the size of message to be received is larger than the current buffer
+        /// so we need to increase the size of buffer 
+        /// </summary>
+        /// <param name="desiredSize"></param>
         private void SetupReceiveBufferWithSize(int? desiredSize = null)
         {
-            var size = desiredSize ?? _config.DefaultMaxBodySize;
+            var size = desiredSize ?? _config.DefaultBodySize;
             var newBuffer = ArrayPool<byte>.Shared.Rent(size + _config.DefaultHeaderSize);
             if (_receiveBuff != null)
             {
                 ArrayPool<byte>.Shared.Return(_receiveBuff);
             }
             _receiveBuff = newBuffer;
+        }
+        
+        private void SetupSendBufferWithSize(int? desiredSize = null)
+        {
+            var size = desiredSize ?? _config.DefaultBodySize;
+            var newBuffer = ArrayPool<byte>.Shared.Rent(size);
+            if (_sendBuff != null)
+            {
+                ArrayPool<byte>.Shared.Return(_sendBuff);
+            }
+            _sendBuff = newBuffer;
         }
     
     }

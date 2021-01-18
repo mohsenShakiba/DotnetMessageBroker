@@ -1,6 +1,4 @@
 ﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.MessageRefStore;
-using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer.Abstractions;
 using System;
@@ -9,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MessageBroker.Core.Payloads;
 
 namespace MessageBroker.Core
 {
@@ -19,15 +18,13 @@ namespace MessageBroker.Core
     {
         private readonly ISessionResolver _sessionResolver;
         private readonly ISerializer _serializer;
-        private readonly IMessageRefStore _messageRefStore;
         private readonly ConcurrentDictionary<Guid, SendQueue> _sendQueues;
 
 
-        public MessageDispatcher(ISessionResolver sessionResolver, ISerializer serializer, IMessageRefStore messageRefStore)
+        public MessageDispatcher(ISessionResolver sessionResolver, ISerializer serializer)
         {
             _sessionResolver = sessionResolver;
             _serializer = serializer;
-            _messageRefStore = messageRefStore;
             _sendQueues = new();
         }
 
@@ -57,7 +54,8 @@ namespace MessageBroker.Core
             var session = _sessionResolver.Resolve(sessionId);
             if (session != null)
             {
-                var sendQueue = new SendQueue(session, _serializer, _messageRefStore,  concurrency);
+                var sendQueue = new SendQueue(session, _serializer);
+                sendQueue.SetupConcurrency(concurrency);
                 _sendQueues[sessionId] = sendQueue;
             }
         }
@@ -100,6 +98,5 @@ namespace MessageBroker.Core
                 }
             }
         }
-
     }
 }

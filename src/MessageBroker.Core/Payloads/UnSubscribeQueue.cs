@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace MessageBroker.Core.Models
+namespace MessageBroker.Core.Payloads
 {
     /// <summary>
     /// will unsubscribe the queue if possible

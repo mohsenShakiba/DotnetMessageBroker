@@ -1,7 +1,5 @@
 ﻿using MessageBroker.Core;
 using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.MessageRefStore;
-using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer.Abstractions;
 using Moq;
@@ -10,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MessageBroker.Core.Payloads;
 using Xunit;
 
 namespace Tests
@@ -19,7 +18,6 @@ namespace Tests
         [Fact]
         public void TestDispatchMessage()
         {
-            var messageRefStore = new DefaultMessageRefStore();
             var sessionId = Guid.NewGuid();
             var session = new Mock<IClientSession>(); 
             var sessionResolver = new Mock<ISessionResolver>();
@@ -28,7 +26,7 @@ namespace Tests
             session.Setup(s => s.SessionId).Returns(sessionId);
             sessionResolver.Setup(sr => sr.Resolve(It.IsAny<Guid>())).Returns(session.Object);
 
-            var dispatcher = new MessageDispatcher(sessionResolver.Object, serializer, messageRefStore);
+            var dispatcher = new MessageDispatcher(sessionResolver.Object, serializer);
 
             dispatcher.AddSendQueue(sessionId, 1);
 

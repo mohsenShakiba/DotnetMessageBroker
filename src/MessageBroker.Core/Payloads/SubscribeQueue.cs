@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MessageBroker.Core.Models
+namespace MessageBroker.Core.Payloads
 {
     /// <summary>
     /// will subscribe the queue if exists

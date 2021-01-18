@@ -1,7 +1,4 @@
 ﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.MessageProcessor;
-using MessageBroker.Core.MessageRefStore;
-using MessageBroker.Core.Models;
 using MessageBroker.Core.Persistance;
 using MessageBroker.Core.Queue;
 using MessageBroker.Core.RouteMatching;
@@ -12,31 +9,30 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using MessageBroker.Core.Payloads;
 
 namespace MessageBroker.Core
 {
-    public class Coordinator : IMessageProcessor
+    public class Coordinator : ISocketEventProcessor
     {
         private readonly ISessionResolver _sessionResolver;
         private readonly ISerializer _serializer;
         private readonly MessageDispatcher _messageDispatcher;
         private readonly IRouteMatcher _routeMatcher;
         private readonly IMessageStore _messageStore;
-        private readonly IMessageRefStore _messageRefStore;
         private readonly ILogger<Coordinator> _logger;
         private readonly Dictionary<string, IQueue> _queues;
         private readonly List<IQueue> _queueArr;
         public int _stat;
 
         public Coordinator(ISessionResolver sessionResolver, ISerializer serializer, MessageDispatcher messageDispatcher, 
-            IRouteMatcher routeMatcher, IMessageStore messageStore, IMessageRefStore messageRefStore,  ILogger<Coordinator> logger)
+            IRouteMatcher routeMatcher, IMessageStore messageStore, ILogger<Coordinator> logger)
         {
             _sessionResolver = sessionResolver;
             _serializer = serializer;
             _messageDispatcher = messageDispatcher;
             _routeMatcher = routeMatcher;
             _messageStore = messageStore;
-            _messageRefStore = messageRefStore;
             _logger = logger;
             _queues = new();
             _queueArr = new();
@@ -152,10 +148,10 @@ namespace MessageBroker.Core
             }
         }
 
-        private void OnSubscribe(Guid sessionId, Subscribe subscribe)
+        private void OnSubscribe(Guid sessionId, Register register)
         {
-            _messageDispatcher.AddSendQueue(sessionId, subscribe.Concurrency);
-            SendRecievedPayloadAck(sessionId, subscribe.Id);
+            _messageDispatcher.AddSendQueue(sessionId, register.Concurrency);
+            SendRecievedPayloadAck(sessionId, register.Id);
         }
 
 

@@ -1,8 +1,8 @@
 ﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.Models;
 using MessageBroker.Core.Serialize;
 using System;
 using System.Text;
+using MessageBroker.Core.Payloads;
 using Xunit;
 
 namespace Tests
@@ -65,7 +65,7 @@ namespace Tests
         [Fact]
         public void TestParseSubscribe()
         {
-            var subscribe = new Subscribe { Id = Guid.NewGuid(), Concurrency = 10 };
+            var subscribe = new Register { Id = Guid.NewGuid(), Concurrency = 10 };
 
             var b = _serializer.ToSendPayload(subscribe);
 
