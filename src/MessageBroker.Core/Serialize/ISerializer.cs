@@ -1,5 +1,4 @@
-﻿using MessageBroker.Core.BufferPool;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,6 +10,7 @@ namespace MessageBroker.Core.Serialize
     public interface ISerializer
     {
         SendPayload ToSendPayload(Ack ack);
+        SendPayload ToSendPayload(Nack nack);
         SendPayload ToSendPayload(Message msg);
         SendPayload ToSendPayload(Register register);
         SendPayload ToSendPayload(SubscribeQueue subscribeQueue);

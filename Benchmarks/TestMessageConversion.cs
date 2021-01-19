@@ -18,14 +18,14 @@ namespace Benchmarks
         private readonly ISerializer _serializer;
         private readonly SessionResolver _sessionResolver;
         private readonly MessageDispatcher _messageDispatcher;
-        private readonly DefaultRouteMatching _defaultRouteMatcher;
+        private readonly RouteMatcher _routeMatcher;
         private readonly InMemoryMessageStore _imessageStore;
         private readonly Coordinator _coordinator;
         private readonly SendPayload _sendPayload;
 
         public TestMessageConversion()
         {
-            _serializer = new DefaultSerializer();
+            _serializer = new Serializer();
             _sessionResolver = new SessionResolver();
             _messageDispatcher = new MessageDispatcher(_sessionResolver, _serializer);
 
@@ -33,10 +33,10 @@ namespace Benchmarks
             {
             });
 
-            _defaultRouteMatcher = new DefaultRouteMatching();
+            _routeMatcher = new RouteMatcher();
             _imessageStore = new InMemoryMessageStore();
             
-            _coordinator = new Coordinator(_sessionResolver, _serializer, _messageDispatcher, _defaultRouteMatcher, _imessageStore,  loggerFactory.CreateLogger<Coordinator>());
+            _coordinator = new Coordinator(_sessionResolver, _serializer, _messageDispatcher, _routeMatcher, _imessageStore,  loggerFactory.CreateLogger<Coordinator>());
 
             var sessionId = Guid.NewGuid();
             var testSession = new TestClientSession();

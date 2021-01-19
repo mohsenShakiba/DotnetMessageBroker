@@ -1,5 +1,4 @@
-﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.Serialize;
+﻿using MessageBroker.Core.Serialize;
 using System;
 using System.Text;
 using MessageBroker.Core.Payloads;
@@ -10,11 +9,11 @@ namespace Tests
     public class ParserTests
     {
 
-        private DefaultSerializer _serializer;
+        private Serializer _serializer;
 
         public ParserTests()
         {
-            _serializer = new DefaultSerializer();
+            _serializer = new Serializer();
         }
 
         [Fact]

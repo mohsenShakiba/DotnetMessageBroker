@@ -1,5 +1,4 @@
 ﻿using MessageBroker.Core;
-using MessageBroker.Core.BufferPool;
 using MessageBroker.Core.Persistance;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Serialize;
@@ -14,6 +13,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Core.Payloads;
+using MessageBroker.Core.Pools;
 using Tests.Classes;
 using Xunit;
 
@@ -22,7 +22,7 @@ namespace Tests
     public class PublisherSubscriberTests
     {
         [Theory]
-        [InlineData(10_000)]
+        [InlineData(50_000)]
         public void TestPublishSubscribe(int count)
         {
             var resetEvent = new ManualResetEvent(false);
@@ -38,9 +38,9 @@ namespace Tests
             var sessionConfiguration = SessionConfiguration.Default();
             var bufferPool = new ObjectPool();
             var messageStore = new InMemoryMessageStore();
-            var serializer = new DefaultSerializer();
+            var serializer = new Serializer();
             var dispatcher = new MessageDispatcher(resolver, serializer);
-            var routeMatching = new DefaultRouteMatching();
+            var routeMatching = new RouteMatcher();
             var publisherEventListener = new TestEventListener();
             var subscriberEventListener = new TestEventListener();
             var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, messageStore, loggerFactory.CreateLogger<Coordinator>());
@@ -66,21 +66,21 @@ namespace Tests
             var queueDeclareB = serializer.ToSendPayload(queueDeclare);
             subscriber.Send(queueDeclareB.Data);
 
-            Thread.Sleep(1000);
+            Thread.Sleep(100);
 
             // send subscribe
             var subscribe = new Register { Id = Guid.NewGuid(), Concurrency = 100 };
             var subscribeB = serializer.ToSendPayload(subscribe);
             subscriber.Send(subscribeB.Data);
 
-            Thread.Sleep(1000);
+            Thread.Sleep(100);
 
             // send listen
             var listen = new SubscribeQueue { Id = Guid.NewGuid(), QueueName = "TEST" };
             var listenB = serializer.ToSendPayload(listen);
             subscriber.Send(listenB.Data);
 
-            Thread.Sleep(1000);
+            Thread.Sleep(100);
 
             var receivedMessageCount = 0;
             var receivedAckCount = 0;

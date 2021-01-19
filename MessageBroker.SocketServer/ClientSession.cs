@@ -27,7 +27,6 @@ namespace MessageBroker.SocketServer
 
         private byte[] _receiveBuff;
         private byte[] _sendBuff;
-        private bool _isSending;
         private bool _connected;
 
         public ClientSession(ISessionEventListener eventListener, Socket socket, SessionConfiguration config, ILogger<ClientSession> logger)
@@ -214,12 +213,12 @@ namespace MessageBroker.SocketServer
         /// <returns></returns>
         public bool SendAsync(Memory<byte> payload)
         {
-            // if (payload.Length > _sendBuff.Length)
-            //     SetupSendBufferWithSize(payload.Length);
-            //
-            // payload.CopyTo(_sendBuff);
+            if (_sendBuff.Length < payload.Length) 
+                SetupSendBufferWithSize(payload.Length);
             
-            _sendEventArgs.SetBuffer(payload);
+            payload.CopyTo(_sendBuff);
+                
+            _sendEventArgs.SetBuffer(_sendBuff.AsMemory(0, payload.Length));
             
             return _socket.SendAsync(_sendEventArgs);
         }

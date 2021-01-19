@@ -1,14 +1,14 @@
-﻿using MessageBroker.Core.BufferPool;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using MessageBroker.Core.Payloads;
+using MessageBroker.Core.Pools;
 
 namespace MessageBroker.Core.Serialize
 {
-    public class DefaultSerializer: ISerializer
+    public class Serializer: ISerializer
     {
 
         public PayloadType ParsePayloadType(Memory<byte> b)
@@ -26,6 +26,16 @@ namespace MessageBroker.Core.Serialize
 
             return sendPayload
                 .WriteType(PayloadType.Ack)
+                .WriteId(ack.Id)
+                .Build();
+        }
+        
+        public SendPayload ToSendPayload(Nack ack)
+        {
+            var sendPayload = ObjectPool.Shared.RentBinarySerializeHelper();
+
+            return sendPayload
+                .WriteType(PayloadType.Nack)
                 .WriteId(ack.Id)
                 .Build();
         }

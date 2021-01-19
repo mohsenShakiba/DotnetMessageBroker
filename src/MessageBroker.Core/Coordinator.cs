@@ -1,5 +1,4 @@
-﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.Persistance;
+﻿using MessageBroker.Core.Persistance;
 using MessageBroker.Core.Queue;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Serialize;
@@ -165,7 +164,7 @@ namespace MessageBroker.Core
             }
 
             var sessionSelectionPolicy = new RandomSessionSelectionPolicy();
-            queue = new MessageQueue(_messageDispatcher, sessionSelectionPolicy, _messageStore, _routeMatcher);
+            queue = new Queue.Queue(_messageDispatcher, sessionSelectionPolicy, _messageStore, _routeMatcher);
             queue.Setup(queueDeclare.Name, queueDeclare.Route);
 
             _queues[queueDeclare.Name] = queue;

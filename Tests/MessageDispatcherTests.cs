@@ -1,5 +1,4 @@
 ﻿using MessageBroker.Core;
-using MessageBroker.Core.BufferPool;
 using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer.Abstractions;
 using Moq;
@@ -21,7 +20,7 @@ namespace Tests
             var sessionId = Guid.NewGuid();
             var session = new Mock<IClientSession>(); 
             var sessionResolver = new Mock<ISessionResolver>();
-            var serializer = new DefaultSerializer();
+            var serializer = new Serializer();
 
             session.Setup(s => s.SessionId).Returns(sessionId);
             sessionResolver.Setup(sr => sr.Resolve(It.IsAny<Guid>())).Returns(session.Object);

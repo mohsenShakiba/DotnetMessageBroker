@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
-namespace MessageBroker.Core.BufferPool
+namespace MessageBroker.Core.Pools
 {
     public class StringPool
     {

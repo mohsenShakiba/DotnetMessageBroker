@@ -84,7 +84,7 @@ namespace Tests.SocketServer
             services.AddSingleton(i => loggerFactory);
             services.AddSingleton(i => sessionConfiguration);
             services.AddSingleton<TcpSocketServer>();
-            services.AddSingleton<ISerializer, DefaultSerializer>();
+            services.AddSingleton<ISerializer, Serializer>();
             
             var serviceProvider = services.BuildServiceProvider();
             

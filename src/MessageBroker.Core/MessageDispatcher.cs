@@ -1,5 +1,4 @@
-﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.Serialize;
+﻿using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer.Abstractions;
 using System;
 using System.Collections.Concurrent;

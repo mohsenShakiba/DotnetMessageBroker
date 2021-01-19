@@ -1,5 +1,4 @@
-﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.Serialize;
+﻿using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer.Abstractions;
 using System;
 using System.Buffers;
@@ -10,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Core.Payloads;
+using MessageBroker.Core.Pools;
 
 namespace MessageBroker.Core
 {
@@ -23,15 +23,15 @@ namespace MessageBroker.Core
         private readonly ISerializer _serializer;
         private readonly ConcurrentQueue<SendPayload> _queue;
         private readonly ConcurrentBag<Guid> _pendingMessages;
-        
+
         private int _currentConcurrency;
         private int _maxConcurrency;
         private bool _isSending;
-        private SendPayload _sendPayloadToRelease;
+        private object _lock;
 
         private bool IsQueueFull => _currentConcurrency >= _maxConcurrency;
         private bool IsQueueEmpty => _currentConcurrency == 0;
-        
+
         public int CurrentConcurrency => _currentConcurrency;
         public int MaxConcurrency => _maxConcurrency;
         public IClientSession Session => _session;
@@ -43,7 +43,8 @@ namespace MessageBroker.Core
             _serializer = serializer;
             _queue = new();
             _pendingMessages = new();
-            
+            _lock = new();
+
             // setup the method that is used when the sending of asynchronous data is compelete
             _session.SetupSendCompletedHandler(SendPendingMessagesIfQueueNotFull);
         }
@@ -97,10 +98,10 @@ namespace MessageBroker.Core
             if (_pendingMessages.Contains(messageId))
             {
                 Interlocked.Decrement(ref _currentConcurrency);
-                
+
                 if (_isSending)
                     return;
-                
+
                 SendPendingMessagesIfQueueNotFull();
             }
         }
@@ -111,20 +112,16 @@ namespace MessageBroker.Core
         /// </summary>
         private void SendPendingMessagesIfQueueNotFull()
         {
-            // if there are any retained references to send payload, release it
-            if (_sendPayloadToRelease != null)
+            lock (_lock)
             {
-                ObjectPool.Shared.Return(_sendPayloadToRelease);
-                _sendPayloadToRelease = null;
+                _isSending = false;
+
+                if (IsQueueFull)
+                    return;
+
+                if (_queue.TryDequeue(out var msg))
+                    Send(msg);
             }
-
-            _isSending = false;
-
-            if (IsQueueFull)
-                return;
-
-            if (_queue.TryDequeue(out var msg))
-                Send(msg);
         }
 
         /// <summary>
@@ -134,38 +131,37 @@ namespace MessageBroker.Core
         /// <param name="sendPayload"></param>
         private void Send(SendPayload sendPayload)
         {
-            // perform the following actions only when payload type is msg
-            if (sendPayload.IsMessageType)
+            lock (_lock)
             {
-                // increment the _currentConcurrency
-                Interlocked.Increment(ref _currentConcurrency);
+                // perform the following actions only when payload type is msg
+                if (sendPayload.IsMessageType)
+                {
+                    // increment the _currentConcurrency
+                    Interlocked.Increment(ref _currentConcurrency);
 
-                // add the id of the payload to list of pending 
-                _pendingMessages.Add(sendPayload.Id);
-            }
+                    // add the id of the payload to list of pending 
+                    _pendingMessages.Add(sendPayload.Id);
+                }
 
-            // send the payload 
-            var sendAsync = _session.SendAsync(sendPayload.Data);
-            
-            // if the message isn't sent asynchronously
-            if (!sendAsync)
-            {
+                // send the payload 
+                var sendAsync = _session.SendAsync(sendPayload.Data);
+
                 // return the send queue to pool
                 ObjectPool.Shared.Return(sendPayload);
-                
-                // check if any pending messages exist
-                SendPendingMessagesIfQueueNotFull();
-            }
-            // otherwise wait for the message to be sent
-            else
-            {
-                // the send payload must be release when the message is sent
-                // so we must retain a reference to it
-                _sendPayloadToRelease = sendPayload;
-                
-                // set is loading to true
-                // so no longer messages will be sent while in progress
-                _isSending = true;
+
+                // if the message isn't sent asynchronously
+                if (!sendAsync)
+                {
+                    // check if any pending messages exist
+                    SendPendingMessagesIfQueueNotFull();
+                }
+                // otherwise wait for the message to be sent
+                else
+                {
+                    // set is loading to true
+                    // so no longer messages will be sent while in progress
+                    _isSending = true;
+                }
             }
         }
     }

@@ -9,7 +9,7 @@ using MessageBroker.Core.Payloads;
 
 namespace MessageBroker.Core.Queue
 {
-    class MessageQueue : IQueue, IDisposable
+    class Queue : IQueue, IDisposable
     {
         private readonly MessageDispatcher _dispatcher;
         private readonly ISessionSelectionPolicy _sessionSelectionPolicy;
@@ -19,7 +19,7 @@ namespace MessageBroker.Core.Queue
         private string _name;
         private string _route;
 
-        public MessageQueue(MessageDispatcher dispatcher, ISessionSelectionPolicy sessionSelectionPolicy, IMessageStore messageStore, 
+        public Queue(MessageDispatcher dispatcher, ISessionSelectionPolicy sessionSelectionPolicy, IMessageStore messageStore, 
             IRouteMatcher routeMatcher)
         {
             _dispatcher = dispatcher;

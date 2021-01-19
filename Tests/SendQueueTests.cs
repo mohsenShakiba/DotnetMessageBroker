@@ -1,5 +1,4 @@
 ﻿using MessageBroker.Core;
-using MessageBroker.Core.BufferPool;
 using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer.Abstractions;
 using Moq;
@@ -18,7 +17,7 @@ namespace Tests
         [Fact]
         public void TestEnqueuWhenFull()
         {
-            var serializer = new DefaultSerializer();
+            var serializer = new Serializer();
             var session = new Mock<IClientSession>();
 
             var messageOne = new Message
@@ -60,7 +59,7 @@ namespace Tests
         [Fact]
         public void TestReleaseWhenMessageDoesNotExists()
         {
-            var serializer = new DefaultSerializer();
+            var serializer = new Serializer();
             var session = new Mock<IClientSession>();
             var sendQueue = new SendQueue(session.Object, serializer);
             sendQueue.SetupConcurrency(1, 1);

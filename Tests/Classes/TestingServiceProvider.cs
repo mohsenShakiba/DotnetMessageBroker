@@ -20,7 +20,7 @@ namespace Tests.Classes
             services.AddSingleton<ISessionResolver, SessionResolver>();
             services.AddSingleton<ISessionEventListener, TcpSocketServer>();
             services.AddSingleton<ISocketEventProcessor, Coordinator>();
-            services.AddSingleton<ISerializer, DefaultSerializer>();
+            services.AddSingleton<ISerializer, Serializer>();
             services.AddSingleton(_ => loggerFactory);
             services.AddSingleton(_ => sessionConfiguration);
 

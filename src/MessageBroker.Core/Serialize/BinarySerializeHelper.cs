@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Buffers;
 using System.Text;
-using MessageBroker.Core.BufferPool;
 using MessageBroker.Core.Configurations;
 using MessageBroker.Core.Payloads;
+using MessageBroker.Core.Pools;
 
 namespace MessageBroker.Core.Serialize
 {

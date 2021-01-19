@@ -1,5 +1,4 @@
-﻿using MessageBroker.Core.BufferPool;
-using MessageBroker.Core.Serialize;
+﻿using MessageBroker.Core.Serialize;
 using MessageBroker.SocketServer;
 using Microsoft.Extensions.Logging;
 using System;
@@ -28,7 +27,7 @@ namespace Tests
             var resetEvent = new ManualResetEvent(false);
             var messageReceivedCount = count;
 
-            var serializer = new DefaultSerializer();
+            var serializer = new Serializer();
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new TestSocketEventProcessor();
             var resolver = new SessionResolver();
@@ -83,7 +82,7 @@ namespace Tests
             var messageReceivedCount = count;
             Guid sessionId = new();
 
-            var serializer = new DefaultSerializer();
+            var serializer = new Serializer();
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new TestSocketEventProcessor();
             var resolver = new SessionResolver();
