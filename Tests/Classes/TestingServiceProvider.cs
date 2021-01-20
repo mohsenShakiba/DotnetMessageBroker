@@ -1,6 +1,5 @@
-﻿using System;
-using MessageBroker.Core;
-using MessageBroker.Core.Serialize;
+﻿using MessageBroker.Core;
+using MessageBroker.Serialization;
 using MessageBroker.SocketServer;
 using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +12,7 @@ namespace Tests.Classes
         public static IServiceCollection New()
         {
             var services = new ServiceCollection();
-            
+
             var loggerFactory = LoggerFactory.Create(_ => { });
             var sessionConfiguration = SessionConfiguration.Default();
 
@@ -25,7 +24,6 @@ namespace Tests.Classes
             services.AddSingleton(_ => sessionConfiguration);
 
             return services;
-
         }
     }
 }

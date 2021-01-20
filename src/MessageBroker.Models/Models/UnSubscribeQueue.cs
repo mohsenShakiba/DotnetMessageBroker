@@ -1,13 +1,13 @@
 ﻿using System;
 
-namespace MessageBroker.Core.Payloads
+namespace MessageBroker.Models.Models
 {
     /// <summary>
-    /// will subscribe the queue if exists
+    ///     will unsubscribe the queue if possible
     /// </summary>
-    public ref struct SubscribeQueue
+    public ref struct UnSubscribeQueue
     {
         public Guid Id { get; init; }
         public string QueueName { get; init; }
-    };
+    }
 }

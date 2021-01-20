@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace MessageBroker.Core.Payloads
+namespace MessageBroker.Models.Models
 {
     /// <summary>
-    /// will delete the queue if exists
+    ///     will delete the queue if exists
     /// </summary>
     public ref struct QueueDelete
     {

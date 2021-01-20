@@ -1,13 +1,10 @@
-﻿using MessageBroker.Core;
-using MessageBroker.Core.Serialize;
+﻿using System;
+using System.Text;
+using MessageBroker.Core;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization;
 using MessageBroker.SocketServer.Abstractions;
 using Moq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MessageBroker.Core.Payloads;
 using Xunit;
 
 namespace Tests
@@ -35,7 +32,7 @@ namespace Tests
             };
 
             var sendQueue = new SendQueue(session.Object, serializer);
-            sendQueue.SetupConcurrency(1, 0);
+            sendQueue.SetupConcurrency(1);
 
             // enqueu first message
             sendQueue.Enqueue(messageOne);

@@ -1,14 +1,14 @@
-﻿using MessageBroker.Core.Serialize;
-using MessageBroker.SocketServer;
-using Microsoft.Extensions.Logging;
-using System;
+﻿using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using MessageBroker.Core.Payloads;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization;
+using MessageBroker.SocketServer;
+using Microsoft.Extensions.Logging;
 using Tests.Classes;
 using Xunit;
 
@@ -16,7 +16,7 @@ namespace Tests
 {
     public class ServerClientTests
     {
-        private Random random = new Random();
+        private readonly Random random = new();
 
         [Theory]
         [InlineData(1_000, 100)]
@@ -71,7 +71,7 @@ namespace Tests
 
             server.Stop();
         }
-        
+
         [Theory]
         [InlineData(1_000, 100)]
         [InlineData(10_000, 100)]
@@ -95,7 +95,7 @@ namespace Tests
             server.Start(ipEndPoint);
 
 
-            messageProcessor.OnClientConnected += (sid) =>
+            messageProcessor.OnClientConnected += sid =>
             {
                 sessionId = sid;
                 resetEvent.Set();
@@ -122,7 +122,7 @@ namespace Tests
             {
                 var buffer = new byte[data.Length];
 
-                for(var i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                 {
                     var len = client.Receive(buffer);
 
@@ -132,17 +132,13 @@ namespace Tests
                 }
 
                 resetEvent.Set();
-
             });
 
             resetEvent.WaitOne();
 
             var clientSession = resolver.Sessions.First();
 
-            for (var i = 0; i < count; i++)
-            {
-                clientSession.Send(payload.Data);
-            }
+            for (var i = 0; i < count; i++) clientSession.Send(payload.Data);
 
             resetEvent.WaitOne();
 
@@ -153,8 +149,7 @@ namespace Tests
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             return new string(Enumerable.Repeat(chars, length)
-              .Select(s => s[random.Next(s.Length)]).ToArray());
+                .Select(s => s[random.Next(s.Length)]).ToArray());
         }
-
     }
 }

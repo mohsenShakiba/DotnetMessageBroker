@@ -1,19 +1,17 @@
-﻿using MessageBroker.Core;
-using MessageBroker.Core.Persistance;
-using MessageBroker.Core.RouteMatching;
-using MessageBroker.Core.Serialize;
-using MessageBroker.SocketServer;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Diagnostics;
-using System.Linq;
+﻿using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using MessageBroker.Core.Payloads;
-using MessageBroker.Core.Pools;
+using MessageBroker.Core;
+using MessageBroker.Core.Persistance;
+using MessageBroker.Core.RouteMatching;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization;
+using MessageBroker.Serialization.Pools;
+using MessageBroker.SocketServer;
+using Microsoft.Extensions.Logging;
 using Tests.Classes;
 using Xunit;
 
@@ -43,7 +41,8 @@ namespace Tests
             var routeMatching = new RouteMatcher();
             var publisherEventListener = new TestEventListener();
             var subscriberEventListener = new TestEventListener();
-            var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, messageStore, loggerFactory.CreateLogger<Coordinator>());
+            var coordiantor = new Coordinator(resolver, serializer, dispatcher, routeMatching, messageStore,
+                loggerFactory.CreateLogger<Coordinator>());
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
@@ -54,29 +53,31 @@ namespace Tests
             // setup publisher
             var publisherSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             publisherSocket.Connect(ipEndPoint);
-            var publisher = new ClientSession(publisherEventListener, publisherSocket, sessionConfiguration, loggerFactory.CreateLogger<ClientSession>());
+            var publisher = new ClientSession(publisherEventListener, publisherSocket, sessionConfiguration,
+                loggerFactory.CreateLogger<ClientSession>());
 
             // setup subscriber
             var subscriberSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             subscriberSocket.Connect(ipEndPoint);
-            var subscriber = new ClientSession(subscriberEventListener, subscriberSocket, sessionConfiguration, loggerFactory.CreateLogger<ClientSession>());
+            var subscriber = new ClientSession(subscriberEventListener, subscriberSocket, sessionConfiguration,
+                loggerFactory.CreateLogger<ClientSession>());
 
             // send declare queue 
-            var queueDeclare = new QueueDeclare { Id = Guid.NewGuid(), Name = "TEST", Route = "TEST" };
+            var queueDeclare = new QueueDeclare {Id = Guid.NewGuid(), Name = "TEST", Route = "TEST"};
             var queueDeclareB = serializer.ToSendPayload(queueDeclare);
             subscriber.Send(queueDeclareB.Data);
 
             Thread.Sleep(100);
 
             // send subscribe
-            var subscribe = new Register { Id = Guid.NewGuid(), Concurrency = 100 };
+            var subscribe = new Register {Id = Guid.NewGuid(), Concurrency = 100};
             var subscribeB = serializer.ToSendPayload(subscribe);
             subscriber.Send(subscribeB.Data);
 
             Thread.Sleep(100);
 
             // send listen
-            var listen = new SubscribeQueue { Id = Guid.NewGuid(), QueueName = "TEST" };
+            var listen = new SubscribeQueue {Id = Guid.NewGuid(), QueueName = "TEST"};
             var listenB = serializer.ToSendPayload(listen);
             subscriber.Send(listenB.Data);
 
@@ -99,7 +100,7 @@ namespace Tests
                             if (receivedMessageCount == count)
                                 resetEvent.Set();
 
-                            var ack = new Ack { Id = receivedMessage.Id };
+                            var ack = new Ack {Id = receivedMessage.Id};
                             var ackB = serializer.ToSendPayload(ack);
                             subscriber.Send(ackB.Data);
 
@@ -137,7 +138,7 @@ namespace Tests
                 for (var i = 0; i < count; i++)
                 {
                     var guid = Guid.NewGuid();
-                    var message = new Message { Id = guid, Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
+                    var message = new Message {Id = guid, Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST")};
                     var messageB = serializer.ToSendPayload(message);
                     publisher.Send(messageB.Data);
                     bufferPool.Return(messageB);
@@ -148,7 +149,9 @@ namespace Tests
             {
                 Console.WriteLine("data is " + coordiantor._stat);
                 Thread.Sleep(1000);
-            };
+            }
+
+            ;
 
             resetEvent.WaitOne();
             publisherAck.WaitOne();

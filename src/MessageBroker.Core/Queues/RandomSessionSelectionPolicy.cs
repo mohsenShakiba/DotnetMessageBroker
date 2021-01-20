@@ -1,23 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
-namespace MessageBroker.Core.Queue
+namespace MessageBroker.Core.Queues
 {
     public class RandomSessionSelectionPolicy : ISessionSelectionPolicy
     {
-
         private readonly List<Guid> _hashTable;
         private readonly Random _random;
         private readonly ReaderWriterLockSlim _wrLock;
 
         public RandomSessionSelectionPolicy()
         {
-            _hashTable = new();
-            _random = new();
+            _hashTable = new List<Guid>();
+            _random = new Random();
             _wrLock = new ReaderWriterLockSlim();
         }
 
@@ -32,7 +29,6 @@ namespace MessageBroker.Core.Queue
             {
                 _wrLock.ExitWriteLock();
             }
-
         }
 
         public Guid? GetNextSession()

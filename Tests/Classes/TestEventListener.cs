@@ -1,17 +1,10 @@
-﻿using MessageBroker.SocketServer.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System;
+using MessageBroker.SocketServer.Abstractions;
 
 namespace Tests.Classes
 {
     public class TestEventListener : ISessionEventListener
     {
-
-        public event Action<Guid, Memory<byte>> ReceivedEvent;
-        public event Action<Guid> SessionDisconnectedEvent;
         public void OnReceived(Guid sessionId, Memory<byte> data)
         {
             ReceivedEvent?.Invoke(sessionId, data);
@@ -21,5 +14,8 @@ namespace Tests.Classes
         {
             SessionDisconnectedEvent?.Invoke(sessionId);
         }
+
+        public event Action<Guid, Memory<byte>> ReceivedEvent;
+        public event Action<Guid> SessionDisconnectedEvent;
     }
 }

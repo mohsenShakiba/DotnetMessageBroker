@@ -1,28 +1,29 @@
-﻿using MessageBroker.SocketServer.Abstractions;
-using Microsoft.Extensions.Logging;
-using System;
+﻿using System;
 using System.Net;
 using System.Net.Sockets;
+using MessageBroker.SocketServer.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.SocketServer
 {
     /// <summary>
-    /// TCP implementation of ISocketServer
+    ///     TCP implementation of ISocketServer
     /// </summary>
     public class TcpSocketServer : ISocketServer, ISessionEventListener
     {
-        private readonly ISocketEventProcessor _socketEventProcessor;
-        private readonly ISessionResolver _sessionResolver;
-        private readonly SessionConfiguration _sessionConfiguration;
-        private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger<TcpSocketServer> _logger;
+        private readonly ILoggerFactory _loggerFactory;
+        private readonly SessionConfiguration _sessionConfiguration;
+        private readonly ISessionResolver _sessionResolver;
+        private readonly ISocketEventProcessor _socketEventProcessor;
+        private IPEndPoint _endPoint;
+        private bool _isAccepting;
 
         private Socket _socket;
         private SocketAsyncEventArgs _socketAsyncEventArgs;
-        private bool _isAccepting;
-        private IPEndPoint _endPoint;
 
-        public TcpSocketServer(ISocketEventProcessor socketEventProcessor, ISessionResolver sessionResolver, SessionConfiguration sessionConfiguration, ILoggerFactory loggerFactory)
+        public TcpSocketServer(ISocketEventProcessor socketEventProcessor, ISessionResolver sessionResolver,
+            SessionConfiguration sessionConfiguration, ILoggerFactory loggerFactory)
         {
             _socketEventProcessor = socketEventProcessor;
             _sessionResolver = sessionResolver;
@@ -31,11 +32,39 @@ namespace MessageBroker.SocketServer
             _logger = _loggerFactory.CreateLogger<TcpSocketServer>();
         }
 
+
         /// <summary>
-        /// This method will start the server and begin accepting connections
+        ///     this method will be called by the session when a new message has been received
+        /// </summary>
+        /// <param name="sessionId">
+        ///     the id of session
+        /// </param>
+        /// <param name="data">
+        ///     the message received
+        /// </param>
+        public void OnReceived(Guid sessionId, Memory<byte> data)
+        {
+            _socketEventProcessor.DataReceived(sessionId, data);
+        }
+
+        /// <summary>
+        ///     this method will be called by the session when client has been forcibly disconnected
+        /// </summary>
+        /// <param name="SessionId">
+        ///     the id of session
+        /// </param>
+        public void OnSessionDisconnected(Guid SessionId)
+        {
+            _logger.LogInformation($"removed session due to being disconnected, sessionId: {SessionId}");
+            _sessionResolver.Remove(SessionId);
+            _socketEventProcessor.ClientDisconnected(SessionId);
+        }
+
+        /// <summary>
+        ///     This method will start the server and begin accepting connections
         /// </summary>
         /// <param name="endpoint">
-        /// the endpoint server will listen on
+        ///     the endpoint server will listen on
         /// </param>
         public void Start(IPEndPoint endpoint)
         {
@@ -48,8 +77,8 @@ namespace MessageBroker.SocketServer
         }
 
         /// <summary>
-        /// will stop and dispose the server,
-        /// all the sessions will be disconnected and removed
+        ///     will stop and dispose the server,
+        ///     all the sessions will be disconnected and removed
         /// </summary>
         public void Stop()
         {
@@ -65,36 +94,8 @@ namespace MessageBroker.SocketServer
             RemoveAllSessions();
         }
 
-
         /// <summary>
-        /// this method will be called by the session when a new message has been received
-        /// </summary>
-        /// <param name="sessionId">
-        /// the id of session 
-        /// </param>
-        /// <param name="data">
-        /// the message received 
-        /// </param>
-        public void OnReceived(Guid sessionId, Memory<byte> data)
-        {
-            _socketEventProcessor.DataReceived(sessionId, data);
-        }
-
-        /// <summary>
-        /// this method will be called by the session when client has been forcibly disconnected
-        /// </summary>
-        /// <param name="SessionId">
-        /// the id of session
-        /// </param>
-        public void OnSessionDisconnected(Guid SessionId)
-        {
-            _logger.LogInformation($"removed session due to being disconnected, sessionId: {SessionId}");
-            _sessionResolver.Remove(SessionId);
-            _socketEventProcessor.ClientDisconnected(SessionId);
-        }
-
-        /// <summary>
-        /// this method is called when a new socket has been soccessfully accepted
+        ///     this method is called when a new socket has been soccessfully accepted
         /// </summary>
         private void CreateSocket()
         {
@@ -109,7 +110,7 @@ namespace MessageBroker.SocketServer
         }
 
         /// <summary>
-        /// begin accepting a connection
+        ///     begin accepting a connection
         /// </summary>
         private void AcceptConnection()
         {
@@ -123,7 +124,7 @@ namespace MessageBroker.SocketServer
         }
 
         /// <summary>
-        /// called by AcceptConnection when accepting compelets 
+        ///     called by AcceptConnection when accepting compelets
         /// </summary>
         /// <param name="_"></param>
         /// <param name="socketAsyncEventArgs">SocketAsyncEventArgs</param>
@@ -143,8 +144,8 @@ namespace MessageBroker.SocketServer
         }
 
         /// <summary>
-        /// called when the socket can be accepted
-        /// this method will create a session
+        ///     called when the socket can be accepted
+        ///     this method will create a session
         /// </summary>
         /// <param name="socket"></param>
         private void OnAcceptSuccess(Socket socket)
@@ -161,7 +162,7 @@ namespace MessageBroker.SocketServer
         }
 
         /// <summary>
-        /// called when accepting socket fails
+        ///     called when accepting socket fails
         /// </summary>
         /// <param name="err"></param>
         private void OnAcceptError(SocketError err)
@@ -170,7 +171,7 @@ namespace MessageBroker.SocketServer
         }
 
         /// <summary>
-        /// called by Stop method to remove all sessions
+        ///     called by Stop method to remove all sessions
         /// </summary>
         private void RemoveAllSessions()
         {
@@ -181,6 +182,5 @@ namespace MessageBroker.SocketServer
                 session.Close();
             }
         }
-
     }
 }

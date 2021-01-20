@@ -1,35 +1,35 @@
-﻿using MessageBroker.SocketServer.Abstractions;
-using Microsoft.Extensions.Logging;
-using System;
+﻿using System;
 using System.Buffers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using MessageBroker.SocketServer.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.SocketServer
 {
     /// <summary>
-    /// ClientSession stores information about the accepted socket
-    /// it will continue to receive data from socket and allows sending data to socket
+    ///     ClientSession stores information about the accepted socket
+    ///     it will continue to receive data from socket and allows sending data to socket
     /// </summary>
     public class ClientSession : IClientSession, IDisposable
     {
-        public Guid SessionId { get; }
-
-        private ISessionEventListener _eventListener;
-        private readonly Socket _socket;
         private readonly SessionConfiguration _config;
-        private readonly SocketAsyncEventArgs _sendEventArgs;
-        private readonly SocketAsyncEventArgs _receiveEventArgs;
-        private readonly SocketAsyncEventArgs _sizeEventArgs;
-        private readonly AutoResetEvent _receiveResetEvent;
         private readonly ILogger<ClientSession> _logger;
+        private readonly SocketAsyncEventArgs _receiveEventArgs;
+        private readonly AutoResetEvent _receiveResetEvent;
+        private readonly SocketAsyncEventArgs _sendEventArgs;
+        private readonly SocketAsyncEventArgs _sizeEventArgs;
+        private readonly Socket _socket;
+        private bool _connected;
+
+        private readonly ISessionEventListener _eventListener;
 
         private byte[] _receiveBuff;
         private byte[] _sendBuff;
-        private bool _connected;
 
-        public ClientSession(ISessionEventListener eventListener, Socket socket, SessionConfiguration config, ILogger<ClientSession> logger)
+        public ClientSession(ISessionEventListener eventListener, Socket socket, SessionConfiguration config,
+            ILogger<ClientSession> logger)
         {
             _logger = logger;
             _eventListener = eventListener;
@@ -39,18 +39,37 @@ namespace MessageBroker.SocketServer
             _connected = true;
             SessionId = Guid.NewGuid();
 
-            _sendEventArgs = new();
-            _receiveEventArgs = new();
-            _sizeEventArgs = new();
+            _sendEventArgs = new SocketAsyncEventArgs();
+            _receiveEventArgs = new SocketAsyncEventArgs();
+            _sizeEventArgs = new SocketAsyncEventArgs();
 
-            _receiveResetEvent = new(false);
-            
+            _receiveResetEvent = new AutoResetEvent(false);
+
             SetupEventArgs();
 
             SetupReceiveBufferWithSize();
             SetupSendBufferWithSize();
 
             Receive();
+        }
+
+        public Guid SessionId { get; }
+
+        public void Close()
+        {
+            _connected = false;
+            _receiveEventArgs.Completed -= OnMessageReceived;
+            _sizeEventArgs.Completed -= OnMessageSizeReceived;
+
+            _socket.Close();
+            _socket.Dispose();
+
+            _eventListener.OnSessionDisconnected(SessionId);
+        }
+
+        public void Dispose()
+        {
+            Close();
         }
 
         private void SetupEventArgs()
@@ -60,7 +79,7 @@ namespace MessageBroker.SocketServer
         }
 
         /// <summary>
-        /// this method will start recieving message from socket
+        ///     this method will start recieving message from socket
         /// </summary>
         private void Receive()
         {
@@ -70,16 +89,46 @@ namespace MessageBroker.SocketServer
                 {
                     ReceiveMessageSize();
                     _receiveResetEvent.WaitOne();
-
                 }
             }, TaskCreationOptions.LongRunning);
+        }
+
+        /// <summary>
+        ///     OnReceive is called when the a message is successfully received
+        /// </summary>
+        /// <param name="buff"></param>
+        private void OnReceived(Memory<byte> buff)
+        {
+            _logger.LogInformation($"received {buff.Length} from client");
+            _eventListener.OnReceived(SessionId, buff);
+        }
+
+        /// <summary>
+        ///     SetupReceiveBufferWithSize is called when the size of message to be received is larger than the current buffer
+        ///     so we need to increase the size of buffer
+        /// </summary>
+        /// <param name="desiredSize"></param>
+        private void SetupReceiveBufferWithSize(int? desiredSize = null)
+        {
+            var size = desiredSize ?? _config.DefaultBodySize;
+            var newBuffer = ArrayPool<byte>.Shared.Rent(size + _config.DefaultHeaderSize);
+            if (_receiveBuff != null) ArrayPool<byte>.Shared.Return(_receiveBuff);
+            _receiveBuff = newBuffer;
+        }
+
+        private void SetupSendBufferWithSize(int? desiredSize = null)
+        {
+            var size = desiredSize ?? _config.DefaultBodySize;
+            var newBuffer = ArrayPool<byte>.Shared.Rent(size);
+            if (_sendBuff != null) ArrayPool<byte>.Shared.Return(_sendBuff);
+            _sendBuff = newBuffer;
         }
 
         #region ReceiveSize
 
         /// <summary>
-        /// this method will read only the 4 bytes of the message to know how long the actual incoming message is.
-        /// it will then call receive message method once the size in known
+        ///     this method will read only the 4 bytes of the message to know how long the actual incoming message is.
+        ///     it will then call receive message method once the size in known
         /// </summary>
         private void ReceiveMessageSize()
         {
@@ -90,10 +139,7 @@ namespace MessageBroker.SocketServer
             _sizeEventArgs.SetBuffer(_receiveBuff, default, _config.DefaultHeaderSize);
 
             // receive the 4 bytes from docket 
-            if (!_socket.ReceiveAsync(_sizeEventArgs))
-            {
-                OnMessageSizeReceived(null, _sizeEventArgs);
-            }
+            if (!_socket.ReceiveAsync(_sizeEventArgs)) OnMessageSizeReceived(null, _sizeEventArgs);
         }
 
         private void OnMessageSizeReceived(object _, SocketAsyncEventArgs args)
@@ -129,7 +175,7 @@ namespace MessageBroker.SocketServer
         #region ReceiveMessage
 
         /// <summary>
-        /// this method will read exactly n bytes from socket
+        ///     this method will read exactly n bytes from socket
         /// </summary>
         /// <param name="msgSize">the size of message to read</param>
         private void ReceiveMsg(int msgSize)
@@ -182,23 +228,20 @@ namespace MessageBroker.SocketServer
 
         #endregion
 
-        #region Send   
+        #region Send
 
         /// <summary>
-        /// sets an action for when send async finished sending data
+        ///     sets an action for when send async finished sending data
         /// </summary>
         /// <param name="onSendCompleted"></param>
         public void SetupSendCompletedHandler(Action onSendCompleted)
         {
-            _sendEventArgs.Completed += (_, _) =>
-            {
-                onSendCompleted();
-            };
+            _sendEventArgs.Completed += (_, _) => { onSendCompleted(); };
         }
 
         /// <summary>
-        /// Send is synchronous and will block until the message is sent
-        /// this method is only used for testing
+        ///     Send is synchronous and will block until the message is sent
+        ///     this method is only used for testing
         /// </summary>
         /// <param name="payload"></param>
         public void Send(Memory<byte> payload)
@@ -207,78 +250,22 @@ namespace MessageBroker.SocketServer
         }
 
         /// <summary>
-        /// SendAsync will asynchronously send the message, then it will call the complete handler
+        ///     SendAsync will asynchronously send the message, then it will call the complete handler
         /// </summary>
         /// <param name="payload"></param>
         /// <returns></returns>
         public bool SendAsync(Memory<byte> payload)
         {
-            if (_sendBuff.Length < payload.Length) 
+            if (_sendBuff.Length < payload.Length)
                 SetupSendBufferWithSize(payload.Length);
-            
+
             payload.CopyTo(_sendBuff);
-                
+
             _sendEventArgs.SetBuffer(_sendBuff.AsMemory(0, payload.Length));
-            
+
             return _socket.SendAsync(_sendEventArgs);
         }
 
         #endregion
-
-        /// <summary>
-        /// OnReceive is called when the a message is successfully received
-        /// </summary>
-        /// <param name="buff"></param>
-        private void OnReceived(Memory<byte> buff)
-        {
-            _logger.LogInformation($"received {buff.Length} from client");
-            _eventListener.OnReceived(SessionId, buff);
-
-        }
-
-        public void Close()
-        {
-            _connected = false;
-            _receiveEventArgs.Completed -= OnMessageReceived;
-            _sizeEventArgs.Completed -= OnMessageSizeReceived;
-
-            _socket.Close();
-            _socket.Dispose();
-
-            _eventListener.OnSessionDisconnected(SessionId);
-        }
-
-        public void Dispose()
-        {
-            Close();
-        }
-
-        /// <summary>
-        /// SetupReceiveBufferWithSize is called when the size of message to be received is larger than the current buffer
-        /// so we need to increase the size of buffer 
-        /// </summary>
-        /// <param name="desiredSize"></param>
-        private void SetupReceiveBufferWithSize(int? desiredSize = null)
-        {
-            var size = desiredSize ?? _config.DefaultBodySize;
-            var newBuffer = ArrayPool<byte>.Shared.Rent(size + _config.DefaultHeaderSize);
-            if (_receiveBuff != null)
-            {
-                ArrayPool<byte>.Shared.Return(_receiveBuff);
-            }
-            _receiveBuff = newBuffer;
-        }
-        
-        private void SetupSendBufferWithSize(int? desiredSize = null)
-        {
-            var size = desiredSize ?? _config.DefaultBodySize;
-            var newBuffer = ArrayPool<byte>.Shared.Rent(size);
-            if (_sendBuff != null)
-            {
-                ArrayPool<byte>.Shared.Return(_sendBuff);
-            }
-            _sendBuff = newBuffer;
-        }
-    
     }
 }

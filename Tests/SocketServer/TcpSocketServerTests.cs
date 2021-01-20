@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
-using MessageBroker.Core.Payloads;
-using MessageBroker.Core.Serialize;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization;
 using MessageBroker.SocketServer;
 using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,8 +15,8 @@ namespace Tests.SocketServer
     public class TcpSocketServerTests
     {
         /// <summary>
-        /// this test will verify that add and remove methods of session resolver is called by tcp socket server
-        /// when a client is connected or disconnected
+        ///     this test will verify that add and remove methods of session resolver is called by tcp socket server
+        ///     when a client is connected or disconnected
         /// </summary>
         [Fact]
         public void TcpSocketServerSessionResolverTest()
@@ -29,24 +29,24 @@ namespace Tests.SocketServer
             var loggerFactory = LoggerFactory.Create(_ => { });
 
             var services = new ServiceCollection();
-            
+
             services.AddSingleton(i => sessionResolverMock.Object);
             services.AddSingleton(i => socketEventProcessorMock.Object);
             services.AddSingleton(i => loggerFactory);
             services.AddSingleton(i => sessionConfiguration);
             services.AddSingleton<TcpSocketServer>();
-            
+
             var serviceProvider = services.BuildServiceProvider();
-            
+
             #endregion
 
             #region Act
-            
+
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8001);
 
             var server = serviceProvider.GetRequiredService<TcpSocketServer>();
             server.Start(ipEndPoint);
-            
+
             var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             client.Connect(ipEndPoint);
             client.Disconnect(true);
@@ -62,10 +62,10 @@ namespace Tests.SocketServer
         }
 
         /// <summary>
-        /// this test will verify that IEventProcessor methods are called when:
-        /// client connects
-        /// client disconnects
-        /// data is received
+        ///     this test will verify that IEventProcessor methods are called when:
+        ///     client connects
+        ///     client disconnects
+        ///     data is received
         /// </summary>
         [Fact]
         public void TcpSocketServerEventProcessorTest()
@@ -78,25 +78,25 @@ namespace Tests.SocketServer
             var loggerFactory = LoggerFactory.Create(_ => { });
 
             var services = new ServiceCollection();
-            
+
             services.AddSingleton(i => sessionResolverMock.Object);
             services.AddSingleton(i => socketEventProcessorMock.Object);
             services.AddSingleton(i => loggerFactory);
             services.AddSingleton(i => sessionConfiguration);
             services.AddSingleton<TcpSocketServer>();
             services.AddSingleton<ISerializer, Serializer>();
-            
+
             var serviceProvider = services.BuildServiceProvider();
-            
+
             #endregion
 
             #region Act
-            
+
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8002);
 
             var server = serviceProvider.GetRequiredService<TcpSocketServer>();
             server.Start(ipEndPoint);
-            
+
             var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             client.Connect(ipEndPoint);
 
@@ -105,7 +105,7 @@ namespace Tests.SocketServer
             var register = new Register {Concurrency = 10, Id = Guid.Empty};
             var sendPayload = serializer.ToSendPayload(register);
             client.Send(sendPayload.Data.Span);
-            
+
             client.Disconnect(true);
 
             #endregion

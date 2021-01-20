@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace MessageBroker.Core.Payloads
+namespace MessageBroker.Models.Models
 {
     /// <summary>
-    /// indicating the payload process failed
+    ///     indicating the payload process failed
     /// </summary>
     public ref struct Nack
     {

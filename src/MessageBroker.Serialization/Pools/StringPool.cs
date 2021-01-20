@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace MessageBroker.Core.Pools
+namespace MessageBroker.Serialization.Pools
 {
     public class StringPool
     {
-
         private static StringPool _shared;
+        private readonly Dictionary<int, byte[]> _reverseStore = new();
+
+        private readonly Dictionary<int, string> _store = new();
 
         public static StringPool Shared
         {
@@ -19,17 +21,11 @@ namespace MessageBroker.Core.Pools
             }
         }
 
-        private readonly Dictionary<int, string> _store = new();
-        private readonly Dictionary<int, byte[]> _reverseStore = new();
-
         public string GetStringForBytes(Span<byte> data)
         {
             var hashCode = ComputeHash(data);
 
-            if (_store.TryGetValue(hashCode, out var s))
-            {
-                return s;
-            }
+            if (_store.TryGetValue(hashCode, out var s)) return s;
 
             s = Encoding.UTF8.GetString(data);
 
@@ -58,9 +54,9 @@ namespace MessageBroker.Core.Pools
             unchecked
             {
                 const int p = 16777619;
-                int hash = (int)2166136261;
+                var hash = (int) 2166136261;
 
-                for (int i = 0; i < data.Length; i++)
+                for (var i = 0; i < data.Length; i++)
                     hash = (hash ^ data[i]) * p;
 
                 hash += hash << 13;
@@ -71,6 +67,5 @@ namespace MessageBroker.Core.Pools
                 return hash;
             }
         }
-
     }
 }

@@ -1,15 +1,12 @@
-﻿using BenchmarkDotNet.Running;
-using System.Buffers;
-using BenchmarkDotNet.Configs;
+﻿using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Running;
 
 namespace Benchmarks
 {
-    class Program
+    internal class Program
     {
-
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
-
             var summary = BenchmarkRunner.Run(typeof(Program).Assembly, new DebugInProcessConfig());
         }
     }

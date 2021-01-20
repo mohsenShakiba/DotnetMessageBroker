@@ -1,27 +1,26 @@
-﻿using MessageBroker.SocketServer.Abstractions;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using MessageBroker.SocketServer.Abstractions;
 
 namespace MessageBroker.SocketServer
 {
     /// <summary>
-    /// SessionResolver is used to retrieve sessions based on session guid
-    /// this class is used by dispatcher
+    ///     SessionResolver is used to retrieve sessions based on session guid
+    ///     this class is used by dispatcher
     /// </summary>
     public class SessionResolver : ISessionResolver
     {
-
         private readonly ConcurrentDictionary<Guid, IClientSession> _sesions;
-
-        public IReadOnlyList<IClientSession> Sessions => _sesions.Values.ToList();
 
 
         public SessionResolver()
         {
-            _sesions = new();
+            _sesions = new ConcurrentDictionary<Guid, IClientSession>();
         }
+
+        public IReadOnlyList<IClientSession> Sessions => _sesions.Values.ToList();
 
         public void Add(IClientSession session)
         {

@@ -1,13 +1,10 @@
-﻿using MessageBroker.Core;
-using MessageBroker.Core.Serialize;
+﻿using System;
+using System.Text;
+using MessageBroker.Core;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization;
 using MessageBroker.SocketServer.Abstractions;
 using Moq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MessageBroker.Core.Payloads;
 using Xunit;
 
 namespace Tests
@@ -18,7 +15,7 @@ namespace Tests
         public void TestDispatchMessage()
         {
             var sessionId = Guid.NewGuid();
-            var session = new Mock<IClientSession>(); 
+            var session = new Mock<IClientSession>();
             var sessionResolver = new Mock<ISessionResolver>();
             var serializer = new Serializer();
 
@@ -29,7 +26,8 @@ namespace Tests
 
             dispatcher.AddSendQueue(sessionId, 1);
 
-            var originalMessage = new Message { Id = Guid.NewGuid(), Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST") };
+            var originalMessage = new Message
+                {Id = Guid.NewGuid(), Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST")};
 
             var originalMessageSendData = serializer.ToSendPayload(originalMessage);
 
@@ -47,6 +45,5 @@ namespace Tests
             // make sure the send method of session was called
             session.Verify(s => s.SendAsync(It.IsAny<Memory<byte>>()));
         }
-
     }
 }

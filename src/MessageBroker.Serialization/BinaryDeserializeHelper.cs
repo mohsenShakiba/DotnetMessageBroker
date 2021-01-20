@@ -1,25 +1,25 @@
 ﻿using System;
 using System.Buffers;
 using System.Text;
-using MessageBroker.Core.Pools;
+using MessageBroker.Serialization.Pools;
 
-namespace MessageBroker.Core.Serialize
+namespace MessageBroker.Serialization
 {
     /// <summary>
-    /// BinaryDeserializeHelper is a utility class to that provides helper methods to deserialize binary to payload 
+    ///     BinaryDeserializeHelper is a utility class to that provides helper methods to deserialize binary to payload
     /// </summary>
     public class BinaryDeserializeHelper
     {
         private static byte[] _delimiter;
+        private int _currentOffset;
+
+        private Memory<byte> _receivedData;
 
         public static Span<byte> Delimiter
         {
             get
             {
-                if (_delimiter != null)
-                {
-                    return _delimiter.AsSpan();
-                }
+                if (_delimiter != null) return _delimiter.AsSpan();
 
                 var delimiter = "\n";
                 var delimiterB = Encoding.ASCII.GetBytes(delimiter);
@@ -27,9 +27,6 @@ namespace MessageBroker.Core.Serialize
                 return delimiterB;
             }
         }
-
-        private Memory<byte> _receivedData;
-        private int _currentOffset = 0;
 
         public void Setup(Memory<byte> data)
         {
@@ -69,6 +66,5 @@ namespace MessageBroker.Core.Serialize
             data.Slice(0, indexOfDelimiter).CopyTo(arr);
             return arr;
         }
-
     }
 }

@@ -1,62 +1,57 @@
-﻿using MessageBroker.Core.Serialize;
-using MessageBroker.SocketServer.Abstractions;
-using System;
-using System.Buffers;
+﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using MessageBroker.Core.Payloads;
-using MessageBroker.Core.Pools;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization;
+using MessageBroker.Serialization.Pools;
+using MessageBroker.SocketServer.Abstractions;
 
 namespace MessageBroker.Core
 {
     /// <summary>
-    /// SendQueue is in charge of sending messages to subscribers
-    /// it will handle how many messages has been sent based on the concurrency requested
+    ///     SendQueue is in charge of sending messages to subscribers
+    ///     it will handle how many messages has been sent based on the concurrency requested
     /// </summary>
     public class SendQueue
     {
-        private readonly IClientSession _session;
-        private readonly ISerializer _serializer;
-        private readonly ConcurrentQueue<SendPayload> _queue;
         private readonly ConcurrentBag<Guid> _pendingMessages;
+        private readonly ConcurrentQueue<SendPayload> _queue;
+        private readonly ISerializer _serializer;
 
         private int _currentConcurrency;
-        private int _maxConcurrency;
         private bool _isSending;
-        private object _lock;
-
-        private bool IsQueueFull => _currentConcurrency >= _maxConcurrency;
-        private bool IsQueueEmpty => _currentConcurrency == 0;
-
-        public int CurrentConcurrency => _currentConcurrency;
-        public int MaxConcurrency => _maxConcurrency;
-        public IClientSession Session => _session;
+        private readonly object _lock;
 
 
         public SendQueue(IClientSession session, ISerializer serializer)
         {
-            _session = session;
+            Session = session;
             _serializer = serializer;
-            _queue = new();
-            _pendingMessages = new();
-            _lock = new();
+            _queue = new ConcurrentQueue<SendPayload>();
+            _pendingMessages = new ConcurrentBag<Guid>();
+            _lock = new object();
 
             // setup the method that is used when the sending of asynchronous data is compelete
-            _session.SetupSendCompletedHandler(SendPendingMessagesIfQueueNotFull);
+            Session.SetupSendCompletedHandler(SendPendingMessagesIfQueueNotFull);
         }
+
+        private bool IsQueueFull => _currentConcurrency >= MaxConcurrency;
+        private bool IsQueueEmpty => _currentConcurrency == 0;
+
+        public int CurrentConcurrency => _currentConcurrency;
+        public int MaxConcurrency { get; private set; }
+
+        public IClientSession Session { get; }
 
         public void SetupConcurrency(int maxConcurrency, int currentConcurrency = 0)
         {
-            _maxConcurrency = maxConcurrency;
+            MaxConcurrency = maxConcurrency;
         }
 
         /// <summary>
-        /// Enqueue will send the message to subscriber immediately if the queue isn't full
-        /// otherwise the message will be saved in a queue to be sent when the queue isn't full
+        ///     Enqueue will send the message to subscriber immediately if the queue isn't full
+        ///     otherwise the message will be saved in a queue to be sent when the queue isn't full
         /// </summary>
         /// <param name="message">The message that must be sent</param>
         public void Enqueue(Message message)
@@ -65,13 +60,9 @@ namespace MessageBroker.Core
 
             // the queue shouldn't have any item in it and the send queue must not be in sending mode
             if (_isSending || !IsQueueEmpty)
-            {
                 _queue.Enqueue(sendPayload);
-            }
             else
-            {
                 Send(sendPayload);
-            }
         }
 
         public void Enqueue(Ack ack)
@@ -80,17 +71,13 @@ namespace MessageBroker.Core
 
             // note: we don't need to check for IsQueueFull since ack can be sent regardless of queue size
             if (_isSending)
-            {
                 _queue.Enqueue(sendPayload);
-            }
             else
-            {
                 Send(sendPayload);
-            }
         }
 
         /// <summary>
-        /// ReleaseOne will remove the message from pending messages array, clearing room in the queue
+        ///     ReleaseOne will remove the message from pending messages array, clearing room in the queue
         /// </summary>
         /// <param name="messageId">The id of message that was acked or nacked</param>
         public void ReleaseOne(Guid messageId)
@@ -107,8 +94,8 @@ namespace MessageBroker.Core
         }
 
         /// <summary>
-        /// This method will send another message if the queue isn't full
-        /// This method will be called when ReleaseOne is called
+        ///     This method will send another message if the queue isn't full
+        ///     This method will be called when ReleaseOne is called
         /// </summary>
         private void SendPendingMessagesIfQueueNotFull()
         {
@@ -125,8 +112,8 @@ namespace MessageBroker.Core
         }
 
         /// <summary>
-        /// Send will send the payload to ClientSession
-        /// it will also increment the _currentConcurrency and add the message to _pendingMessages list
+        ///     Send will send the payload to ClientSession
+        ///     it will also increment the _currentConcurrency and add the message to _pendingMessages list
         /// </summary>
         /// <param name="sendPayload"></param>
         private void Send(SendPayload sendPayload)
@@ -144,24 +131,20 @@ namespace MessageBroker.Core
                 }
 
                 // send the payload 
-                var sendAsync = _session.SendAsync(sendPayload.Data);
+                var sendAsync = Session.SendAsync(sendPayload.Data);
 
                 // return the send queue to pool
                 ObjectPool.Shared.Return(sendPayload);
 
                 // if the message isn't sent asynchronously
                 if (!sendAsync)
-                {
                     // check if any pending messages exist
                     SendPendingMessagesIfQueueNotFull();
-                }
                 // otherwise wait for the message to be sent
                 else
-                {
                     // set is loading to true
                     // so no longer messages will be sent while in progress
                     _isSending = true;
-                }
             }
         }
     }

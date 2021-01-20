@@ -15,6 +15,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Benchmarks", "Benchmarks\Be
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessageBroker.Client", "MessageBroker.Client\MessageBroker.Client.csproj", "{115F8F74-5EF0-4D65-B3B0-F4EE740CF3DE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessageBroker.Serialization", "src\MessageBroker.Serialization\MessageBroker.Serialization.csproj", "{2B8B6938-F320-4E3B-B008-DAAF5D32443A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessageBroker.Models", "src\MessageBroker.Models\MessageBroker.Models.csproj", "{434295B9-B4E8-49C9-B08A-F08CEEF97690}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +49,14 @@ Global
 		{115F8F74-5EF0-4D65-B3B0-F4EE740CF3DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{115F8F74-5EF0-4D65-B3B0-F4EE740CF3DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{115F8F74-5EF0-4D65-B3B0-F4EE740CF3DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2B8B6938-F320-4E3B-B008-DAAF5D32443A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2B8B6938-F320-4E3B-B008-DAAF5D32443A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2B8B6938-F320-4E3B-B008-DAAF5D32443A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2B8B6938-F320-4E3B-B008-DAAF5D32443A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{434295B9-B4E8-49C9-B08A-F08CEEF97690}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{434295B9-B4E8-49C9-B08A-F08CEEF97690}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{434295B9-B4E8-49C9-B08A-F08CEEF97690}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{434295B9-B4E8-49C9-B08A-F08CEEF97690}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

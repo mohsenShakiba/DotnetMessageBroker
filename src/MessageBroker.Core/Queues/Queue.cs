@@ -1,31 +1,33 @@
-﻿using MessageBroker.Core.Persistance;
+﻿using System;
+using MessageBroker.Core.Persistance;
 using MessageBroker.Core.RouteMatching;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MessageBroker.Core.Payloads;
+using MessageBroker.Models.Models;
 
-namespace MessageBroker.Core.Queue
+namespace MessageBroker.Core.Queues
 {
-    class Queue : IQueue, IDisposable
+    internal class Queue : IQueue, IDisposable
     {
         private readonly MessageDispatcher _dispatcher;
-        private readonly ISessionSelectionPolicy _sessionSelectionPolicy;
         private readonly IMessageStore _messageStore;
         private readonly IRouteMatcher _routeMatcher;
+        private readonly ISessionSelectionPolicy _sessionSelectionPolicy;
 
         private string _name;
         private string _route;
 
-        public Queue(MessageDispatcher dispatcher, ISessionSelectionPolicy sessionSelectionPolicy, IMessageStore messageStore, 
+        public Queue(MessageDispatcher dispatcher, ISessionSelectionPolicy sessionSelectionPolicy,
+            IMessageStore messageStore,
             IRouteMatcher routeMatcher)
         {
             _dispatcher = dispatcher;
             _sessionSelectionPolicy = sessionSelectionPolicy;
             _messageStore = messageStore;
             _routeMatcher = routeMatcher;
+        }
+
+        public void Dispose()
+        {
+            // nothing for now
         }
 
         public void Setup(string name, string route)
@@ -40,10 +42,7 @@ namespace MessageBroker.Core.Queue
 
             var sessionId = _sessionSelectionPolicy.GetNextSession();
 
-            if (sessionId.HasValue)
-            {
-                _dispatcher.Dispatch(message, sessionId.Value);
-            }
+            if (sessionId.HasValue) _dispatcher.Dispatch(message, sessionId.Value);
         }
 
         public bool MessageRouteMatch(string messageRoute)
@@ -64,10 +63,6 @@ namespace MessageBroker.Core.Queue
         public void SessionUnSubscribed(Guid sessionId)
         {
             SessionDisconnected(sessionId);
-        }
-        public void Dispose()
-        {
-            // nothing for now
         }
 
         public void OnAck(Ack ack)

@@ -1,7 +1,7 @@
-﻿namespace MessageBroker.Core.Payloads
+﻿namespace MessageBroker.Models.Models
 {
     /// <summary>
-    /// types of payload
+    ///     types of payload
     /// </summary>
     public enum PayloadType
     {

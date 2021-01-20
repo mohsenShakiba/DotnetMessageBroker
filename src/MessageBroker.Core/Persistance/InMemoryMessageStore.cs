@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace MessageBroker.Core.Persistance
@@ -13,7 +11,7 @@ namespace MessageBroker.Core.Persistance
 
         public InMemoryMessageStore()
         {
-            _messages = new();
+            _messages = new ConcurrentDictionary<Guid, byte[]>();
         }
 
         public ValueTask DeleteAsync(Guid messageId)
@@ -24,7 +22,7 @@ namespace MessageBroker.Core.Persistance
 
         public async IAsyncEnumerable<byte[]> GetMessagesAsync()
         {
-            foreach(var message in _messages)
+            foreach (var message in _messages)
             {
                 await Task.Yield();
                 yield return message.Value;

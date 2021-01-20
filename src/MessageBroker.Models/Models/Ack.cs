@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace MessageBroker.Core.Payloads
+namespace MessageBroker.Models.Models
 {
     /// <summary>
-    /// indicating the payload process was successful
+    ///     indicating the payload process was successful
     /// </summary>
     public ref struct Ack
     {

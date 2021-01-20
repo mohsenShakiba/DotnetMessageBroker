@@ -1,21 +1,32 @@
 ﻿using System;
 using System.Buffers;
 using System.Text;
-using MessageBroker.Core.Configurations;
-using MessageBroker.Core.Payloads;
-using MessageBroker.Core.Pools;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization.Pools;
 
-namespace MessageBroker.Core.Serialize
+namespace MessageBroker.Serialization
 {
     /// <summary>
-    /// BinarySerializeHelper is a utility class that provides method for serialize a payload to binary 
+    ///     BinarySerializeHelper is a utility class that provides method for serialize a payload to binary
     /// </summary>
     public class BinarySerializeHelper : IDisposable
     {
+        private readonly SerializationConfig _config;
+
         private byte[] _buffer;
         private int _currentBufferOffset;
         private Guid _id;
         private PayloadType _type;
+
+        public BinarySerializeHelper(SerializationConfig config)
+        {
+            _config = config;
+        }
+
+        public void Dispose()
+        {
+            ArrayPool<byte>.Shared.Return(_buffer);
+        }
 
         public BinarySerializeHelper WriteType(PayloadType type)
         {
@@ -73,8 +84,7 @@ namespace MessageBroker.Core.Serialize
             try
             {
                 var bufferSpan = _buffer.AsSpan();
-                var headerSize = ConfigurationProvider.Shared.BaseConfiguration.MessageHeaderSize;
-                BitConverter.TryWriteBytes(bufferSpan, _currentBufferOffset - headerSize);
+                BitConverter.TryWriteBytes(bufferSpan, _currentBufferOffset - _config.MessageHeaderSize);
 
                 var sendPayload = ObjectPool.Shared.RentSendPayload();
                 sendPayload.FillFrom(_buffer, _currentBufferOffset, _id, _type);
@@ -89,26 +99,15 @@ namespace MessageBroker.Core.Serialize
 
         public void Refresh()
         {
-            var baseConfiguration = ConfigurationProvider.Shared.BaseConfiguration;
-            _currentBufferOffset = baseConfiguration.MessageHeaderSize;
+            _currentBufferOffset = _config.MessageHeaderSize;
         }
 
 
         public void Setup()
         {
-            var baseConfiguration = ConfigurationProvider.Shared.BaseConfiguration;
+            if (_buffer == null) _buffer = ArrayPool<byte>.Shared.Rent(_config.MaxBodySize);
 
-            if (_buffer == null)
-            {
-                _buffer = ArrayPool<byte>.Shared.Rent(baseConfiguration.StartMessageSize);
-            }
-
-            _currentBufferOffset = baseConfiguration.MessageHeaderSize;
-        }
-
-        public void Dispose()
-        {
-            ArrayPool<byte>.Shared.Return(_buffer);
+            Refresh();
         }
 
         private void MakeSureBufferSizeHasRoomForSize(int s)

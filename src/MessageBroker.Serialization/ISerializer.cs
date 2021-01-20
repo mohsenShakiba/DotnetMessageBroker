@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MessageBroker.Core.Payloads;
+using MessageBroker.Models.Models;
 
-namespace MessageBroker.Core.Serialize
+namespace MessageBroker.Serialization
 {
     public interface ISerializer
     {

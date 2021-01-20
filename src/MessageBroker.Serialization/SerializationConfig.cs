@@ -1,13 +1,13 @@
-﻿namespace MessageBroker.Core.Configurations
+﻿namespace MessageBroker.Serialization
 {
-    public class BaseConfiguration
+    public class SerializationConfig
     {
         public int MessageHeaderSize { get; init; }
         public int StartMessageSize { get; init; }
         public int MaxBodySize { get; init; }
 
 
-        public static BaseConfiguration Default => new BaseConfiguration
+        public static SerializationConfig Default => new()
         {
             MaxBodySize = 1024 * 1024,
             StartMessageSize = 128,

@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace MessageBroker.Core.Payloads
+namespace MessageBroker.Models.Models
 {
     /// <summary>
-    /// will create a new queue, if not exists
+    ///     will create a new queue, if not exists
     /// </summary>
     public ref struct QueueDeclare
     {

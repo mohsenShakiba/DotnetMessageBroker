@@ -1,30 +1,30 @@
-﻿using MessageBroker.Core.Persistance;
-using MessageBroker.Core.Queue;
+﻿using System;
+using System.Buffers;
+using System.Collections.Generic;
+using MessageBroker.Core.Persistance;
+using MessageBroker.Core.Queues;
 using MessageBroker.Core.RouteMatching;
-using MessageBroker.Core.Serialize;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization;
 using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Buffers;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using MessageBroker.Core.Payloads;
 
 namespace MessageBroker.Core
 {
     public class Coordinator : ISocketEventProcessor
     {
-        private readonly ISessionResolver _sessionResolver;
-        private readonly ISerializer _serializer;
-        private readonly MessageDispatcher _messageDispatcher;
-        private readonly IRouteMatcher _routeMatcher;
-        private readonly IMessageStore _messageStore;
         private readonly ILogger<Coordinator> _logger;
-        private readonly Dictionary<string, IQueue> _queues;
+        private readonly MessageDispatcher _messageDispatcher;
+        private readonly IMessageStore _messageStore;
         private readonly List<IQueue> _queueArr;
+        private readonly Dictionary<string, IQueue> _queues;
+        private readonly IRouteMatcher _routeMatcher;
+        private readonly ISerializer _serializer;
+        private readonly ISessionResolver _sessionResolver;
         public int _stat;
 
-        public Coordinator(ISessionResolver sessionResolver, ISerializer serializer, MessageDispatcher messageDispatcher, 
+        public Coordinator(ISessionResolver sessionResolver, ISerializer serializer,
+            MessageDispatcher messageDispatcher,
             IRouteMatcher routeMatcher, IMessageStore messageStore, ILogger<Coordinator> logger)
         {
             _sessionResolver = sessionResolver;
@@ -33,8 +33,8 @@ namespace MessageBroker.Core
             _routeMatcher = routeMatcher;
             _messageStore = messageStore;
             _logger = logger;
-            _queues = new();
-            _queueArr = new();
+            _queues = new Dictionary<string, IQueue>();
+            _queueArr = new List<IQueue>();
         }
 
         public void ClientConnected(Guid sessionId)
@@ -45,9 +45,7 @@ namespace MessageBroker.Core
 
         public void ClientDisconnected(Guid sessionId)
         {
-            foreach(var (_, queue) in _queues) {
-                queue.SessionDisconnected(sessionId);
-            }
+            foreach (var (_, queue) in _queues) queue.SessionDisconnected(sessionId);
         }
 
         public void DataReceived(Guid sessionId, Memory<byte> payloadData)
@@ -96,29 +94,25 @@ namespace MessageBroker.Core
         {
             // send message to all the queues that match this message route
             foreach (var (_, queue) in _queues)
-            {
                 if (queue.MessageRouteMatch(message.Route))
-                {
                     queue.OnMessage(message);
-                }
-            }
 
             // send received ack to publisher
             SendRecievedPayloadAck(sessionId, message.Id);
 
-            
+
             // 
             ArrayPool<byte>.Shared.Return(message.OriginalMessageData);
         }
 
         public void OnAck(Guid sessionId, Ack ack)
         {
-            _messageDispatcher.Release(ack.Id, new Guid[1] { sessionId });
+            _messageDispatcher.Release(ack.Id, new Guid[1] {sessionId});
         }
 
         public void OnNack(Guid sessionId, Ack nack)
         {
-            _messageDispatcher.Release(nack.Id, new Guid[1] { sessionId });
+            _messageDispatcher.Release(nack.Id, new Guid[1] {sessionId});
         }
 
         public void OnListen(Guid sessionId, SubscribeQueue subscribeQueue)
@@ -164,7 +158,7 @@ namespace MessageBroker.Core
             }
 
             var sessionSelectionPolicy = new RandomSessionSelectionPolicy();
-            queue = new Queue.Queue(_messageDispatcher, sessionSelectionPolicy, _messageStore, _routeMatcher);
+            queue = new Queue(_messageDispatcher, sessionSelectionPolicy, _messageStore, _routeMatcher);
             queue.Setup(queueDeclare.Name, queueDeclare.Route);
 
             _queues[queueDeclare.Name] = queue;
@@ -179,7 +173,7 @@ namespace MessageBroker.Core
         }
 
         /// <summary>
-        /// Ack that is sent to client indicating the payload has been successfully processed
+        ///     Ack that is sent to client indicating the payload has been successfully processed
         /// </summary>
         /// <param name="sessionId"></param>
         /// <param name="payloadId"></param>

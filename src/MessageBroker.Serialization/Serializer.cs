@@ -1,24 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MessageBroker.Core.Payloads;
-using MessageBroker.Core.Pools;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization.Pools;
 
-namespace MessageBroker.Core.Serialize
+namespace MessageBroker.Serialization
 {
-    public class Serializer: ISerializer
+    public class Serializer : ISerializer
     {
-
         public PayloadType ParsePayloadType(Memory<byte> b)
         {
-            var messageType = (PayloadType)BitConverter.ToInt32(b.Slice(0, 4).Span);
+            var messageType = (PayloadType) BitConverter.ToInt32(b.Slice(0, 4).Span);
             return messageType;
         }
 
         #region Serialize
-
 
         public SendPayload ToSendPayload(Ack ack)
         {
@@ -29,7 +23,7 @@ namespace MessageBroker.Core.Serialize
                 .WriteId(ack.Id)
                 .Build();
         }
-        
+
         public SendPayload ToSendPayload(Nack ack)
         {
             var sendPayload = ObjectPool.Shared.RentBinarySerializeHelper();
@@ -97,7 +91,6 @@ namespace MessageBroker.Core.Serialize
                 .Build();
         }
 
-        
         #endregion
 
         #region Deserialize
@@ -110,14 +103,13 @@ namespace MessageBroker.Core.Serialize
             try
             {
                 var messageId = receivePayload.ReadNextGuid();
-                
-                return new Ack { Id = messageId };
+
+                return new Ack {Id = messageId};
             }
             finally
             {
                 ObjectPool.Shared.Return(receivePayload);
             }
-
         }
 
 
@@ -144,7 +136,6 @@ namespace MessageBroker.Core.Serialize
             {
                 ObjectPool.Shared.Return(receivePayload);
             }
-
         }
 
         public SubscribeQueue ToListenRoute(Memory<byte> data)
@@ -167,7 +158,6 @@ namespace MessageBroker.Core.Serialize
             {
                 ObjectPool.Shared.Return(receivePayload);
             }
-
         }
 
 
@@ -191,8 +181,6 @@ namespace MessageBroker.Core.Serialize
             {
                 ObjectPool.Shared.Return(receivePayload);
             }
-            
-            
         }
 
         public QueueDeclare ToQueueDeclareModel(Memory<byte> data)
@@ -217,8 +205,6 @@ namespace MessageBroker.Core.Serialize
             {
                 ObjectPool.Shared.Return(receivePayload);
             }
-            
-            
         }
 
         public QueueDelete ToQueueDeleteModel(Memory<byte> data)
@@ -234,18 +220,15 @@ namespace MessageBroker.Core.Serialize
                 return new QueueDelete
                 {
                     Id = id,
-                    Name = queueName,
+                    Name = queueName
                 };
             }
             finally
             {
                 ObjectPool.Shared.Return(receivePayload);
             }
-            
-            
         }
-        
-        
+
         #endregion
     }
 }

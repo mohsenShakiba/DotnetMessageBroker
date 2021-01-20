@@ -6,7 +6,7 @@ namespace Benchmarks
     public class TestClientSession : IClientSession
     {
         public Guid SessionId { get; set; }
-        
+
         public void SetupSendCompletedHandler(Action onSendCompleted)
         {
         }

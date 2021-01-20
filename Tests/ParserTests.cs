@@ -1,15 +1,14 @@
-﻿using MessageBroker.Core.Serialize;
-using System;
+﻿using System;
 using System.Text;
-using MessageBroker.Core.Payloads;
+using MessageBroker.Models.Models;
+using MessageBroker.Serialization;
 using Xunit;
 
 namespace Tests
 {
     public class ParserTests
     {
-
-        private Serializer _serializer;
+        private readonly Serializer _serializer;
 
         public ParserTests()
         {
@@ -19,7 +18,7 @@ namespace Tests
         [Fact]
         public void TestParseAck()
         {
-            var ack = new Ack { Id = Guid.NewGuid() };
+            var ack = new Ack {Id = Guid.NewGuid()};
 
             var b = _serializer.ToSendPayload(ack);
 
@@ -44,13 +43,15 @@ namespace Tests
 
             Assert.Equal(msg.Id, convertedMsg.Id);
             Assert.Equal(msg.Route, convertedMsg.Route);
-            Assert.Equal(Encoding.UTF8.GetString(msg.Data.ToArray()), Encoding.UTF8.GetString(convertedMsg.Data.Trim(Encoding.UTF8.GetBytes("\0")).Trim(Encoding.UTF8.GetBytes("\n")).ToArray()));
+            Assert.Equal(Encoding.UTF8.GetString(msg.Data.ToArray()),
+                Encoding.UTF8.GetString(convertedMsg.Data.Trim(Encoding.UTF8.GetBytes("\0"))
+                    .Trim(Encoding.UTF8.GetBytes("\n")).ToArray()));
         }
 
         [Fact]
         public void TestParseListen()
         {
-            var listen = new SubscribeQueue { Id = Guid.NewGuid(), QueueName = "TEST" };
+            var listen = new SubscribeQueue {Id = Guid.NewGuid(), QueueName = "TEST"};
 
             var b = _serializer.ToSendPayload(listen);
 
@@ -64,7 +65,7 @@ namespace Tests
         [Fact]
         public void TestParseSubscribe()
         {
-            var subscribe = new Register { Id = Guid.NewGuid(), Concurrency = 10 };
+            var subscribe = new Register {Id = Guid.NewGuid(), Concurrency = 10};
 
             var b = _serializer.ToSendPayload(subscribe);
 
@@ -77,7 +78,7 @@ namespace Tests
         [Fact]
         public void TestParseQueueDeclare()
         {
-            var queue = new QueueDeclare { Id = Guid.NewGuid(), Name = "TEST_QUEUE", Route = "TEST_PATH"};
+            var queue = new QueueDeclare {Id = Guid.NewGuid(), Name = "TEST_QUEUE", Route = "TEST_PATH"};
 
             var b = _serializer.ToSendPayload(queue);
 
@@ -91,7 +92,7 @@ namespace Tests
         [Fact]
         public void TestParseQueueDelete()
         {
-            var queue = new QueueDelete { Id = Guid.NewGuid(), Name = "TEST_QUEUE" };
+            var queue = new QueueDelete {Id = Guid.NewGuid(), Name = "TEST_QUEUE"};
 
             var b = _serializer.ToSendPayload(queue);
 
@@ -100,6 +101,5 @@ namespace Tests
             Assert.Equal(queue.Id, convertedQueueDelete.Id);
             Assert.Equal(queue.Name, convertedQueueDelete.Name);
         }
-
     }
 }
