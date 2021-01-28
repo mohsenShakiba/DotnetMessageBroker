@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace MessageBroker.Core.Queues
+namespace MessageBroker.Core.SessionPolicy
 {
-    public class RandomSessionSelectionPolicy : ISessionSelectionPolicy
+    public class RandomSessionPolicy : ISessionPolicy
     {
         private readonly List<Guid> _hashTable;
         private readonly Random _random;
         private readonly ReaderWriterLockSlim _wrLock;
 
-        public RandomSessionSelectionPolicy()
+        public RandomSessionPolicy()
         {
             _hashTable = new List<Guid>();
             _random = new Random();

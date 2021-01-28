@@ -30,7 +30,6 @@ namespace MessageBroker.Serialization
 
         public void Setup(Memory<byte> data)
         {
-            // ignore type and size
             _currentOffset = 5;
             _receivedData = data;
         }

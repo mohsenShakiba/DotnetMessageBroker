@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Text;
-using MessageBroker.Models.Models;
+using MessageBroker.Models;
 using MessageBroker.Serialization;
 using Xunit;
 
@@ -49,30 +49,44 @@ namespace Tests
         }
 
         [Fact]
-        public void TestParseListen()
+        public void TestParseSubscribeQueue()
         {
-            var listen = new SubscribeQueue {Id = Guid.NewGuid(), QueueName = "TEST"};
+            var subscribeQueue = new SubscribeQueue {Id = Guid.NewGuid(), QueueName = "TEST"};
 
-            var b = _serializer.ToSendPayload(listen);
+            var b = _serializer.ToSendPayload(subscribeQueue);
 
-            var convertedListen = _serializer.ToListenRoute(b.DataWithoutSize);
+            var converted = _serializer.ToSubscribeQueue(b.DataWithoutSize);
 
-            Assert.Equal(listen.Id, convertedListen.Id);
-            Assert.Equal(listen.QueueName, convertedListen.QueueName);
+            Assert.Equal(subscribeQueue.Id, converted.Id);
+            Assert.Equal(subscribeQueue.QueueName, converted.QueueName);
+        }
+
+        [Fact]
+        public void TestParseUnSubscribeQueue()
+        {
+            var unsubscribeQueue = new SubscribeQueue {Id = Guid.NewGuid(), QueueName = "TEST"};
+
+            var b = _serializer.ToSendPayload(unsubscribeQueue);
+
+            var converted = _serializer.ToSubscribeQueue(b.DataWithoutSize);
+
+            Assert.Equal(unsubscribeQueue.Id, converted.Id);
+            Assert.Equal(unsubscribeQueue.QueueName, converted.QueueName);
         }
 
 
         [Fact]
-        public void TestParseSubscribe()
+        public void TestParseConfigureSubscription()
         {
-            var subscribe = new Register {Id = Guid.NewGuid(), Concurrency = 10};
+            var configureSubscription = new ConfigureSubscription {Id = Guid.NewGuid(), Concurrency = 10};
 
-            var b = _serializer.ToSendPayload(subscribe);
+            var b = _serializer.ToSendPayload(configureSubscription);
 
-            var convertedSubscribe = _serializer.ToSubscribe(b.DataWithoutSize);
+            var convertedConfigureSubscription = _serializer.ToConfigureSubscription(b.DataWithoutSize);
 
-            Assert.Equal(subscribe.Id, convertedSubscribe.Id);
-            Assert.Equal(subscribe.Concurrency, convertedSubscribe.Concurrency);
+            Assert.Equal(configureSubscription.Id, convertedConfigureSubscription.Id);
+            Assert.Equal(configureSubscription.Concurrency, convertedConfigureSubscription.Concurrency);
+            Assert.Equal(configureSubscription.AutoAck, convertedConfigureSubscription.AutoAck);
         }
 
         [Fact]

@@ -1,4 +1,4 @@
-﻿namespace MessageBroker.Models.Models
+﻿namespace MessageBroker.Models
 {
     /// <summary>
     ///     types of payload

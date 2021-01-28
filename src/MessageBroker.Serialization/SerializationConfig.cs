@@ -1,17 +1,23 @@
 ﻿namespace MessageBroker.Serialization
 {
-    public class SerializationConfig
+    public static class SerializationConfig
     {
-        public int MessageHeaderSize { get; init; }
-        public int StartMessageSize { get; init; }
-        public int MaxBodySize { get; init; }
-
-
-        public static SerializationConfig Default => new()
-        {
-            MaxBodySize = 1024 * 1024,
-            StartMessageSize = 128,
-            MessageHeaderSize = 4
-        };
+        /// <summary>
+        /// the size of payload header
+        /// header is a 4 byte array containing the payload size 
+        /// </summary>
+        public const int PayloadHeaderSize = 4;
+        
+        /// <summary>
+        /// the size that send payloads buffer starts at
+        /// this size might increase over time as the payload size exceed this amount
+        /// </summary>
+        public const int SendPayloadStartingBufferSize = 128;
+        
+        /// <summary>
+        /// the size that receive buffer starts at
+        /// this size might increase over time as the payload size exceed this amount
+        /// </summary>
+        public const int ReceivePayloadStartingBufferSize = 128;
     }
 }

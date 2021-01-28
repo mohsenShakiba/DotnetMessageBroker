@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.SocketClient;
-using MessageBroker.Models.Models;
+using MessageBroker.Models;
 using MessageBroker.Serialization;
 
 namespace MessageBroker.Client
@@ -65,7 +65,7 @@ namespace MessageBroker.Client
         
         private SendPayload UnSubscribeSendPayload()
         {
-            var payload = new UnSubscribeQueue
+            var payload = new UnsubscribeQueue
             {
                 Id = Guid.NewGuid(),
                 QueueName = _queueName

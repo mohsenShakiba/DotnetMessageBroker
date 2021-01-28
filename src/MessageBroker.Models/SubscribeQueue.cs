@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace MessageBroker.Models.Models
+namespace MessageBroker.Models
 {
     /// <summary>
     ///     will subscribe the queue if exists
@@ -9,5 +9,6 @@ namespace MessageBroker.Models.Models
     {
         public Guid Id { get; init; }
         public string QueueName { get; init; }
+        public int Concurrency { get; init; }
     }
 }

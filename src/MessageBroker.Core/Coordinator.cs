@@ -1,51 +1,48 @@
 ﻿using System;
 using System.Buffers;
 using System.Collections.Generic;
-using MessageBroker.Core.Persistance;
+using MessageBroker.Common.Logging;
+using MessageBroker.Core.MessageIdTracking;
 using MessageBroker.Core.Queues;
-using MessageBroker.Core.RouteMatching;
-using MessageBroker.Models.Models;
+using MessageBroker.Core.StatRecording;
+using MessageBroker.Models;
 using MessageBroker.Serialization;
 using MessageBroker.SocketServer.Abstractions;
-using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Core
 {
     public class Coordinator : ISocketEventProcessor
     {
-        private readonly ILogger<Coordinator> _logger;
         private readonly MessageDispatcher _messageDispatcher;
-        private readonly IMessageStore _messageStore;
-        private readonly List<IQueue> _queueArr;
-        private readonly Dictionary<string, IQueue> _queues;
-        private readonly IRouteMatcher _routeMatcher;
+        private readonly IMessageIdTracker _messageIdTracker;
+        private readonly IQueueStore _queueStore;
+        private readonly IStatRecorder _statRecorder;
         private readonly ISerializer _serializer;
-        private readonly ISessionResolver _sessionResolver;
-        public int _stat;
 
-        public Coordinator(ISessionResolver sessionResolver, ISerializer serializer,
-            MessageDispatcher messageDispatcher,
-            IRouteMatcher routeMatcher, IMessageStore messageStore, ILogger<Coordinator> logger)
+        public Coordinator(ISerializer serializer, MessageDispatcher messageDispatcher,
+            IMessageIdTracker messageIdTracker, IQueueStore queueStore, IStatRecorder statRecorder)
         {
-            _sessionResolver = sessionResolver;
             _serializer = serializer;
             _messageDispatcher = messageDispatcher;
-            _routeMatcher = routeMatcher;
-            _messageStore = messageStore;
-            _logger = logger;
-            _queues = new Dictionary<string, IQueue>();
-            _queueArr = new List<IQueue>();
+            _messageIdTracker = messageIdTracker;
+            _queueStore = queueStore;
+            _statRecorder = statRecorder;
         }
 
         public void ClientConnected(Guid sessionId)
         {
-            // remove this
-            _messageDispatcher.AddSendQueue(sessionId, 1000);
+            Logger.LogInformation("client session connected, added send queue");
+            _messageDispatcher.AddSendQueue(sessionId);
         }
 
         public void ClientDisconnected(Guid sessionId)
         {
-            foreach (var (_, queue) in _queues) queue.SessionDisconnected(sessionId);
+            Logger.LogInformation("client session disconnected, removing send queue");
+            
+            foreach (var queue in _queueStore.Queues)
+                queue.SessionDisconnected(sessionId);
+
+            _messageDispatcher.RemoveSendQueue(sessionId);
         }
 
         public void DataReceived(Guid sessionId, Memory<byte> payloadData)
@@ -57,144 +54,169 @@ namespace MessageBroker.Core
                 case PayloadType.Msg:
                     var message = _serializer.ToMessage(payloadData);
                     OnMessage(sessionId, message);
-                    _stat += 1;
                     break;
                 case PayloadType.Ack:
                     var ack = _serializer.ToAck(payloadData);
-                    OnAck(sessionId, ack);
+                    OnMessageAck(sessionId, ack);
                     break;
                 case PayloadType.Nack:
                     var nack = _serializer.ToAck(payloadData);
-                    OnNack(sessionId, nack);
+                    OnMessageNack(sessionId, nack);
                     break;
                 case PayloadType.SubscribeQueue:
-                    var listen = _serializer.ToListenRoute(payloadData);
-                    OnListen(sessionId, listen);
+                    var subscribeQueue = _serializer.ToSubscribeQueue(payloadData);
+                    OnSubscribeQueue(sessionId, subscribeQueue);
                     break;
                 case PayloadType.UnSubscribeQueue:
-                    var unListen = _serializer.ToListenRoute(payloadData);
-                    OnUnListen(sessionId, unListen);
+                    var unsubscribeQueue = _serializer.ToUnsubscribeQueue(payloadData);
+                    OnUnsubscribeQueue(sessionId, unsubscribeQueue);
                     break;
                 case PayloadType.Register:
-                    var subscribe = _serializer.ToSubscribe(payloadData);
-                    OnSubscribe(sessionId, subscribe);
+                    var subscribe = _serializer.ToConfigureSubscription(payloadData);
+                    OnConfigureSubscription(sessionId, subscribe);
                     break;
                 case PayloadType.QueueCreate:
                     var queueDeclare = _serializer.ToQueueDeclareModel(payloadData);
-                    DeclareQueue(sessionId, queueDeclare);
+                    OnDeclareQueue(sessionId, queueDeclare);
                     break;
                 case PayloadType.QueueDelete:
                     var queueDelete = _serializer.ToQueueDeleteModel(payloadData);
-                    DeleteQueue(sessionId, queueDelete);
+                    OnDeleteQueue(sessionId, queueDelete);
                     break;
             }
         }
 
         public void OnMessage(Guid sessionId, Message message)
         {
-            // send message to all the queues that match this message route
-            foreach (var (_, queue) in _queues)
-                if (queue.MessageRouteMatch(message.Route))
-                    queue.OnMessage(message);
+            // dispatch the message to matched queues
+            _queueStore.Dispatch(message.Route, message);
 
             // send received ack to publisher
-            SendRecievedPayloadAck(sessionId, message.Id);
+            SendReceivedPayloadAck(sessionId, message.Id);
 
+            _statRecorder.OnMessageReceived();
 
-            // 
+            // must return the original message data to buffer pool
             ArrayPool<byte>.Shared.Return(message.OriginalMessageData);
         }
 
-        public void OnAck(Guid sessionId, Ack ack)
+        public void OnMessageAck(Guid sessionId, Ack ack)
         {
-            _messageDispatcher.Release(ack.Id, new Guid[1] {sessionId});
+            // find the queue that is responsible for sending this message
+            var queueName = _messageIdTracker.ResolveMessageId(ack.Id);
+
+            // if the queue is found, then call OnMessageAck
+            if (_queueStore.TryGetValue(queueName, out var queue))
+            {
+                queue.OnMessageAck(sessionId, ack.Id);
+            }
         }
 
-        public void OnNack(Guid sessionId, Ack nack)
+        public void OnMessageNack(Guid sessionId, Ack nack)
         {
-            _messageDispatcher.Release(nack.Id, new Guid[1] {sessionId});
+            // find the queue responsible for this message
+            var queueName = _messageIdTracker.ResolveMessageId(nack.Id);
+
+            // if the queue is found, then call OnMessageNack
+            if (_queueStore.TryGetValue(queueName, out var queue))
+            {
+                queue.OnMessageNack(sessionId, nack.Id);
+            }
         }
 
-        public void OnListen(Guid sessionId, SubscribeQueue subscribeQueue)
+        public void OnSubscribeQueue(Guid sessionId, SubscribeQueue subscribeQueue)
         {
-            if (_queues.TryGetValue(subscribeQueue.QueueName, out var queue))
+            if (_queueStore.TryGetValue(subscribeQueue.QueueName, out var queue))
             {
                 queue.SessionSubscribed(sessionId);
-                SendRecievedPayloadAck(sessionId, subscribeQueue.Id);
+                SendReceivedPayloadAck(sessionId, subscribeQueue.Id);
             }
             else
             {
-                SendRecievedPayloadNack(sessionId, subscribeQueue.Id);
+                SendReceivedPayloadNack(sessionId, subscribeQueue.Id);
             }
         }
 
-        public void OnUnListen(Guid sessionId, SubscribeQueue unlisten)
+        public void OnUnsubscribeQueue(Guid sessionId, UnsubscribeQueue unsubscribeQueue)
         {
-            if (_queues.TryGetValue(unlisten.QueueName, out var queue))
+            if (_queueStore.TryGetValue(unsubscribeQueue.QueueName, out var queue))
             {
                 queue.SessionUnSubscribed(sessionId);
-                SendRecievedPayloadAck(sessionId, unlisten.Id);
+                SendReceivedPayloadAck(sessionId, unsubscribeQueue.Id);
             }
             else
             {
-                SendRecievedPayloadNack(sessionId, unlisten.Id);
+                SendReceivedPayloadNack(sessionId, unsubscribeQueue.Id);
             }
         }
 
-        private void OnSubscribe(Guid sessionId, Register register)
-        {
-            _messageDispatcher.AddSendQueue(sessionId, register.Concurrency);
-            SendRecievedPayloadAck(sessionId, register.Id);
-        }
 
-
-        private void DeclareQueue(Guid sessionId, QueueDeclare queueDeclare)
+        private void OnDeclareQueue(Guid sessionId, QueueDeclare queueDeclare)
         {
+            Logger.LogInformation($"declaring queue with name {queueDeclare.Name}");
+            
             // check if queue exists 
-            if (_queues.TryGetValue(queueDeclare.Name, out var queue))
+            var queue = _queueStore.Get(queueDeclare.Name);
+
+            // if queue exists
+            if (queue != null)
             {
-                SendRecievedPayloadAck(sessionId, queueDeclare.Id);
+                // if queue route match
+                if (queue.Route == queueDeclare.Route)
+                    SendReceivedPayloadAck(sessionId, queueDeclare.Id);
+                else
+                    SendReceivedPayloadNack(sessionId, queueDeclare.Id);
+
                 return;
             }
 
-            var sessionSelectionPolicy = new RandomSessionSelectionPolicy();
-            queue = new Queue(_messageDispatcher, sessionSelectionPolicy, _messageStore, _routeMatcher);
-            queue.Setup(queueDeclare.Name, queueDeclare.Route);
+            // create new queue
+            _queueStore.Add(queueDeclare);
 
-            _queues[queueDeclare.Name] = queue;
-
-            SendRecievedPayloadAck(sessionId, queueDeclare.Id);
+            SendReceivedPayloadAck(sessionId, queueDeclare.Id);
         }
 
-        private void DeleteQueue(Guid sessionId, QueueDelete queueDelete)
+        private void OnDeleteQueue(Guid sessionId, QueueDelete queueDelete)
         {
-            _queues.Remove(queueDelete.Name, out var _);
-            SendRecievedPayloadAck(sessionId, queueDelete.Id);
+            Logger.LogInformation($"deleting queue with name {queueDelete.Name}");
+            
+            _queueStore.Remove(queueDelete.Name);
+
+            SendReceivedPayloadAck(sessionId, queueDelete.Id);
         }
 
-        /// <summary>
-        ///     Ack that is sent to client indicating the payload has been successfully processed
-        /// </summary>
-        /// <param name="sessionId"></param>
-        /// <param name="payloadId"></param>
-        private void SendRecievedPayloadAck(Guid sessionId, Guid payloadId)
+        private void OnConfigureSubscription(Guid sessionId, ConfigureSubscription configureSubscription)
         {
-            var ack = new Ack
-            {
-                Id = payloadId
-            };
+            _messageDispatcher.ConfigureSubscription(
+                sessionId,
+                configureSubscription.Concurrency,
+                configureSubscription.AutoAck);
 
-            _messageDispatcher.Dispatch(ack, sessionId);
+            SendReceivedPayloadAck(sessionId, configureSubscription.Id);
         }
 
-        private void SendRecievedPayloadNack(Guid sessionId, Guid payloadId)
+        private void SendReceivedPayloadAck(Guid sessionId, Guid payloadId)
         {
             var ack = new Ack
             {
                 Id = payloadId
             };
 
-            _messageDispatcher.Dispatch(ack, sessionId);
+            var sendPayload = _serializer.ToSendPayload(ack);
+
+            _messageDispatcher.Dispatch(sendPayload, sessionId);
+        }
+
+        private void SendReceivedPayloadNack(Guid sessionId, Guid payloadId)
+        {
+            var nack = new Nack
+            {
+                Id = payloadId
+            };
+
+            var sendPayload = _serializer.ToSendPayload(nack);
+
+            _messageDispatcher.Dispatch(sendPayload, sessionId);
         }
     }
 }

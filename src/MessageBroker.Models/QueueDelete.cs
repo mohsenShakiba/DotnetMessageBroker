@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace MessageBroker.Models.Models
+namespace MessageBroker.Models
 {
     /// <summary>
     ///     will delete the queue if exists

@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using MessageBroker.Models.Models;
+using MessageBroker.Core.InternalEventChannel;
 using MessageBroker.Serialization;
 using MessageBroker.SocketServer.Abstractions;
 
@@ -12,14 +12,14 @@ namespace MessageBroker.Core
     public class MessageDispatcher
     {
         private readonly ConcurrentDictionary<Guid, SendQueue> _sendQueues;
-        private readonly ISerializer _serializer;
         private readonly ISessionResolver _sessionResolver;
+        private readonly IEventChannel _eventChannel;
 
 
-        public MessageDispatcher(ISessionResolver sessionResolver, ISerializer serializer)
+        public MessageDispatcher(ISessionResolver sessionResolver, IEventChannel eventChannel)
         {
             _sessionResolver = sessionResolver;
-            _serializer = serializer;
+            _eventChannel = eventChannel;
             _sendQueues = new ConcurrentDictionary<Guid, SendQueue>();
         }
 
@@ -37,48 +37,49 @@ namespace MessageBroker.Core
         }
 
         /// <summary>
-        ///     AddSendQueue will create and store a new SendQueue will the specified concurrency
+        ///     AddSendQueue will create and store a new SendQueue
         /// </summary>
         /// <param name="sessionId"></param>
-        /// <param name="concurrency"></param>
-        public void AddSendQueue(Guid sessionId, int concurrency)
+        public void AddSendQueue(Guid sessionId)
         {
             var session = _sessionResolver.Resolve(sessionId);
             if (session != null)
             {
-                var sendQueue = new SendQueue(session, _serializer);
-                sendQueue.SetupConcurrency(concurrency);
+                var sendQueue = new SendQueue(session, _eventChannel);
                 _sendQueues[sessionId] = sendQueue;
             }
         }
 
-        /// <summary>
-        ///     Dispatch will send the message to all the destination
-        ///     if a SendQueue is found for a session id then the Enqueue method will be called
-        ///     otherwise a SendQueue will be created and Enqueue will be called
-        /// </summary>
-        /// <param name="msg">The message that must be dispatched</param>
-        /// <param name="destinations">Array of Guids that the message must be dispatched to</param>
-        public void Dispatch(Message msg, Guid destination)
+        public void RemoveSendQueue(Guid sessionId)
         {
-            if (_sendQueues.TryGetValue(destination, out var sendQueue)) sendQueue.Enqueue(msg);
+            if (_sendQueues.TryRemove(sessionId, out var sendQueue))
+            {
+                sendQueue.Stop();
+            }
         }
 
-        public void Dispatch(Ack ack, Guid destination)
+        public void ConfigureSubscription(Guid sessionId, int concurrency, bool autoAck)
         {
-            if (_sendQueues.TryGetValue(destination, out var sendQueue)) sendQueue.Enqueue(ack);
+            if (_sendQueues.TryGetValue(sessionId, out var sendQueue))
+                sendQueue.Configure(concurrency, autoAck);
         }
+
+        public void Dispatch(SendPayload sendPayload, Guid destination)
+        {
+            if (_sendQueues.TryGetValue(destination, out var sendQueue))
+                sendQueue.Enqueue(sendPayload);
+        }
+
 
         /// <summary>
         ///     release will dispatch the message id to the appropriate SendQueues
         /// </summary>
         /// <param name="messageId">MessageId that has been acked or nacked</param>
         /// <param name="destinations">SenQueues that must receive this message id</param>
-        public void Release(Guid messageId, Guid[] destinations)
+        public void Release(Guid messageId, Guid destination)
         {
-            foreach (var destination in destinations)
-                if (_sendQueues.TryGetValue(destination, out var sendQueue))
-                    sendQueue.ReleaseOne(messageId);
+            if (_sendQueues.TryGetValue(destination, out var sendQueue))
+                sendQueue.ReleaseOne(messageId);
         }
     }
 }

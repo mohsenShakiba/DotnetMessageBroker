@@ -14,14 +14,12 @@ namespace Tests.Classes
             var services = new ServiceCollection();
 
             var loggerFactory = LoggerFactory.Create(_ => { });
-            var sessionConfiguration = SessionConfiguration.Default();
 
             services.AddSingleton<ISessionResolver, SessionResolver>();
             services.AddSingleton<ISessionEventListener, TcpSocketServer>();
             services.AddSingleton<ISocketEventProcessor, Coordinator>();
             services.AddSingleton<ISerializer, Serializer>();
             services.AddSingleton(_ => loggerFactory);
-            services.AddSingleton(_ => sessionConfiguration);
 
             return services;
         }

@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace MessageBroker.Core.Queues
+namespace MessageBroker.Core.SessionPolicy
 {
-    public interface ISessionSelectionPolicy
+    public interface ISessionPolicy
     {
         void AddSession(Guid sessionId);
         void RemoveSession(Guid sessionId);

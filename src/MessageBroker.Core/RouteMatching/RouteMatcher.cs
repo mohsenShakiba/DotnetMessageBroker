@@ -4,6 +4,7 @@
     {
         public bool Match(string messageRoute, string subscriberRoute)
         {
+            // todo: a more complex routing 
             return messageRoute == subscriberRoute;
         }
     }

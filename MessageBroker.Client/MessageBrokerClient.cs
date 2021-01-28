@@ -2,9 +2,10 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Client.SocketClient;
-using MessageBroker.Models.Models;
+using MessageBroker.Models;
 using MessageBroker.Serialization;
 using Microsoft.Extensions.Logging;
 
@@ -70,18 +71,18 @@ namespace MessageBroker.Client
         {
             var payloadType = _serializer.ParsePayloadType(data);
                 
-            payloadType switch
-            {
-                PayloadType.Msg => OnMessageReceived(data),
-                PayloadType.Ack => expr,
-                PayloadType.Nack => expr,
-                PayloadType.SubscribeQueue => expr,
-                PayloadType.UnSubscribeQueue => expr,
-                PayloadType.Register => expr,
-                PayloadType.QueueCreate => expr,
-                PayloadType.QueueDelete => expr,
-                _ => throw new ArgumentOutOfRangeException()
-            }
+            // payloadType switch
+            // {
+            //     PayloadType.Msg => OnMessageReceived(data),
+            //     PayloadType.Ack => expr,
+            //     PayloadType.Nack => expr,
+            //     PayloadType.SubscribeQueue => expr,
+            //     PayloadType.UnSubscribeQueue => expr,
+            //     PayloadType.Register => expr,
+            //     PayloadType.QueueCreate => expr,
+            //     PayloadType.QueueDelete => expr,
+            //     _ => throw new ArgumentOutOfRangeException()
+            // }
         }
 
         private void OnMessageReceived(Memory<byte> data)

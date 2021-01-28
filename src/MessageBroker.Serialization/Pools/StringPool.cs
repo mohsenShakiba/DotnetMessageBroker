@@ -4,10 +4,12 @@ using System.Text;
 
 namespace MessageBroker.Serialization.Pools
 {
+    /// <summary>
+    /// StringPool is a utility class to prevent string allocations
+    /// </summary>
     public class StringPool
     {
         private static StringPool _shared;
-        private readonly Dictionary<int, byte[]> _reverseStore = new();
 
         private readonly Dictionary<int, string> _store = new();
 
@@ -32,21 +34,6 @@ namespace MessageBroker.Serialization.Pools
             _store[hashCode] = s;
 
             return s;
-        }
-
-        public void TryCopyTo(string str, Span<byte> buffer)
-        {
-            var hash = str.GetHashCode();
-            if (_reverseStore.TryGetValue(hash, out var b))
-            {
-                b.CopyTo(buffer);
-            }
-            else
-            {
-                b = Encoding.UTF8.GetBytes(str);
-                _reverseStore[hash] = b;
-                b.CopyTo(buffer);
-            }
         }
 
         private int ComputeHash(Span<byte> data)

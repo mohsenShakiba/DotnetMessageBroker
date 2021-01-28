@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Text;
 using MessageBroker.Core;
-using MessageBroker.Models.Models;
+using MessageBroker.Core.InternalEventChannel;
+using MessageBroker.Models;
 using MessageBroker.Serialization;
 using MessageBroker.SocketServer.Abstractions;
 using Moq;
@@ -16,6 +17,7 @@ namespace Tests
         {
             var serializer = new Serializer();
             var session = new Mock<IClientSession>();
+            var eventChannel = new EventChannel();
 
             var messageOne = new Message
             {
@@ -31,17 +33,20 @@ namespace Tests
                 Data = Encoding.UTF8.GetBytes("TEST")
             };
 
-            var sendQueue = new SendQueue(session.Object, serializer);
-            sendQueue.SetupConcurrency(1);
+            var sendPayloadOne = serializer.ToSendPayload(messageOne);
+            var sendPayloadTwo = serializer.ToSendPayload(messageTwo);
+
+            var sendQueue = new SendQueue(session.Object, eventChannel);
+            sendQueue.Configure(1, false);
 
             // enqueu first message
-            sendQueue.Enqueue(messageOne);
+            sendQueue.Enqueue(sendPayloadOne);
 
             // make sure send method was called
             session.Verify(session => session.SendAsync(It.IsAny<Memory<byte>>()));
 
             // enqueue second message
-            sendQueue.Enqueue(messageTwo);
+            sendQueue.Enqueue(sendPayloadTwo);
 
             // make sure the session has 
             Assert.Equal(1, sendQueue.CurrentConcurrency);
@@ -58,8 +63,9 @@ namespace Tests
         {
             var serializer = new Serializer();
             var session = new Mock<IClientSession>();
-            var sendQueue = new SendQueue(session.Object, serializer);
-            sendQueue.SetupConcurrency(1, 1);
+            var eventChannel = new EventChannel();
+            var sendQueue = new SendQueue(session.Object, eventChannel);
+            sendQueue.Configure(1, false, 1);
             var randomId = Guid.NewGuid();
 
             sendQueue.ReleaseOne(randomId);

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
+using MessageBroker.Common.Logging;
 using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.Logging;
 
@@ -11,9 +12,6 @@ namespace MessageBroker.SocketServer
     /// </summary>
     public class TcpSocketServer : ISocketServer, ISessionEventListener
     {
-        private readonly ILogger<TcpSocketServer> _logger;
-        private readonly ILoggerFactory _loggerFactory;
-        private readonly SessionConfiguration _sessionConfiguration;
         private readonly ISessionResolver _sessionResolver;
         private readonly ISocketEventProcessor _socketEventProcessor;
         private IPEndPoint _endPoint;
@@ -22,14 +20,10 @@ namespace MessageBroker.SocketServer
         private Socket _socket;
         private SocketAsyncEventArgs _socketAsyncEventArgs;
 
-        public TcpSocketServer(ISocketEventProcessor socketEventProcessor, ISessionResolver sessionResolver,
-            SessionConfiguration sessionConfiguration, ILoggerFactory loggerFactory)
+        public TcpSocketServer(ISocketEventProcessor socketEventProcessor, ISessionResolver sessionResolver)
         {
             _socketEventProcessor = socketEventProcessor;
             _sessionResolver = sessionResolver;
-            _sessionConfiguration = sessionConfiguration;
-            _loggerFactory = loggerFactory;
-            _logger = _loggerFactory.CreateLogger<TcpSocketServer>();
         }
 
 
@@ -55,7 +49,6 @@ namespace MessageBroker.SocketServer
         /// </param>
         public void OnSessionDisconnected(Guid SessionId)
         {
-            _logger.LogInformation($"removed session due to being disconnected, sessionId: {SessionId}");
             _sessionResolver.Remove(SessionId);
             _socketEventProcessor.ClientDisconnected(SessionId);
         }
@@ -70,9 +63,6 @@ namespace MessageBroker.SocketServer
         {
             _endPoint = endpoint;
             _isAccepting = true;
-
-            _logger.LogInformation($"Server now listening on {endpoint}");
-
             CreateSocket();
         }
 
@@ -82,6 +72,8 @@ namespace MessageBroker.SocketServer
         /// </summary>
         public void Stop()
         {
+            Logger.LogInformation("stopping socket server");
+            
             _isAccepting = false;
 
             _socketAsyncEventArgs.Completed -= OnAcceptCompleted;
@@ -105,6 +97,8 @@ namespace MessageBroker.SocketServer
             _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             _socket.Bind(_endPoint);
             _socket.Listen();
+            
+            Logger.LogInformation("started socket connection");
 
             AcceptConnection();
         }
@@ -150,11 +144,9 @@ namespace MessageBroker.SocketServer
         /// <param name="socket"></param>
         private void OnAcceptSuccess(Socket socket)
         {
-            var sessionLogger = _loggerFactory.CreateLogger<ClientSession>();
-
-            var session = new ClientSession(this, socket, _sessionConfiguration, sessionLogger);
-
-            _logger.LogInformation($"accepted socket from {socket.RemoteEndPoint} with sessionId {session.SessionId}");
+            Logger.LogInformation("accepted new socket connection");
+            
+            var session = new ClientSession(this, socket);
 
             _sessionResolver.Add(session);
 
@@ -162,20 +154,20 @@ namespace MessageBroker.SocketServer
         }
 
         /// <summary>
-        ///     called when accepting socket fails
+        /// called when accepting socket fails
         /// </summary>
         /// <param name="err"></param>
         private void OnAcceptError(SocketError err)
         {
-            _logger.LogError($"failed to accept connection due to {err}");
+            Logger.LogError($"failed to accept socket connection, error: {err}");
         }
 
         /// <summary>
-        ///     called by Stop method to remove all sessions
+        /// called by Stop method to remove all sessions
         /// </summary>
         private void RemoveAllSessions()
         {
-            _logger.LogInformation("removing all sessions");
+            Logger.LogInformation("removing all sessions");
             foreach (var session in _sessionResolver.Sessions)
             {
                 _socketEventProcessor.ClientDisconnected(session.SessionId);

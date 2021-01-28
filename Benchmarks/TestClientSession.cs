@@ -6,10 +6,17 @@ namespace Benchmarks
     public class TestClientSession : IClientSession
     {
         public Guid SessionId { get; set; }
-
-        public void SetupSendCompletedHandler(Action onSendCompleted)
+        
+        public void SetupSendCompletedHandler(Action<Guid> onSendCompleted, Action<Guid> onMessageError)
         {
+            // do nothing
         }
+
+        public void SetSendPayloadId(Guid sendPayloadId)
+        {
+            // do nothing
+        }
+
 
         public void Send(Memory<byte> payload)
         {

@@ -6,7 +6,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\MessageBroker.Models\MessageBroker.Models.csproj" />
+      <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="5.0.0" />
     </ItemGroup>
 
 </Project>

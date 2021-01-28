@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Buffers;
 using System.Text;
-using MessageBroker.Models.Models;
+using MessageBroker.Common.Pooling;
+using MessageBroker.Models;
 using MessageBroker.Serialization.Pools;
 
 namespace MessageBroker.Serialization
@@ -11,16 +12,13 @@ namespace MessageBroker.Serialization
     /// </summary>
     public class BinarySerializeHelper : IDisposable
     {
-        private readonly SerializationConfig _config;
-
         private byte[] _buffer;
         private int _currentBufferOffset;
         private Guid _id;
         private PayloadType _type;
 
-        public BinarySerializeHelper(SerializationConfig config)
+        public BinarySerializeHelper()
         {
-            _config = config;
         }
 
         public void Dispose()
@@ -84,9 +82,9 @@ namespace MessageBroker.Serialization
             try
             {
                 var bufferSpan = _buffer.AsSpan();
-                BitConverter.TryWriteBytes(bufferSpan, _currentBufferOffset - _config.MessageHeaderSize);
+                BitConverter.TryWriteBytes(bufferSpan, _currentBufferOffset - SerializationConfig.PayloadHeaderSize);
 
-                var sendPayload = ObjectPool.Shared.RentSendPayload();
+                var sendPayload = ObjectPool.Shared.Rent<SendPayload>();
                 sendPayload.FillFrom(_buffer, _currentBufferOffset, _id, _type);
 
                 return sendPayload;
@@ -99,13 +97,13 @@ namespace MessageBroker.Serialization
 
         public void Refresh()
         {
-            _currentBufferOffset = _config.MessageHeaderSize;
+            _currentBufferOffset = SerializationConfig.PayloadHeaderSize;
         }
 
 
         public void Setup()
         {
-            if (_buffer == null) _buffer = ArrayPool<byte>.Shared.Rent(_config.MaxBodySize);
+            if (_buffer == null) _buffer = ArrayPool<byte>.Shared.Rent(SerializationConfig.SendPayloadStartingBufferSize);
 
             Refresh();
         }

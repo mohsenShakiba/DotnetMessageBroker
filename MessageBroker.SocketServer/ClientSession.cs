@@ -3,38 +3,41 @@ using System.Buffers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using MessageBroker.Common.Logging;
+using MessageBroker.Serialization;
 using MessageBroker.SocketServer.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.SocketServer
 {
     /// <summary>
-    ///     ClientSession stores information about the accepted socket
-    ///     it will continue to receive data from socket and allows sending data to socket
+    /// ClientSession stores information about the accepted socket
+    /// it will continue to receive data from socket and allows sending data to socket
+    /// this class isn't thread safe but it's only used by send queue which takes care of multi threading
     /// </summary>
     public class ClientSession : IClientSession, IDisposable
     {
-        private readonly SessionConfiguration _config;
-        private readonly ILogger<ClientSession> _logger;
         private readonly SocketAsyncEventArgs _receiveEventArgs;
         private readonly AutoResetEvent _receiveResetEvent;
         private readonly SocketAsyncEventArgs _sendEventArgs;
         private readonly SocketAsyncEventArgs _sizeEventArgs;
         private readonly Socket _socket;
-        private bool _connected;
-
         private readonly ISessionEventListener _eventListener;
 
+        private bool _connected;
         private byte[] _receiveBuff;
         private byte[] _sendBuff;
+        
+        private Action<Guid> _onSendCompletedHandler;
+        private Action<Guid> _onSendFailedHandler;
+        private Guid _sendPayloadId;
+        
+        public Guid SessionId { get; }
 
-        public ClientSession(ISessionEventListener eventListener, Socket socket, SessionConfiguration config,
-            ILogger<ClientSession> logger)
+        public ClientSession(ISessionEventListener eventListener, Socket socket)
         {
-            _logger = logger;
             _eventListener = eventListener;
             _socket = socket;
-            _config = config;
 
             _connected = true;
             SessionId = Guid.NewGuid();
@@ -49,17 +52,19 @@ namespace MessageBroker.SocketServer
 
             SetupReceiveBufferWithSize();
             SetupSendBufferWithSize();
-
+            
             Receive();
         }
 
-        public Guid SessionId { get; }
 
         public void Close()
         {
+            Logger.LogInformation($"stopping client session {SessionId}");
+            
             _connected = false;
-            _receiveEventArgs.Completed -= OnMessageReceived;
-            _sizeEventArgs.Completed -= OnMessageSizeReceived;
+            _receiveEventArgs.Completed -= OnMessageReceiveCompleted;
+            _sizeEventArgs.Completed -= OnMessageSizeReceiveCompleted;
+            _sendEventArgs.Completed -= OnSendCompleted;
 
             _socket.Close();
             _socket.Dispose();
@@ -74,8 +79,9 @@ namespace MessageBroker.SocketServer
 
         private void SetupEventArgs()
         {
-            _sizeEventArgs.Completed += OnMessageSizeReceived;
-            _receiveEventArgs.Completed += OnMessageReceived;
+            _sizeEventArgs.Completed += OnMessageSizeReceiveCompleted;
+            _receiveEventArgs.Completed += OnMessageReceiveCompleted;
+            _sendEventArgs.Completed += OnSendCompleted;
         }
 
         /// <summary>
@@ -83,6 +89,8 @@ namespace MessageBroker.SocketServer
         /// </summary>
         private void Receive()
         {
+            Logger.LogInformation($"starting client session {SessionId}");
+            
             Task.Factory.StartNew(() =>
             {
                 while (_connected)
@@ -99,26 +107,20 @@ namespace MessageBroker.SocketServer
         /// <param name="buff"></param>
         private void OnReceived(Memory<byte> buff)
         {
-            _logger.LogInformation($"received {buff.Length} from client");
             _eventListener.OnReceived(SessionId, buff);
         }
 
-        /// <summary>
-        ///     SetupReceiveBufferWithSize is called when the size of message to be received is larger than the current buffer
-        ///     so we need to increase the size of buffer
-        /// </summary>
-        /// <param name="desiredSize"></param>
         private void SetupReceiveBufferWithSize(int? desiredSize = null)
         {
-            var size = desiredSize ?? _config.DefaultBodySize;
-            var newBuffer = ArrayPool<byte>.Shared.Rent(size + _config.DefaultHeaderSize);
+            var size = desiredSize ?? SerializationConfig.ReceivePayloadStartingBufferSize;
+            var newBuffer = ArrayPool<byte>.Shared.Rent(size + SerializationConfig.PayloadHeaderSize);
             if (_receiveBuff != null) ArrayPool<byte>.Shared.Return(_receiveBuff);
             _receiveBuff = newBuffer;
         }
 
         private void SetupSendBufferWithSize(int? desiredSize = null)
         {
-            var size = desiredSize ?? _config.DefaultBodySize;
+            var size = desiredSize ?? SerializationConfig.SendPayloadStartingBufferSize;
             var newBuffer = ArrayPool<byte>.Shared.Rent(size);
             if (_sendBuff != null) ArrayPool<byte>.Shared.Return(_sendBuff);
             _sendBuff = newBuffer;
@@ -136,13 +138,13 @@ namespace MessageBroker.SocketServer
                 return;
 
             // resetting the _receiveEventArgs
-            _sizeEventArgs.SetBuffer(_receiveBuff, default, _config.DefaultHeaderSize);
+            _sizeEventArgs.SetBuffer(_receiveBuff, default, SerializationConfig.PayloadHeaderSize);
 
             // receive the 4 bytes from docket 
-            if (!_socket.ReceiveAsync(_sizeEventArgs)) OnMessageSizeReceived(null, _sizeEventArgs);
+            if (!_socket.ReceiveAsync(_sizeEventArgs)) OnMessageSizeReceiveCompleted(null, _sizeEventArgs);
         }
 
-        private void OnMessageSizeReceived(object _, SocketAsyncEventArgs args)
+        private void OnMessageSizeReceiveCompleted(object _, SocketAsyncEventArgs args)
         {
             // get the transferred size
             var size = args.BytesTransferred;
@@ -150,21 +152,19 @@ namespace MessageBroker.SocketServer
             // if operation fails
             if (args.SocketError != SocketError.Success)
             {
-                _logger.LogError($"the receive operation failed with error {args.SocketError}");
                 Close();
                 return;
             }
 
             // check if size of header is invalid, close the connection
-            if (size != _config.DefaultHeaderSize)
+            if (size != SerializationConfig.PayloadHeaderSize)
             {
-                _logger.LogError("failed to read the message size, removing session");
                 Close();
                 return;
             }
 
             // convert the first 4 bytes of the buffer to int32
-            var msgSize = BitConverter.ToInt32(_receiveBuff.AsSpan(0, _config.DefaultHeaderSize));
+            var msgSize = BitConverter.ToInt32(_receiveBuff.AsSpan(0, SerializationConfig.PayloadHeaderSize));
 
             // receive exactly the size converted from the last step
             ReceiveMsg(msgSize);
@@ -182,7 +182,6 @@ namespace MessageBroker.SocketServer
         {
             if (msgSize <= 0)
             {
-                _logger.LogError("invalid message size, closing the connection");
                 Close();
                 return;
             }
@@ -190,16 +189,16 @@ namespace MessageBroker.SocketServer
             if (!_connected)
                 return;
 
-            if (msgSize > _receiveBuff.Length - _config.DefaultHeaderSize)
+            if (msgSize > _receiveBuff.Length - SerializationConfig.PayloadHeaderSize)
                 SetupReceiveBufferWithSize(msgSize);
 
             _receiveEventArgs.SetBuffer(_receiveBuff, 0, msgSize);
 
             if (!_socket.ReceiveAsync(_receiveEventArgs))
-                OnMessageReceived(null, _receiveEventArgs);
+                OnMessageReceiveCompleted(null, _receiveEventArgs);
         }
 
-        private void OnMessageReceived(object _, SocketAsyncEventArgs args)
+        private void OnMessageReceiveCompleted(object _, SocketAsyncEventArgs args)
         {
             // get the transferred size
             var size = args.BytesTransferred;
@@ -207,7 +206,6 @@ namespace MessageBroker.SocketServer
             // if operation fails
             if (args.SocketError != SocketError.Success)
             {
-                _logger.LogError($"the receive operation failed with error {args.SocketError}");
                 Close();
                 return;
             }
@@ -215,7 +213,6 @@ namespace MessageBroker.SocketServer
             // check if size is invalid, close the connection
             if (size <= 0)
             {
-                _logger.LogError("failed to read the message body, removing session");
                 Close();
                 return;
             }
@@ -234,9 +231,15 @@ namespace MessageBroker.SocketServer
         ///     sets an action for when send async finished sending data
         /// </summary>
         /// <param name="onSendCompleted"></param>
-        public void SetupSendCompletedHandler(Action onSendCompleted)
+        public void SetupSendCompletedHandler(Action<Guid> onSendCompleted, Action<Guid> onSendFailed)
         {
-            _sendEventArgs.Completed += (_, _) => { onSendCompleted(); };
+            _onSendCompletedHandler = onSendCompleted;
+            _onSendFailedHandler = onSendFailed;
+        }
+
+        public void SetSendPayloadId(Guid sendPayloadId)
+        {
+            _sendPayloadId = sendPayloadId;
         }
 
         /// <summary>
@@ -264,6 +267,18 @@ namespace MessageBroker.SocketServer
             _sendEventArgs.SetBuffer(_sendBuff.AsMemory(0, payload.Length));
 
             return _socket.SendAsync(_sendEventArgs);
+        }
+
+        private void OnSendCompleted(object _, SocketAsyncEventArgs args)
+        {
+            if (args.SocketError != SocketError.Success)
+            {
+                _onSendCompletedHandler?.Invoke(_sendPayloadId);
+            }
+            else
+            {
+                _onSendFailedHandler?.Invoke(_sendPayloadId);
+            }
         }
 
         #endregion

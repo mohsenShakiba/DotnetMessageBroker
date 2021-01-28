@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace MessageBroker.Models.Models
+namespace MessageBroker.Models
 {
     /// <summary>
     ///     will create a new queue, if not exists

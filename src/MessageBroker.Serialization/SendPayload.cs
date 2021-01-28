@@ -1,32 +1,26 @@
 ﻿using System;
 using System.Buffers;
-using MessageBroker.Models.Models;
+using MessageBroker.Models;
 
 namespace MessageBroker.Serialization
 {
     public class SendPayload : IDisposable
     {
-        private readonly SerializationConfig _config;
-
         private byte[] _buffer;
         private int _size;
-
-
-        public SendPayload(SerializationConfig config)
-        {
-            _config = config;
-        }
 
         public Memory<byte> Data => _buffer.AsMemory(0, _size);
 
         public Memory<byte> DataWithoutSize =>
-            _buffer.AsMemory(_config.MessageHeaderSize, _size - _config.MessageHeaderSize);
+            _buffer.AsMemory(SerializationConfig.PayloadHeaderSize, _size - SerializationConfig.PayloadHeaderSize);
 
         public Guid Id { get; private set; }
 
-        public PayloadType Type { get; private set; }
+        private PayloadType _type;
 
-        public bool IsMessageType => Type == PayloadType.Msg;
+        public bool IsMessageType => _type == PayloadType.Msg;
+        public byte[] Buffer => _buffer;
+        public PayloadType Type => _type;
 
         public void Dispose()
         {
@@ -45,7 +39,7 @@ namespace MessageBroker.Serialization
             data.AsMemory(0, size).CopyTo(_buffer.AsMemory());
 
             Id = id;
-            Type = type;
+            _type = type;
             _size = size;
         }
     }

@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using MessageBroker.Models.Models;
+using MessageBroker.Models;
 using MessageBroker.Serialization;
 using MessageBroker.SocketServer;
 using Microsoft.Extensions.Logging;
@@ -31,11 +31,10 @@ namespace Tests
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new TestSocketEventProcessor();
             var resolver = new SessionResolver();
-            var sessionConfiguration = SessionConfiguration.Default();
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
-            var server = new TcpSocketServer(messageProcessor, resolver, sessionConfiguration, loggerFactory);
+            var server = new TcpSocketServer(messageProcessor, resolver);
             server.Start(ipEndPoint);
 
             var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -86,12 +85,11 @@ namespace Tests
             var loggerFactory = new LoggerFactory();
             var messageProcessor = new TestSocketEventProcessor();
             var resolver = new SessionResolver();
-            var sessionConfiguration = SessionConfiguration.Default();
             var eventListener = new TestEventListener();
 
             var ipEndPoint = new IPEndPoint(IPAddress.Loopback, 8080);
 
-            var server = new TcpSocketServer(messageProcessor, resolver, sessionConfiguration, loggerFactory);
+            var server = new TcpSocketServer(messageProcessor, resolver);
             server.Start(ipEndPoint);
 
 

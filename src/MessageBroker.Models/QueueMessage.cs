@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace MessageBroker.Models.Models
+namespace MessageBroker.Models
 {
     public ref struct QueueMessage
     {

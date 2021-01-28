@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Text;
 using MessageBroker.Core;
-using MessageBroker.Models.Models;
+using MessageBroker.Core.InternalEventChannel;
+using MessageBroker.Core.Queues;
+using MessageBroker.Models;
 using MessageBroker.Serialization;
 using MessageBroker.SocketServer.Abstractions;
 using Moq;
@@ -17,23 +19,22 @@ namespace Tests
             var sessionId = Guid.NewGuid();
             var session = new Mock<IClientSession>();
             var sessionResolver = new Mock<ISessionResolver>();
+            var eventChannel = new EventChannel();
             var serializer = new Serializer();
 
             session.Setup(s => s.SessionId).Returns(sessionId);
             sessionResolver.Setup(sr => sr.Resolve(It.IsAny<Guid>())).Returns(session.Object);
 
-            var dispatcher = new MessageDispatcher(sessionResolver.Object, serializer);
+            var dispatcher = new MessageDispatcher(sessionResolver.Object, eventChannel);
 
-            dispatcher.AddSendQueue(sessionId, 1);
+            dispatcher.AddSendQueue(sessionId);
 
             var originalMessage = new Message
                 {Id = Guid.NewGuid(), Route = "TEST", Data = Encoding.UTF8.GetBytes("TEST")};
 
             var originalMessageSendData = serializer.ToSendPayload(originalMessage);
 
-            var message = serializer.ToMessage(originalMessageSendData.Data);
-
-            dispatcher.Dispatch(message, session.Object.SessionId);
+            dispatcher.Dispatch(originalMessageSendData, session.Object.SessionId);
 
             // make sure the send queue is created and it's the same as session
             var sendQueue = dispatcher.GetSendQueue(sessionId);

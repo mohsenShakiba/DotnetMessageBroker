@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
-using MessageBroker.Models.Models;
+using MessageBroker.Models;
 using MessageBroker.Serialization;
 using MessageBroker.SocketServer;
 using MessageBroker.SocketServer.Abstractions;
@@ -25,7 +25,6 @@ namespace Tests.SocketServer
 
             var sessionResolverMock = new Mock<ISessionResolver>();
             var socketEventProcessorMock = new Mock<ISocketEventProcessor>();
-            var sessionConfiguration = SessionConfiguration.Default();
             var loggerFactory = LoggerFactory.Create(_ => { });
 
             var services = new ServiceCollection();
@@ -33,7 +32,6 @@ namespace Tests.SocketServer
             services.AddSingleton(i => sessionResolverMock.Object);
             services.AddSingleton(i => socketEventProcessorMock.Object);
             services.AddSingleton(i => loggerFactory);
-            services.AddSingleton(i => sessionConfiguration);
             services.AddSingleton<TcpSocketServer>();
 
             var serviceProvider = services.BuildServiceProvider();
@@ -74,7 +72,6 @@ namespace Tests.SocketServer
 
             var sessionResolverMock = new Mock<ISessionResolver>();
             var socketEventProcessorMock = new Mock<ISocketEventProcessor>();
-            var sessionConfiguration = SessionConfiguration.Default();
             var loggerFactory = LoggerFactory.Create(_ => { });
 
             var services = new ServiceCollection();
@@ -82,7 +79,6 @@ namespace Tests.SocketServer
             services.AddSingleton(i => sessionResolverMock.Object);
             services.AddSingleton(i => socketEventProcessorMock.Object);
             services.AddSingleton(i => loggerFactory);
-            services.AddSingleton(i => sessionConfiguration);
             services.AddSingleton<TcpSocketServer>();
             services.AddSingleton<ISerializer, Serializer>();
 
@@ -102,7 +98,7 @@ namespace Tests.SocketServer
 
             var serializer = serviceProvider.GetRequiredService<ISerializer>();
 
-            var register = new Register {Concurrency = 10, Id = Guid.Empty};
+            var register = new ConfigureSubscription {Concurrency = 10, Id = Guid.Empty};
             var sendPayload = serializer.ToSendPayload(register);
             client.Send(sendPayload.Data.Span);
 
