@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 
 namespace MessageBroker.Models
 {
@@ -15,6 +16,25 @@ namespace MessageBroker.Models
         public void SetNewId()
         {
             Id = Guid.NewGuid();
+        }
+
+        public QueueMessage ToQueueMessage(string queueName)
+        {
+            var newData = ArrayPool<byte>.Shared.Rent(Data.Length);
+            Data.CopyTo(newData);
+            return new QueueMessage
+            {
+                Id = Guid.NewGuid(),
+                Data = newData.AsMemory(0, Data.Length),
+                Route = Route,
+                QueueName = queueName,
+                OriginalMessageData = newData
+            };
+        }
+        
+        public void Dispose()
+        {
+            ArrayPool<byte>.Shared.Return(OriginalMessageData);
         }
         
     }

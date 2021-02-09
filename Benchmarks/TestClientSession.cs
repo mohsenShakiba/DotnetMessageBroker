@@ -1,11 +1,12 @@
 ﻿using System;
-using MessageBroker.SocketServer.Abstractions;
+using System.Threading.Tasks;
+using MessageBroker.Core.Socket.Client;
 
 namespace Benchmarks
 {
     public class TestClientSession : IClientSession
     {
-        public Guid SessionId { get; set; }
+        public Guid Id { get; set; }
         
         public void SetupSendCompletedHandler(Action<Guid> onSendCompleted, Action<Guid> onMessageError)
         {
@@ -23,9 +24,9 @@ namespace Benchmarks
             // do nothing
         }
 
-        public bool SendAsync(Memory<byte> payload)
+        public Task<bool> SendAsync(Memory<byte> payload)
         {
-            return false;
+            return Task.FromResult(true);
         }
 
         public void Close()

@@ -1,11 +1,10 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
-using MessageBroker.Core.InternalEventChannel;
-using MessageBroker.Core.MessageIdTracking;
 using MessageBroker.Core.Persistence;
-using MessageBroker.Core.Persistence.InMemoryStore;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.SessionPolicy;
 using MessageBroker.Models;
@@ -18,13 +17,10 @@ namespace MessageBroker.Core.Queues
         private readonly MessageDispatcher _dispatcher;
         private readonly IMessageStore _messageStore;
         private readonly IRouteMatcher _routeMatcher;
-        private readonly IEventChannel _eventChannel;
         private readonly ISerializer _serializer;
-        private readonly IMessageIdTracker _messageIdTracker;
         private readonly ISessionPolicy _sessionPolicy;
         private readonly Channel<Guid> _queue;
 
-        private Channel<InternalEvent> _internalEventChan;
         private string _name;
         private string _route;
         private bool _stopped;
@@ -33,15 +29,13 @@ namespace MessageBroker.Core.Queues
         public string Route => _route;
 
         public Queue(MessageDispatcher dispatcher, ISessionPolicy sessionPolicy,
-            IMessageStore messageStore, IRouteMatcher routeMatcher, IEventChannel eventChannel, ISerializer serializer, IMessageIdTracker messageIdTracker)
+            IMessageStore messageStore, IRouteMatcher routeMatcher, ISerializer serializer)
         {
             _dispatcher = dispatcher;
             _sessionPolicy = sessionPolicy;
             _messageStore = messageStore;
             _routeMatcher = routeMatcher;
-            _eventChannel = eventChannel;
             _serializer = serializer;
-            _messageIdTracker = messageIdTracker;
             _queue = Channel.CreateUnbounded<Guid>();
         }
 
@@ -54,31 +48,19 @@ namespace MessageBroker.Core.Queues
         {
             _name = name;
             _route = route;
-            _internalEventChan = _eventChannel.GetListenChannelForQueueName(_name);
 
+            ReadPayloadsFromMessageStore();
             SetupSendQueueProcessor();
-            SetupInternalEventQueueProcessor();
         }
 
-        private void SetupInternalEventQueueProcessor()
+        private void ReadPayloadsFromMessageStore()
         {
-            Task.Factory.StartNew(async () =>
-            {
-                while (true)
-                {
-                    if (_stopped)
-                        return;
+            var messages = _messageStore.PendingMessages(int.MaxValue);
 
-                    var ev = await _internalEventChan.Reader.ReadAsync();
-
-                    if (ev.Ack)
-                        OnMessageSentSuccess(ev.SessionId, ev.MessageId, ev.AutoAck);
-                    else
-                        OnMessageSentError(ev.SessionId, ev.MessageId);
-                    
-                    ObjectPool.Shared.Return(ev);
-                }
-            });
+            foreach (var message in messages)
+                _queue.Writer.TryWrite(message);
+            
+            Logger.LogInformation($"Queue: setting up messages, found {messages.Count()}");            
         }
 
         private void SetupSendQueueProcessor()
@@ -90,8 +72,6 @@ namespace MessageBroker.Core.Queues
                     if (_stopped)
                         return;
                     
-                    
-                    
                     var messageIds = _queue.Reader.ReadAllAsync();
                     
                     await foreach (var messageId in messageIds)
@@ -99,43 +79,50 @@ namespace MessageBroker.Core.Queues
                         ProcessMessage(messageId);
                     }
                 }
-            });
+            }, TaskCreationOptions.LongRunning);
         }
 
         private void ProcessMessage(Guid messageId)
         {
             if (_messageStore.TryGetValue(messageId, out var message))
             {
-                var sendPayload = _serializer.ToSendPayload(message);
+                var sendPayload = _serializer.Serialize(message);
+                
                 SendMessage(sendPayload);
+                
+                message.Dispose();
             }
         }
 
         public void OnMessage(Message message)
         {
-            // set new id for this message
-            // each message will be assigned a new id
-            message.SetNewId();
-            
-            // track id with queue
-            _messageIdTracker.BindMessageIdToQueue(message.Id, _name);
+            // create queue message from message
+            var queueMessage = message.ToQueueMessage(Name);
             
             // persist the message
-            _messageStore.InsertAsync(message);
+            _messageStore.InsertAsync(queueMessage);
             
             // add the message to queue chan
-            _queue.Writer.TryWrite(message.Id);
+            _queue.Writer.TryWrite(queueMessage.Id);
         }
 
-        private void SendMessage(SendPayload sendPayload)
+        private void SendMessage(SerializedPayload serializedPayload)
         {
             var sessionId = _sessionPolicy.GetNextSession();
 
             if (sessionId.HasValue)
             {
-                if (sendPayload.IsMessageType)
-                    _eventChannel.ListenToEventForId(_name, sendPayload.Id);
-                _dispatcher.Dispatch(sendPayload, sessionId.Value);
+                var queueMessage = ObjectPool.Shared.Rent<MessagePayload>();
+
+                if (!queueMessage.HasSetupStatusChangeListener)
+                {
+                    queueMessage.OnStatusChanged += OnMessageStatusChanged;
+                    queueMessage.StatusChangeListenerIsSet();
+                }
+                
+                queueMessage.Setup(serializedPayload);
+                
+                _dispatcher.Dispatch(queueMessage, sessionId.Value);
             };
         }
 
@@ -158,30 +145,29 @@ namespace MessageBroker.Core.Queues
         {
             SessionDisconnected(sessionId);
         }
-
-        public void OnMessageAck(Guid sessionId, Guid messageId)
+        
+        private void OnMessageStatusChanged(Guid messageId, MessagePayloadStatus payloadStatus)
         {
-            _dispatcher.Release(messageId, sessionId);
-            _messageStore.DeleteAsync(messageId);
-        }
-
-        public void OnMessageNack(Guid sessionId, Guid messageId)
-        {
-            _dispatcher.Release(messageId, sessionId);
-            _queue.Writer.TryWrite(messageId);
-        }
-
-        private void OnMessageSentSuccess(Guid sessionId, Guid messageId, bool clientAutoAck)
-        {
-            if (clientAutoAck)
+            switch (payloadStatus)
             {
-                OnMessageAck(sessionId, messageId);
+                case MessagePayloadStatus.Ack:
+                    OnMessageAck(messageId);
+                    break;
+                case MessagePayloadStatus.Nack:
+                    OnMessageNack(messageId);
+                    break;
             }
         }
 
-        private void OnMessageSentError(Guid sessionId, Guid messageId)
+        private void OnMessageAck(Guid messageId)
         {
-            OnMessageNack(sessionId, messageId);
+            _messageStore.DeleteAsync(messageId);
         }
+
+        private void OnMessageNack(Guid messageId)
+        {
+            _queue.Writer.TryWrite(messageId);
+        }
+
     }
 }

@@ -5,7 +5,6 @@ namespace MessageBroker.Common.Pooling
 {
     public class ObjectPool
     {
-        
         private static ObjectPool _shared;
 
         public static ObjectPool Shared
@@ -18,37 +17,38 @@ namespace MessageBroker.Common.Pooling
             }
         }
 
-        private ConcurrentDictionary<Type, ConcurrentQueue<object>> _d;
-        private ConcurrentDictionary<Type, int> _stat;
-        private ConcurrentDictionary<Type, int> _created;
+        private ConcurrentDictionary<Type, ConcurrentQueue<object>> _objectTypeDict;
+        private ConcurrentDictionary<Type, int> _objectTypeStatDict;
 
         public ObjectPool()
         {
-            _d = new();
-            _stat = new();
-            _created = new();
+            _objectTypeDict = new();
+            _objectTypeStatDict = new();
         }
 
         public T Rent<T>() where T : new()
         {
             var type = typeof(T);
 
-            if (!_d.ContainsKey(type))
+            if (!_objectTypeDict.ContainsKey(type))
             {
-                _d[type] = new ConcurrentQueue<object>();
-                _stat[type] = 0;
-                _created[type] = 0;
+                _objectTypeDict[type] = new ConcurrentQueue<object>();
+
+#if DEBUG
+                _objectTypeStatDict[type] = 0;
+#endif
             }
 
-            var bag = _d[type];
+            var bag = _objectTypeDict[type];
 
             if (bag.TryDequeue(out var o))
             {
-                _stat[type] -= 1;
                 return (T) o;
             }
 
-            _created[type] += 1;
+#if DEBUG
+            _objectTypeStatDict[type] += 1;
+#endif
 
             return new T();
         }
@@ -57,13 +57,16 @@ namespace MessageBroker.Common.Pooling
         {
             var type = typeof(T);
 
-            _d[type].Enqueue(o);
-            _stat[type] += 1;
+            _objectTypeDict[type].Enqueue(o);
         }
 
-        public void Dispose()
+#if DEBUG
+        public int CreatedCount<T>()
         {
-            Console.WriteLine("test");
+            var type = typeof(T);
+            return _objectTypeStatDict[type];
         }
+#endif
+        
     }
 }

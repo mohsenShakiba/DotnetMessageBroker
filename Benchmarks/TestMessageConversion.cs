@@ -1,64 +1,42 @@
-﻿using System;
-using System.Text;
-using System.Threading;
-using System.Threading.Channels;
-using System.Threading.Tasks;
-using System.Threading.Tasks.Sources;
+﻿using System.Threading.Channels;
 using BenchmarkDotNet.Attributes;
 using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
-using MessageBroker.Core;
-using MessageBroker.Core.InternalEventChannel;
-using MessageBroker.Core.MessageIdTracking;
-using MessageBroker.Core.Persistence.InMemoryStore;
-using MessageBroker.Core.Queues;
-using MessageBroker.Core.RouteMatching;
-using MessageBroker.Core.StatRecording;
-using MessageBroker.Models;
 using MessageBroker.Serialization;
-using MessageBroker.SocketServer;
-using Microsoft.Extensions.Logging;
 
 namespace Benchmarks
 {
     [MemoryDiagnoser]
     public class TestMessageConversion
     {
-        private readonly Coordinator _coordinator;
-        private readonly InMemoryMessageStore _imessageStore;
-        private readonly MessageDispatcher _messageDispatcher;
-        private readonly RouteMatcher _routeMatcher;
-        private readonly SendPayload _sendPayload;
-
-        private readonly ISerializer _serializer;
-        private readonly SessionResolver _sessionResolver;
-        private readonly IEventChannel _eventChannel;
-        private readonly IStatRecorder _statRecorder;
-        private readonly MessageIdTracker _messageIdTracker;
-        private readonly IQueueStore _queueStore;
-        private readonly Channel<int> _testChan;
+        // private readonly Coordinator _coordinator;
+        // private readonly InMemoryMessageStore _imessageStore;
+        // private readonly MessageDispatcher _messageDispatcher;
+        // private readonly RouteMatcher _routeMatcher;
+        // private readonly SendPayload _sendPayload;
+        //
+        // private readonly ISerializer _serializer;
+        // private readonly SessionResolver _sessionResolver;
+        // private readonly IStatRecorder _statRecorder;
+        // private readonly IQueueStore _queueStore;
+        // private readonly Channel<int> _testChan;
 
         public TestMessageConversion()
         {
-            _serializer = new Serializer();
-            _sessionResolver = new SessionResolver();
-            _eventChannel = new EventChannel();
-            _messageDispatcher = new MessageDispatcher(_sessionResolver, _eventChannel);
-
-            var loggerFactory = LoggerFactory.Create(builder => { });
-
-            _routeMatcher = new RouteMatcher();
-            _imessageStore = new InMemoryMessageStore();
-            _statRecorder = new StatRecorder();
-            _messageIdTracker = new MessageIdTracker();
-            _queueStore = new QueueStore(null);
-            
-            _coordinator = new Coordinator(_serializer, _messageDispatcher,
-                _messageIdTracker, _queueStore, _statRecorder);
-
-            var sessionId = Guid.NewGuid();
-            var testSession = new TestClientSession();
-            testSession.SessionId = sessionId;
+            // _serializer = new Serializer();
+            // _messageDispatcher = new MessageDispatcher(_sessionResolver);
+            //
+            // var loggerFactory = LoggerFactory.Create(builder => { });
+            //
+            // _routeMatcher = new RouteMatcher();
+            // _imessageStore = new InMemoryMessageStore();
+            // _queueStore = new QueueStore(null);
+            //
+            // _coordinator = new Coordinator(_serializer, _messageDispatcher,_queueStore, _statRecorder);
+            //
+            // var sessionId = Guid.NewGuid();
+            // var testSession = new TestClientSession();
+            // testSession.Id = sessionId;
 
             // _sessionResolver.Add(testSession);
             //
@@ -96,8 +74,6 @@ namespace Benchmarks
             //     {Id = Guid.NewGuid(), Route = "TEST", Data = Encoding.UTF8.GetBytes("SAMPLE TEST DATA")};
             // _sendPayload = _serializer.ToSendPayload(message);
 
-            _testChan = Channel.CreateUnbounded<int>();
-            
             Logger.AddConsole();
         }
 
@@ -121,7 +97,7 @@ namespace Benchmarks
         {
             for (var i = 0; i < 10; i++)
             {
-                var item = ObjectPool.Shared.Rent<SendPayload>();
+                var item = ObjectPool.Shared.Rent<SerializedPayload>();
                 ObjectPool.Shared.Return(item);
             }
         }

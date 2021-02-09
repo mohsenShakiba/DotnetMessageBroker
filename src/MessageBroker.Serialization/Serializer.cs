@@ -1,4 +1,5 @@
 ﻿using System;
+using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
 using MessageBroker.Serialization.Pools;
@@ -7,16 +8,17 @@ namespace MessageBroker.Serialization
 {
     public class Serializer : ISerializer
     {
+     
 
         public PayloadType ParsePayloadType(Memory<byte> b)
         {
-            var messageType = (PayloadType) BitConverter.ToInt32(b.Slice(0, 4).Span);
+            var messageType = (PayloadType) BitConverter.ToInt32(b.Slice(0, BinaryProtocolConfiguration.PayloadHeaderSize).Span);
             return messageType;
         }
 
         #region Serialize
 
-        public SendPayload ToSendPayload(Ack ack)
+        public SerializedPayload Serialize(Ack ack)
         {
             var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
             sendPayload.Setup();
@@ -27,7 +29,7 @@ namespace MessageBroker.Serialization
                 .Build();
         }
 
-        public SendPayload ToSendPayload(Nack ack)
+        public SerializedPayload Serialize(Nack ack)
         {
             var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
             sendPayload.Setup();
@@ -38,7 +40,7 @@ namespace MessageBroker.Serialization
                 .Build();
         }
 
-        public SendPayload ToSendPayload(Message msg)
+        public SerializedPayload Serialize(Message msg)
         {
             var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
             sendPayload.Setup();
@@ -51,7 +53,21 @@ namespace MessageBroker.Serialization
                 .Build();
         }
 
-        public SendPayload ToSendPayload(SubscribeQueue subscribeQueue)
+        public SerializedPayload Serialize(QueueMessage msg)
+        {
+            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
+            sendPayload.Setup();
+
+            return sendPayload
+                .WriteType(PayloadType.Msg)
+                .WriteId(msg.Id)
+                .WriteStr(msg.Route)
+                .WriteStr(msg.QueueName)
+                .WriteMemory(msg.Data)
+                .Build();
+        }
+
+        public SerializedPayload Serialize(SubscribeQueue subscribeQueue)
         {
             var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
             sendPayload.Setup();
@@ -63,7 +79,7 @@ namespace MessageBroker.Serialization
                 .Build();
         }
 
-        public SendPayload ToSendPayload(UnsubscribeQueue subscribeQueue)
+        public SerializedPayload Serialize(UnsubscribeQueue subscribeQueue)
         {
             var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
             sendPayload.Setup();
@@ -75,7 +91,7 @@ namespace MessageBroker.Serialization
                 .Build();
         }
 
-        public SendPayload ToSendPayload(QueueDeclare queueDeclare)
+        public SerializedPayload Serialize(QueueDeclare queueDeclare)
         {
             var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
             sendPayload.Setup();
@@ -88,7 +104,7 @@ namespace MessageBroker.Serialization
                 .Build();
         }
 
-        public SendPayload ToSendPayload(QueueDelete queueDelete)
+        public SerializedPayload Serialize(QueueDelete queueDelete)
         {
             var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
             sendPayload.Setup();
@@ -100,19 +116,30 @@ namespace MessageBroker.Serialization
                 .Build();
         }
         
-        public SendPayload ToSendPayload(ConfigureSubscription configureSubscription)
+        public SerializedPayload Serialize(ConfigureSubscription configureSubscription)
         {
             var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
             sendPayload.Setup();
 
             return sendPayload
-                .WriteType(PayloadType.Register)
+                .WriteType(PayloadType.ConfigureSubscription)
                 .WriteId(configureSubscription.Id)
                 .WriteInt(configureSubscription.Concurrency)
                 .WriteInt(configureSubscription.AutoAck ? 1 : 0)
                 .Build();
         }
+        
+        public SerializedPayload Serialize(Error error)
+        {
+            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
+            sendPayload.Setup();
 
+            return sendPayload
+                .WriteType(PayloadType.Error)
+                .WriteId(error.Id)
+                .WriteStr(error.Message)
+                .Build();
+        }
 
         #endregion
 
@@ -126,8 +153,23 @@ namespace MessageBroker.Serialization
             try
             {
                 var messageId = receivePayload.ReadNextGuid();
-
                 return new Ack {Id = messageId};
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+        }
+
+        public Nack ToNack(Memory<byte> data)
+        {
+            var receivePayload = ObjectPool.Shared.Rent<BinaryDeserializeHelper>();
+            receivePayload.Setup(data);
+
+            try
+            {
+                var messageId = receivePayload.ReadNextGuid();
+                return new Nack {Id = messageId};
             }
             finally
             {
@@ -145,14 +187,41 @@ namespace MessageBroker.Serialization
             {
                 var messageId = receivePayload.ReadNextGuid();
                 var route = receivePayload.ReadNextString();
-                var messageMemoryOwner = receivePayload.ReadNextBytes();
+                var dataSize = receivePayload.ReadNextBytes();
 
                 return new Message
                 {
                     Id = messageId,
                     Route = route,
-                    Data = messageMemoryOwner,
-                    OriginalMessageData = messageMemoryOwner
+                    Data = dataSize.OriginalData.AsMemory(0, dataSize.Size),
+                    OriginalMessageData = dataSize.OriginalData
+                };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+        }
+
+        public QueueMessage ToQueueMessage(Memory<byte> data)
+        {
+            var receivePayload = ObjectPool.Shared.Rent<BinaryDeserializeHelper>();
+            receivePayload.Setup(data);
+
+            try
+            {
+                var messageId = receivePayload.ReadNextGuid();
+                var route = receivePayload.ReadNextString();
+                var queueName = receivePayload.ReadNextString();
+                var dataSize = receivePayload.ReadNextBytes();
+
+                return new QueueMessage()
+                {
+                    Id = messageId,
+                    Route = route,
+                    QueueName = queueName,
+                    Data = dataSize.OriginalData.AsMemory(0, dataSize.Size),
+                    OriginalMessageData = dataSize.OriginalData
                 };
             }
             finally
@@ -262,11 +331,33 @@ namespace MessageBroker.Serialization
                 var concurrency = receivePayload.ReadNextInt();
                 var boolInt = receivePayload.ReadNextInt();
 
-                return new ConfigureSubscription()
+                return new ConfigureSubscription
                 {
                     Id = id,
                     Concurrency = concurrency,
                     AutoAck = boolInt == 1
+                };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+        }
+
+        public Error ToError(Memory<byte> data)
+        {
+            var receivePayload = ObjectPool.Shared.Rent<BinaryDeserializeHelper>();
+            receivePayload.Setup(data);
+
+            try
+            {
+                var id = receivePayload.ReadNextGuid();
+                var message = receivePayload.ReadNextString();
+
+                return new Error
+                {
+                    Id = id,
+                    Message = message,
                 };
             }
             finally

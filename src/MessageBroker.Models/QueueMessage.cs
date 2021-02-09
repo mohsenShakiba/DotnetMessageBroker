@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 
 namespace MessageBroker.Models
 {
@@ -9,5 +10,10 @@ namespace MessageBroker.Models
         public string Route { get; init; }
         public Memory<byte> Data { get; init; }
         public byte[] OriginalMessageData { get; init; }
+
+        public void Dispose()
+        {
+            ArrayPool<byte>.Shared.Return(OriginalMessageData);
+        }
     }
 }

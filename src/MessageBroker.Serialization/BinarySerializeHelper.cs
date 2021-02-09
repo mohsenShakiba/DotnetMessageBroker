@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers;
 using System.Text;
+using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
 using MessageBroker.Serialization.Pools;
@@ -16,10 +17,6 @@ namespace MessageBroker.Serialization
         private int _currentBufferOffset;
         private Guid _id;
         private PayloadType _type;
-
-        public BinarySerializeHelper()
-        {
-        }
 
         public void Dispose()
         {
@@ -77,14 +74,14 @@ namespace MessageBroker.Serialization
             return this;
         }
 
-        public SendPayload Build()
+        public SerializedPayload Build()
         {
             try
             {
                 var bufferSpan = _buffer.AsSpan();
-                BitConverter.TryWriteBytes(bufferSpan, _currentBufferOffset - SerializationConfig.PayloadHeaderSize);
+                BitConverter.TryWriteBytes(bufferSpan, _currentBufferOffset - BinaryProtocolConfiguration.PayloadHeaderSize);
 
-                var sendPayload = ObjectPool.Shared.Rent<SendPayload>();
+                var sendPayload = ObjectPool.Shared.Rent<SerializedPayload>();
                 sendPayload.FillFrom(_buffer, _currentBufferOffset, _id, _type);
 
                 return sendPayload;
@@ -97,7 +94,7 @@ namespace MessageBroker.Serialization
 
         public void Refresh()
         {
-            _currentBufferOffset = SerializationConfig.PayloadHeaderSize;
+            _currentBufferOffset = BinaryProtocolConfiguration.PayloadHeaderSize;
         }
 
 

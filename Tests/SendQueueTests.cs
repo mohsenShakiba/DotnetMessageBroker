@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Text;
 using MessageBroker.Core;
-using MessageBroker.Core.InternalEventChannel;
+using MessageBroker.Core.Socket.Client;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
-using MessageBroker.SocketServer.Abstractions;
 using Moq;
 using Xunit;
 
@@ -17,7 +16,6 @@ namespace Tests
         {
             var serializer = new Serializer();
             var session = new Mock<IClientSession>();
-            var eventChannel = new EventChannel();
 
             var messageOne = new Message
             {
@@ -33,10 +31,10 @@ namespace Tests
                 Data = Encoding.UTF8.GetBytes("TEST")
             };
 
-            var sendPayloadOne = serializer.ToSendPayload(messageOne);
-            var sendPayloadTwo = serializer.ToSendPayload(messageTwo);
+            var sendPayloadOne = serializer.Serialize(messageOne);
+            var sendPayloadTwo = serializer.Serialize(messageTwo);
 
-            var sendQueue = new SendQueue(session.Object, eventChannel);
+            var sendQueue = new SendQueue(session.Object);
             sendQueue.Configure(1, false);
 
             // enqueu first message
@@ -52,7 +50,7 @@ namespace Tests
             Assert.Equal(1, sendQueue.CurrentConcurrency);
 
             // when release is called, send method of session should be called 
-            sendQueue.ReleaseOne(messageOne.Id);
+            sendQueue.OnMessageAckReceived(messageOne.Id);
 
             // verify send was called
             session.Verify(session => session.SendAsync(It.IsAny<Memory<byte>>()));
@@ -63,12 +61,11 @@ namespace Tests
         {
             var serializer = new Serializer();
             var session = new Mock<IClientSession>();
-            var eventChannel = new EventChannel();
-            var sendQueue = new SendQueue(session.Object, eventChannel);
+            var sendQueue = new SendQueue(session.Object);
             sendQueue.Configure(1, false, 1);
             var randomId = Guid.NewGuid();
 
-            sendQueue.ReleaseOne(randomId);
+            sendQueue.OnMessageAckReceived(randomId);
 
             Assert.Equal(1, sendQueue.CurrentConcurrency);
         }

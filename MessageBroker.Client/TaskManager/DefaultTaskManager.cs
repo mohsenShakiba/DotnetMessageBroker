@@ -2,26 +2,24 @@
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using MessageBroker.Client.EventStores;
+using MessageBroker.Client.Models;
 
 namespace MessageBroker.Client.TaskManager
 {
     public class DefaultTaskManager : ITaskManager
     {
-        private readonly IEventStore _eventStore;
-        private readonly ConcurrentDictionary<Guid, PayloadTaskCompletionData> _tasks;
+        private readonly ConcurrentDictionary<Guid, SendTaskCompletionSource> _tasks;
 
-        public DefaultTaskManager(IEventStore eventStore)
+        public DefaultTaskManager()
         {
-            _eventStore = eventStore;
-            _tasks = new ConcurrentDictionary<Guid, PayloadTaskCompletionData>();
-            ListenToEvents();
+            _tasks = new ConcurrentDictionary<Guid, SendTaskCompletionSource>();
         }
 
-        public Task<bool> Setup(Guid id, bool completeOnAcknowledge)
+        public Task<SendAsyncResult> Setup(Guid id, bool completeOnAcknowledge)
         {
-            var tcs = new TaskCompletionSource<bool>();
+            var tcs = new TaskCompletionSource<SendAsyncResult>();
 
-            var data = new PayloadTaskCompletionData
+            var data = new SendTaskCompletionSource
             {
                 CompleteOnAcknowledge = completeOnAcknowledge,
                 TaskCompletionSource = tcs
@@ -32,27 +30,24 @@ namespace MessageBroker.Client.TaskManager
             return tcs.Task;
         }
 
-        private void ListenToEvents()
+        public void OnPayloadEvent(Guid payloadId, SendEventType ev, string error)
         {
-            _eventStore.OnResult += ev =>
-            {
-                if (_tasks.TryRemove(ev.Id, out var data))
-                    switch (ev.EventType)
-                    {
-                        case SendEventType.Ack:
-                            data.OnAcknowledgeResult(true);
-                            break;
-                        case SendEventType.Nack:
-                            data.OnAcknowledgeResult(false);
-                            break;
-                        case SendEventType.Sent:
-                            data.OnSendResult(true);
-                            break;
-                        case SendEventType.Failed:
-                            data.OnSendResult(false);
-                            break;
-                    }
-            };
+            if (_tasks.TryGetValue(payloadId, out var data))
+                switch (ev)
+                {
+                    case SendEventType.Ack:
+                        data.OnAcknowledgeResult(true, null);
+                        break;
+                    case SendEventType.Nack:
+                        data.OnAcknowledgeResult(false, error);
+                        break;
+                    case SendEventType.Sent:
+                        data.OnSendResult(true, null);
+                        break;
+                    case SendEventType.Failed:
+                        data.OnSendResult(false, error);
+                        break;
+                }
         }
     }
 }

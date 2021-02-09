@@ -56,14 +56,14 @@ namespace MessageBroker.Serialization
             return BitConverter.ToInt32(data);
         }
 
-        public byte[] ReadNextBytes()
+        public (byte[] OriginalData, int Size) ReadNextBytes()
         {
             var data = _receivedData.Span.Slice(_currentOffset);
             var indexOfDelimiter = data.IndexOf(Delimiter);
             _currentOffset += indexOfDelimiter + 1;
             var arr = ArrayPool<byte>.Shared.Rent(indexOfDelimiter);
             data.Slice(0, indexOfDelimiter).CopyTo(arr);
-            return arr;
+            return (arr, indexOfDelimiter);
         }
     }
 }

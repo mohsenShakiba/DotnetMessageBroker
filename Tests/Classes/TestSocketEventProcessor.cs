@@ -1,18 +1,20 @@
 ﻿using System;
-using MessageBroker.SocketServer.Abstractions;
+using MessageBroker.Client.SocketClient;
+using MessageBroker.Core.Socket;
+using MessageBroker.Core.Socket.Client;
 
 namespace Tests.Classes
 {
     public class TestSocketEventProcessor : ISocketEventProcessor
     {
-        public void ClientConnected(Guid sessionId)
+        public void ClientConnected(IClientSession clientSession)
         {
-            OnClientConnected?.Invoke(sessionId);
+            OnClientConnected?.Invoke(clientSession.Id);
         }
 
-        public void ClientDisconnected(Guid sessionId)
+        public void ClientDisconnected(IClientSession clientSession)
         {
-            OnClientDisconnected?.Invoke(sessionId);
+            OnClientDisconnected?.Invoke(clientSession.Id);
         }
 
         public void DataReceived(Guid sessionId, Memory<byte> payload)

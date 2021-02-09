@@ -10,8 +10,9 @@
         Nack = 3,
         SubscribeQueue = 4,
         UnSubscribeQueue = 5,
-        Register = 6,
+        ConfigureSubscription = 6,
         QueueCreate = 7,
-        QueueDelete = 8
+        QueueDelete = 8,
+        Error = 9
     }
 }

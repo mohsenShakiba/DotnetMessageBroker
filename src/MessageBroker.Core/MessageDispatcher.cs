@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using MessageBroker.Core.InternalEventChannel;
+using MessageBroker.Core.Queues;
+using MessageBroker.Core.Socket.Client;
 using MessageBroker.Serialization;
-using MessageBroker.SocketServer.Abstractions;
 
 namespace MessageBroker.Core
 {
@@ -12,14 +12,10 @@ namespace MessageBroker.Core
     public class MessageDispatcher
     {
         private readonly ConcurrentDictionary<Guid, SendQueue> _sendQueues;
-        private readonly ISessionResolver _sessionResolver;
-        private readonly IEventChannel _eventChannel;
 
 
-        public MessageDispatcher(ISessionResolver sessionResolver, IEventChannel eventChannel)
+        public MessageDispatcher()
         {
-            _sessionResolver = sessionResolver;
-            _eventChannel = eventChannel;
             _sendQueues = new ConcurrentDictionary<Guid, SendQueue>();
         }
 
@@ -36,25 +32,18 @@ namespace MessageBroker.Core
             return null;
         }
 
-        /// <summary>
-        ///     AddSendQueue will create and store a new SendQueue
-        /// </summary>
-        /// <param name="sessionId"></param>
-        public void AddSendQueue(Guid sessionId)
+        public void AddSession(IClientSession clientSession)
         {
-            var session = _sessionResolver.Resolve(sessionId);
-            if (session != null)
-            {
-                var sendQueue = new SendQueue(session, _eventChannel);
-                _sendQueues[sessionId] = sendQueue;
-            }
+            var sendQueue = new SendQueue(clientSession);
+            _sendQueues[clientSession.Id] = sendQueue;
         }
 
-        public void RemoveSendQueue(Guid sessionId)
+        public void RemoveSession(IClientSession clientSession)
         {
-            if (_sendQueues.TryRemove(sessionId, out var sendQueue))
+            if (_sendQueues.TryRemove(clientSession.Id, out var sendQueue))
             {
                 sendQueue.Stop();
+                clientSession.Close();
             }
         }
 
@@ -64,22 +53,29 @@ namespace MessageBroker.Core
                 sendQueue.Configure(concurrency, autoAck);
         }
 
-        public void Dispatch(SendPayload sendPayload, Guid destination)
+        public void Dispatch(SerializedPayload serializedPayload, Guid destination)
+        {
+            if (_sendQueues.TryGetValue(destination, out var sendQueue))
+                sendQueue.Enqueue(serializedPayload);
+        }
+        
+        public void Dispatch(MessagePayload sendPayload, Guid destination)
         {
             if (_sendQueues.TryGetValue(destination, out var sendQueue))
                 sendQueue.Enqueue(sendPayload);
         }
 
 
-        /// <summary>
-        ///     release will dispatch the message id to the appropriate SendQueues
-        /// </summary>
-        /// <param name="messageId">MessageId that has been acked or nacked</param>
-        /// <param name="destinations">SenQueues that must receive this message id</param>
-        public void Release(Guid messageId, Guid destination)
+        public void OnMessageAck(Guid messageId, Guid destination)
         {
             if (_sendQueues.TryGetValue(destination, out var sendQueue))
-                sendQueue.ReleaseOne(messageId);
+                sendQueue.OnMessageAckReceived(messageId);
+        }
+
+        public void OnMessageNack(Guid messageId, Guid destination)
+        {
+            if (_sendQueues.TryGetValue(destination, out var sendQueue))
+                sendQueue.OnMessageNackReceived(messageId);
         }
     }
 }

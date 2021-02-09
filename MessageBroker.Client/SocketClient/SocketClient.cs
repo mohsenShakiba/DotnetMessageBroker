@@ -3,176 +3,161 @@ using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
-using MessageBroker.Client.Buffers;
+using MessageBroker.Client.ConnectionManager;
 using MessageBroker.Client.EventStores;
+using MessageBroker.Client.Models;
+using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Client.TaskManager;
+using MessageBroker.Common.Binary;
+using MessageBroker.Common.Pooling;
 using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Client.SocketClient
 {
+    /// <summary>
+    /// the purpose of this class is to enable send and receiving payloads
+    /// </summary>
     internal class SocketClient : ISocketClient
     {
-        private readonly IEventStore _eventStore;
-        private readonly ILogger<SocketClient> _logger;
-        private readonly ManualResetEventSlim _sendResetEvent;
-        private readonly Socket _socket;
+        private readonly ILoggerFactory _loggerFactory;
         private readonly ITaskManager _taskManager;
-        private MemoryBuffer _buffer;
-        private bool _connected;
-        private bool _connecting;
-        private IPEndPoint _endPoint;
+        private readonly IReceiveDataProcessor _receiveDataProcessor;
+        private readonly Channel<SendData> _sendDataChannel;
+
+        private readonly IConnectionManager _connectionManager;
+
         private SocketAsyncEventArgs _sendEventArgs;
-        private SocketAsyncEventArgs _receiveSizeEventArgs;
         private SocketAsyncEventArgs _receiveEventArgs;
+
         private byte[] _receiveBuff;
-        private TaskCompletionSource<Memory<byte>> _receiveTask;
+        private bool _stopped;
 
-        public SocketClient(ILogger<SocketClient> logger, IEventStore eventStore, ITaskManager taskManager)
+        public ChannelWriter<SendData> SendDataChannel => _sendDataChannel.Writer;
+
+
+        public SocketClient(ILoggerFactory loggerFactory, ITaskManager taskManager, IReceiveDataProcessor receiveDataProcessor,
+            IConnectionManager connectionManager)
         {
-            _logger = logger;
-            _eventStore = eventStore;
+            _loggerFactory = loggerFactory;
             _taskManager = taskManager;
-            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            _buffer = new MemoryBuffer();
-            _sendResetEvent = new ManualResetEventSlim();
+            _receiveDataProcessor = receiveDataProcessor;
+            _connectionManager = connectionManager;
 
-            _receiveBuff = ArrayPool<byte>.Shared.Rent(1024);
-            _sendEventArgs.Completed += OnSendAsyncCompleted;
-            _receiveSizeEventArgs.Completed += OnReceiveSizeCompleted;
-            _receiveEventArgs.Completed += OnReceiveCompleted;
+            _sendDataChannel =
+                Channel.CreateBounded<SendData>(ClientConfiguration.CurrentConfiguration.SendMessageChannelSize);
+
+            SetupSendChannelProcessor();
+            SetupReceiveChannelProcessor();
         }
 
-        public void Connect(IPEndPoint endPoint, bool retryOnFailure)
+        private void SetupSendChannelProcessor()
         {
-            if (_connecting)
+            Task.Factory.StartNew(async () =>
+            {
+                while (!_stopped)
+                {
+                    var sendData = await _sendDataChannel.Reader.ReadAsync();
+                    
+                    await CheckSocketConnection();
+
+                    await TrySendAsync(sendData);
+                }
+            }, TaskCreationOptions.LongRunning);
+        }
+
+        private void SetupReceiveChannelProcessor()
+        {
+            Task.Factory.StartNew(async () =>
+            {
+                while (!_stopped)
+                {
+                    var receiveData = await ReceiveAsync();
+                    
+                    _receiveDataProcessor.AddReceiveDataChunk(receiveData);
+                }
+            }, TaskCreationOptions.LongRunning);
+        }
+
+        private async ValueTask CheckSocketConnection()
+        {
+            if (_connectionManager.IsConnected)
                 return;
 
-            _endPoint = endPoint;
-            _connecting = true;
-
-            try
+            while (!_connectionManager.IsConnected && !_stopped)
             {
-                _socket.Connect(_endPoint);
-                _logger.LogInformation("Client successfully connected to server");
-                _connected = true;
-                _connecting = false;
-            }
-            catch (SocketException)
-            {
-                if (!retryOnFailure)
-                    throw;
-
-                _logger.LogWarning($"Failed to connect to server with endpoint: {_endPoint}");
-                _connecting = false;
-                Reconnect();
+                await Task.Delay(1000);
             }
         }
 
-        public Task<bool> SendAsync(Guid payloadId, Memory<byte> payload, bool completeOnAcknowledge)
+        public void Connect(SocketConnectionConfiguration configuration)
         {
-            _sendResetEvent.Wait();
+            _connectionManager.Connect(configuration);
+        }
 
-            var task = _taskManager.Setup(payloadId, completeOnAcknowledge);
+        public Task<SendAsyncResult> SendAsync(Guid id, Memory<byte> data, bool completeOnAcknowledge)
+        {
+            var task = _taskManager.Setup(id, completeOnAcknowledge);
 
-            _sendEventArgs.SetBuffer(payload);
-            _socket.SendAsync(payload, SocketFlags.None);
+            var sendData = new SendData
+            {
+                Data = data,
+                Id = id
+            };
 
-            _sendEventArgs.UserToken = payloadId;
-
+            _sendDataChannel.Writer.WriteAsync(sendData);
+            
             return task;
         }
 
-        public Task<Memory<byte>> ReceiveAsync()
+        private async Task TrySendAsync(SendData sendData)
         {
-            var tcs = new TaskCompletionSource<Memory<byte>>();
-
-            _receiveTask = tcs;
-            
-            _receiveSizeEventArgs.SetBuffer(_receiveBuff, 0, 4);
-
-            if (!_socket.ReceiveAsync(_receiveSizeEventArgs)) OnReceiveCompleted(null, _receiveSizeEventArgs);
-
-            return tcs.Task;
-        }
-
-        private void Reconnect()
-        {
-            if (_connected || _connecting)
-            {
-                _logger.LogWarning("Retry in not possible when client is connected or trying to connect");
-                return;
-            }
-
-            _connecting = true;
+            var retryCount = 0;
 
             while (true)
-                try
-                {
-                    _socket.Connect(_endPoint);
-                    _connected = true;
-                    _connecting = false;
-                    _logger.LogInformation("Client successfully connected to server");
-                    break;
-                }
-                catch (SocketException)
-                {
-                    _logger.LogWarning($"Failed to connect to server with endpoint: {_endPoint}");
-                }
-        }
-
-        private void OnSendAsyncCompleted(object _, SocketAsyncEventArgs args)
-        {
-            _sendResetEvent.Set();
-
-            var payloadId = (Guid?) args.UserToken;
-
-            if (payloadId == null)
-                throw new InvalidOperationException();
-
-            _eventStore.OnSent(payloadId.Value);
-
-            if (args.SocketError != SocketError.Success)
             {
-                _logger.LogWarning("Failed to send data, looks like the connection is broker");
-                _logger.LogWarning("Trying to reconnect");
-                Reconnect();
+                var result = await SendToSocketAsync(sendData.Data);
+
+                retryCount += 1;
+
+                if (!result && retryCount < ClientConfiguration.CurrentConfiguration.MaxSandRetryCount)
+                    continue;
+
+                if (result)
+                    _taskManager.OnPayloadEvent(sendData.Id, SendEventType.Sent, null);
+                else
+                {
+                    var errMessage = _connectionManager.LastSocketError;
+                    _taskManager.OnPayloadEvent(sendData.Id, SendEventType.Failed, errMessage);
+                }
+
+                break;                    
             }
         }
 
-        private void OnReceiveSizeCompleted(object _, SocketAsyncEventArgs args)
+        private async Task<bool> SendToSocketAsync(Memory<byte> payload)
         {
-            var bytesTransferred = args.BytesTransferred;
+            var sentCount = await _connectionManager.Socket.SendAsync(payload, SocketFlags.None);
 
-            if (bytesTransferred < 4)
-                throw new InvalidOperationException();
+            if (sentCount == payload.Length)
+                return true;
 
-            if (args.SocketError != SocketError.Success)
-                throw new InvalidOperationException();
+            _connectionManager.CheckConnectionStatusAndRetryIfDisconnected();
 
-            var messageSize = BitConverter.ToInt32(_receiveBuff);
+            await Task.Delay(1000);
 
-            ReceiveAsync(messageSize);
+            return false;
         }
 
-        private void ReceiveAsync(int msgSize)
+        private async Task<Memory<byte>> ReceiveAsync()
         {
-            _receiveEventArgs.SetBuffer(_receiveBuff, 0, msgSize);
-            
-            if (!_socket.ReceiveAsync(_receiveEventArgs)) OnReceiveCompleted(null, _receiveEventArgs);
-        }
+            _receiveBuff = ArrayPool<byte>.Shared.Rent(ClientConfiguration.CurrentConfiguration.ReceiveDataBufferSize);
 
-        private void OnReceiveCompleted(object _, SocketAsyncEventArgs args)
-        {
-            var bytesTransferred = args.BytesTransferred;
-            
-            if (bytesTransferred <= 0)
-                throw new InvalidOperationException();
-            
-            if (args.SocketError != SocketError.Success)
-                throw new InvalidOperationException();
+            var receiveSize = await _connectionManager.Socket.ReceiveAsync(_receiveBuff, SocketFlags.None);
 
-            _receiveTask.TrySetResult(_receiveBuff.AsMemory(0, bytesTransferred));
+            return _receiveBuff.AsMemory(0, receiveSize);
         }
+        
     }
 }
