@@ -5,6 +5,7 @@ namespace MessageBroker.Serialization
 {
     public interface ISerializer
     {
+        SerializedPayload Serialize(Ok ok);
         SerializedPayload Serialize(Ack ack);
         SerializedPayload Serialize(Nack nack);
         SerializedPayload Serialize(Message msg);
@@ -18,15 +19,16 @@ namespace MessageBroker.Serialization
 
         PayloadType ParsePayloadType(Memory<byte> b);
 
-        Ack ToAck(Memory<byte> data);
-        Nack ToNack(Memory<byte> data);
         Message ToMessage(Memory<byte> data);
         QueueMessage ToQueueMessage(Memory<byte> data);
+        Ack ToAck(Memory<byte> data);
+        Nack ToNack(Memory<byte> data);
+        Error ToError(Memory<byte> data);
+        Ok ToOk(Memory<byte> data);
         SubscribeQueue ToSubscribeQueue(Memory<byte> data);
         UnsubscribeQueue ToUnsubscribeQueue(Memory<byte> data);
         QueueDeclare ToQueueDeclareModel(Memory<byte> data);
         QueueDelete ToQueueDeleteModel(Memory<byte> data);
         ConfigureSubscription ToConfigureSubscription(Memory<byte> data);
-        Error ToError(Memory<byte> data);
     }
 }

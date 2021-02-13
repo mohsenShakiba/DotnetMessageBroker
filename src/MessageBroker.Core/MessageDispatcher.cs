@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using MessageBroker.Core.Queues;
-using MessageBroker.Core.Socket.Client;
 using MessageBroker.Serialization;
+using MessageBroker.Socket.Client;
 
 namespace MessageBroker.Core
 {
@@ -58,7 +58,7 @@ namespace MessageBroker.Core
             if (_sendQueues.TryGetValue(destination, out var sendQueue))
                 sendQueue.Enqueue(serializedPayload);
         }
-        
+
         public void Dispatch(MessagePayload sendPayload, Guid destination)
         {
             if (_sendQueues.TryGetValue(destination, out var sendQueue))

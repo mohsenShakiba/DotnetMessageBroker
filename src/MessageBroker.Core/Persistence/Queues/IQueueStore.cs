@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Threading.Tasks;
 using MessageBroker.Core.Queues;
 
 namespace MessageBroker.Core.Persistence.Queues

@@ -4,7 +4,6 @@ using System.Text;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
-using MessageBroker.Serialization.Pools;
 
 namespace MessageBroker.Serialization
 {
@@ -79,7 +78,8 @@ namespace MessageBroker.Serialization
             try
             {
                 var bufferSpan = _buffer.AsSpan();
-                BitConverter.TryWriteBytes(bufferSpan, _currentBufferOffset - BinaryProtocolConfiguration.PayloadHeaderSize);
+                BitConverter.TryWriteBytes(bufferSpan,
+                    _currentBufferOffset - BinaryProtocolConfiguration.PayloadHeaderSize);
 
                 var sendPayload = ObjectPool.Shared.Rent<SerializedPayload>();
                 sendPayload.FillFrom(_buffer, _currentBufferOffset, _id, _type);
@@ -100,7 +100,8 @@ namespace MessageBroker.Serialization
 
         public void Setup()
         {
-            if (_buffer == null) _buffer = ArrayPool<byte>.Shared.Rent(SerializationConfig.SendPayloadStartingBufferSize);
+            if (_buffer == null)
+                _buffer = ArrayPool<byte>.Shared.Rent(SerializationConfig.SendPayloadStartingBufferSize);
 
             Refresh();
         }

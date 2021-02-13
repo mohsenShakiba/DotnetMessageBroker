@@ -2,43 +2,19 @@
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
-using MessageBroker.Serialization.Pools;
 
 namespace MessageBroker.Serialization
 {
     public class Serializer : ISerializer
     {
-     
-
         public PayloadType ParsePayloadType(Memory<byte> b)
         {
-            var messageType = (PayloadType) BitConverter.ToInt32(b.Slice(0, BinaryProtocolConfiguration.PayloadHeaderSize).Span);
+            var messageType =
+                (PayloadType) BitConverter.ToInt32(b.Slice(0, BinaryProtocolConfiguration.PayloadHeaderSize).Span);
             return messageType;
         }
 
         #region Serialize
-
-        public SerializedPayload Serialize(Ack ack)
-        {
-            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
-            sendPayload.Setup();
-
-            return sendPayload
-                .WriteType(PayloadType.Ack)
-                .WriteId(ack.Id)
-                .Build();
-        }
-
-        public SerializedPayload Serialize(Nack ack)
-        {
-            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
-            sendPayload.Setup();
-            
-            return sendPayload
-                .WriteType(PayloadType.Nack)
-                .WriteId(ack.Id)
-                .Build();
-        }
 
         public SerializedPayload Serialize(Message msg)
         {
@@ -64,6 +40,51 @@ namespace MessageBroker.Serialization
                 .WriteStr(msg.Route)
                 .WriteStr(msg.QueueName)
                 .WriteMemory(msg.Data)
+                .Build();
+        }
+
+        public SerializedPayload Serialize(Ack ack)
+        {
+            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
+            sendPayload.Setup();
+
+            return sendPayload
+                .WriteType(PayloadType.Ack)
+                .WriteId(ack.Id)
+                .Build();
+        }
+
+        public SerializedPayload Serialize(Nack ack)
+        {
+            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
+            sendPayload.Setup();
+
+            return sendPayload
+                .WriteType(PayloadType.Nack)
+                .WriteId(ack.Id)
+                .Build();
+        }
+
+        public SerializedPayload Serialize(Ok ok)
+        {
+            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
+            sendPayload.Setup();
+
+            return sendPayload
+                .WriteType(PayloadType.Ok)
+                .WriteId(ok.Id)
+                .Build();
+        }
+
+        public SerializedPayload Serialize(Error error)
+        {
+            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
+            sendPayload.Setup();
+
+            return sendPayload
+                .WriteType(PayloadType.Error)
+                .WriteId(error.Id)
+                .WriteStr(error.Message)
                 .Build();
         }
 
@@ -115,7 +136,7 @@ namespace MessageBroker.Serialization
                 .WriteStr(queueDelete.Name)
                 .Build();
         }
-        
+
         public SerializedPayload Serialize(ConfigureSubscription configureSubscription)
         {
             var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
@@ -126,18 +147,6 @@ namespace MessageBroker.Serialization
                 .WriteId(configureSubscription.Id)
                 .WriteInt(configureSubscription.Concurrency)
                 .WriteInt(configureSubscription.AutoAck ? 1 : 0)
-                .Build();
-        }
-        
-        public SerializedPayload Serialize(Error error)
-        {
-            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
-            sendPayload.Setup();
-
-            return sendPayload
-                .WriteType(PayloadType.Error)
-                .WriteId(error.Id)
-                .WriteStr(error.Message)
                 .Build();
         }
 
@@ -177,6 +186,49 @@ namespace MessageBroker.Serialization
             }
         }
 
+        public Ok ToOk(Memory<byte> data)
+        {
+            var receivePayload = ObjectPool.Shared.Rent<BinaryDeserializeHelper>();
+            receivePayload.Setup(data);
+
+            try
+            {
+                var id = receivePayload.ReadNextGuid();
+                var message = receivePayload.ReadNextString();
+
+                return new Ok
+                {
+                    Id = id
+                };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+        }
+
+
+        public Error ToError(Memory<byte> data)
+        {
+            var receivePayload = ObjectPool.Shared.Rent<BinaryDeserializeHelper>();
+            receivePayload.Setup(data);
+
+            try
+            {
+                var id = receivePayload.ReadNextGuid();
+                var message = receivePayload.ReadNextString();
+
+                return new Error
+                {
+                    Id = id,
+                    Message = message
+                };
+            }
+            finally
+            {
+                ObjectPool.Shared.Return(receivePayload);
+            }
+        }
 
         public Message ToMessage(Memory<byte> data)
         {
@@ -215,7 +267,7 @@ namespace MessageBroker.Serialization
                 var queueName = receivePayload.ReadNextString();
                 var dataSize = receivePayload.ReadNextBytes();
 
-                return new QueueMessage()
+                return new QueueMessage
                 {
                     Id = messageId,
                     Route = route,
@@ -262,7 +314,7 @@ namespace MessageBroker.Serialization
                 var id = receivePayload.ReadNextGuid();
                 var queueName = receivePayload.ReadNextString();
 
-                return new UnsubscribeQueue()
+                return new UnsubscribeQueue
                 {
                     Id = id,
                     QueueName = queueName
@@ -336,28 +388,6 @@ namespace MessageBroker.Serialization
                     Id = id,
                     Concurrency = concurrency,
                     AutoAck = boolInt == 1
-                };
-            }
-            finally
-            {
-                ObjectPool.Shared.Return(receivePayload);
-            }
-        }
-
-        public Error ToError(Memory<byte> data)
-        {
-            var receivePayload = ObjectPool.Shared.Rent<BinaryDeserializeHelper>();
-            receivePayload.Setup(data);
-
-            try
-            {
-                var id = receivePayload.ReadNextGuid();
-                var message = receivePayload.ReadNextString();
-
-                return new Error
-                {
-                    Id = id,
-                    Message = message,
                 };
             }
             finally

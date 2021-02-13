@@ -6,17 +6,17 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MessageBroker.Core.Persistence.Queues
 {
-    public class InMemoryQueueStore: IQueueStore
+    public class InMemoryQueueStore : IQueueStore
     {
-        private readonly IServiceProvider _serviceProvider;
         private readonly List<IQueue> _queues;
+        private readonly IServiceProvider _serviceProvider;
 
         public InMemoryQueueStore(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
-            _queues = new();
+            _queues = new List<IQueue>();
         }
-        
+
         public void Setup()
         {
         }
@@ -41,13 +41,13 @@ namespace MessageBroker.Core.Persistence.Queues
         public void Remove(string name)
         {
             var queueToRemove = _queues.FirstOrDefault(q => q.Name == name);
-            
+
             if (queueToRemove == null)
                 return;
-            
+
             _queues.Remove(queueToRemove);
         }
-        
+
         private IQueue SetupQueue(string name, string route)
         {
             var queue = _serviceProvider.GetService<IQueue>();

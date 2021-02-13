@@ -3,33 +3,40 @@ using MessageBroker.Client.Models;
 
 namespace MessageBroker.Client.TaskManager
 {
-    public class SendTaskCompletionSource
+    public class SendPayloadTaskCompletionSource
     {
         public TaskCompletionSource<SendAsyncResult> TaskCompletionSource { get; init; }
         public bool CompleteOnAcknowledge { get; set; }
 
-
-        public void OnSendResult(bool sent, string error)
+        public void OnOk()
         {
-            if (CompleteOnAcknowledge)
-                return;
-
             TaskCompletionSource.TrySetResult(new SendAsyncResult
             {
-                IsSuccess = sent,
+                IsSuccess = true
+            });
+        }
+
+        public void OnError(string error)
+        {
+            TaskCompletionSource.TrySetResult(new SendAsyncResult
+            {
+                IsSuccess = false,
                 InternalErrorCode = error
             });
         }
 
-        public void OnAcknowledgeResult(bool acknowledged, string error)
+        public void OnSendSuccess()
         {
             if (!CompleteOnAcknowledge)
-                return;
+                OnOk();
+        }
 
+        public void OnSendError()
+        {
             TaskCompletionSource.TrySetResult(new SendAsyncResult
             {
-                IsSuccess = acknowledged,
-                InternalErrorCode = error
+                IsSuccess = false,
+                InternalErrorCode = "Failed to send data to server"
             });
         }
     }

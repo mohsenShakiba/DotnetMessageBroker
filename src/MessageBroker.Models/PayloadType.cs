@@ -6,13 +6,14 @@
     public enum PayloadType
     {
         Msg = 1,
-        Ack = 2,
-        Nack = 3,
-        SubscribeQueue = 4,
-        UnSubscribeQueue = 5,
+        Ok = 2,
+        Error = 3,
+        Ack = 4,
+        Nack = 5,
         ConfigureSubscription = 6,
         QueueCreate = 7,
         QueueDelete = 8,
-        Error = 9
+        SubscribeQueue = 9,
+        UnSubscribeQueue = 10
     }
 }

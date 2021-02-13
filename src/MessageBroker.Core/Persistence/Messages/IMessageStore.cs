@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using MessageBroker.Models;
 
-namespace MessageBroker.Core.Persistence
+namespace MessageBroker.Core.Persistence.Messages
 {
     public interface IMessageStore
     {

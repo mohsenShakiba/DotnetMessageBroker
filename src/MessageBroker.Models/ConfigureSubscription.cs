@@ -3,7 +3,7 @@
 namespace MessageBroker.Models
 {
     /// <summary>
-    /// sent by subscribers to provide basic configuration
+    ///     sent by subscribers to provide basic configuration
     /// </summary>
     public ref struct ConfigureSubscription
     {

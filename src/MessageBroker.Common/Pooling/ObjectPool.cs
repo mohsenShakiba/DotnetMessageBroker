@@ -7,6 +7,15 @@ namespace MessageBroker.Common.Pooling
     {
         private static ObjectPool _shared;
 
+        private readonly ConcurrentDictionary<Type, ConcurrentQueue<object>> _objectTypeDict;
+        private readonly ConcurrentDictionary<Type, int> _objectTypeStatDict;
+
+        public ObjectPool()
+        {
+            _objectTypeDict = new ConcurrentDictionary<Type, ConcurrentQueue<object>>();
+            _objectTypeStatDict = new ConcurrentDictionary<Type, int>();
+        }
+
         public static ObjectPool Shared
         {
             get
@@ -15,15 +24,6 @@ namespace MessageBroker.Common.Pooling
                     _shared = new ObjectPool();
                 return _shared;
             }
-        }
-
-        private ConcurrentDictionary<Type, ConcurrentQueue<object>> _objectTypeDict;
-        private ConcurrentDictionary<Type, int> _objectTypeStatDict;
-
-        public ObjectPool()
-        {
-            _objectTypeDict = new();
-            _objectTypeStatDict = new();
         }
 
         public T Rent<T>() where T : new()
@@ -41,10 +41,7 @@ namespace MessageBroker.Common.Pooling
 
             var bag = _objectTypeDict[type];
 
-            if (bag.TryDequeue(out var o))
-            {
-                return (T) o;
-            }
+            if (bag.TryDequeue(out var o)) return (T) o;
 
 #if DEBUG
             _objectTypeStatDict[type] += 1;
@@ -67,6 +64,5 @@ namespace MessageBroker.Common.Pooling
             return _objectTypeStatDict[type];
         }
 #endif
-        
     }
 }

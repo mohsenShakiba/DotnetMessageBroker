@@ -1,36 +1,33 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text;
-using MessageBroker.Common.Pooling;
-using MessageBroker.Core.Persistence.InMemoryStore;
+using MessageBroker.Core.Persistence.Messages.InMemoryStore;
 using MessageBroker.Core.Persistence.Redis;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
 
 namespace MessageBroker.Core.Persistence.Messages.RedisStore
 {
-    public class RedisMessageStore: IMessageStore
+    public class RedisMessageStore : IMessageStore
     {
+        private const string MessageRedisKey = "MessageBroker.Messages.Set";
+        private readonly InMemoryMessageStore _inMemoryMessageStore;
         private readonly IRedisConnectionProvider _redisConnectionProvider;
         private readonly ISerializer _serializer;
-        private readonly InMemoryMessageStore _inMemoryMessageStore;
-        private const string MessageRedisKey = "MessageBroker.Messages.Set";
 
         public RedisMessageStore(IRedisConnectionProvider redisConnectionProvider, ISerializer serializer)
         {
             _redisConnectionProvider = redisConnectionProvider;
-            _inMemoryMessageStore = new();
+            _inMemoryMessageStore = new InMemoryMessageStore();
             _serializer = serializer;
         }
-        
+
         public void Setup()
         {
             var connection = _redisConnectionProvider.Get();
             var messages = connection.GetDatabase().SetScan(MessageRedisKey, int.MaxValue);
             foreach (var messageData in messages)
             {
-                var message = Deserialize((byte[])messageData);
+                var message = Deserialize((byte[]) messageData);
                 _inMemoryMessageStore.InsertAsync(message);
             }
         }

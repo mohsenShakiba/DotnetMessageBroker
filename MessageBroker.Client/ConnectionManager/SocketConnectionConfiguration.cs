@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace MessageBroker.Client.Models
+namespace MessageBroker.Client.ConnectionManager
 {
     public class SocketConnectionConfiguration
     {

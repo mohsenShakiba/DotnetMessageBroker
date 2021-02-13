@@ -1,9 +1,8 @@
-﻿using Microsoft.Extensions.Configuration;
-using StackExchange.Redis;
+﻿using StackExchange.Redis;
 
 namespace MessageBroker.Core.Persistence.Redis
 {
-    public class RedisConnectionProvider: IRedisConnectionProvider
+    public class RedisConnectionProvider : IRedisConnectionProvider
     {
         private readonly string _urlConnection;
         private ConnectionMultiplexer _connection;
@@ -12,7 +11,7 @@ namespace MessageBroker.Core.Persistence.Redis
         {
             _urlConnection = urlConnection;
         }
-        
+
         public ConnectionMultiplexer Get()
         {
             return _connection ??= ConnectionMultiplexer.Connect(_urlConnection);

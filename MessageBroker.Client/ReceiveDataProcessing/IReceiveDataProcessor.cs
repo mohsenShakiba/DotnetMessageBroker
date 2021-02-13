@@ -1,11 +1,8 @@
-﻿using System;
-using MessageBroker.Client.Models;
-using MessageBroker.Common.Binary;
+﻿using MessageBroker.Socket;
 
 namespace MessageBroker.Client.ReceiveDataProcessing
 {
-    public interface IReceiveDataProcessor
+    public interface IReceiveDataProcessor : ISocketDataProcessor
     {
-        public void AddReceiveDataChunk(Memory<byte> binaryChunk);
     }
 }

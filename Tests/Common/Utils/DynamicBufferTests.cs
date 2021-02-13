@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using MessageBroker.Client;
 using MessageBroker.Common.Utils;
@@ -17,7 +16,7 @@ namespace Tests.Common.Utils
             var dynamicBuffer = new DynamicBuffer();
             var random = new Random();
             var randomData = new List<string>();
-            
+
             dynamicBuffer.SetCurrent(ClientConfiguration.CurrentConfiguration.ReceiveDataBufferSize / 2);
 
             for (var i = 0; i <= 1000; i++)
@@ -29,7 +28,7 @@ namespace Tests.Common.Utils
             foreach (var randomItem in randomData)
             {
                 var size = BitConverter.GetBytes(randomItem.Length);
-                
+
                 dynamicBuffer.Write(size);
                 dynamicBuffer.Write(Encoding.UTF8.GetBytes(randomItem));
             }
@@ -37,18 +36,16 @@ namespace Tests.Common.Utils
             foreach (var randomItem in randomData)
             {
                 var canRead = dynamicBuffer.CanRead(4);
-                
+
                 Assert.True(canRead);
-                
+
                 var sizeB = dynamicBuffer.ReadAndClear(4);
                 var size = BitConverter.ToInt32(sizeB);
 
                 var data = dynamicBuffer.ReadAndClear(size);
-                
+
                 Assert.Equal(randomItem, Encoding.UTF8.GetString(data));
             }
         }
-
-
     }
 }

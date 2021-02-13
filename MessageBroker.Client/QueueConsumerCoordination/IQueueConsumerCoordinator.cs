@@ -1,4 +1,5 @@
-﻿using MessageBroker.Models;
+﻿using MessageBroker.Client.QueueManagement;
+using MessageBroker.Models;
 
 namespace MessageBroker.Client.QueueConsumerCoordination
 {

@@ -9,10 +9,10 @@ namespace MessageBroker.Serialization
     {
         private byte[] _buffer;
         private int _size;
-        
+
         public PayloadType Type { get; private set; }
         public Guid Id { get; private set; }
-        
+
         public Memory<byte> Data => _buffer.AsMemory(0, _size);
         public Memory<byte> DataWithoutSize => Data.Slice(BinaryProtocolConfiguration.PayloadHeaderSize);
 
@@ -31,6 +31,5 @@ namespace MessageBroker.Serialization
             Type = type;
             Id = id;
         }
-
     }
 }

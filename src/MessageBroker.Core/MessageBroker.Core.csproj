@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\MessageBroker.SocketServer\MessageBroker.SocketServer.csproj" />
     <ProjectReference Include="..\MessageBroker.Models\MessageBroker.Models.csproj" />
     <ProjectReference Include="..\MessageBroker.Serialization\MessageBroker.Serialization.csproj" />
+    <ProjectReference Include="..\MessageBroker.Socket\MessageBroker.Socket.csproj" />
   </ItemGroup>
 
 </Project>

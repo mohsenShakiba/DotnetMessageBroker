@@ -6,8 +6,8 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Core.Queues;
-using MessageBroker.Core.Socket.Client;
 using MessageBroker.Serialization;
+using MessageBroker.Socket.Client;
 
 namespace MessageBroker.Core
 {
@@ -17,22 +17,15 @@ namespace MessageBroker.Core
     /// </summary>
     public class SendQueue
     {
+        private readonly Channel<MessagePayload> _messageQueue;
         private readonly ConcurrentDictionary<Guid, MessagePayload> _pendingMessages;
         private readonly Channel<SerializedPayload> _queue;
-        private readonly Channel<MessagePayload> _messageQueue;
         private readonly SemaphoreSlim _semaphore;
-        private SemaphoreSlim _sendSemaphore;
-
-        private int _currentConcurrency;
-        private int _maxConcurrency;
         private bool _autoAck;
+        private int _currentConcurrncyLevel;
+
+        private SemaphoreSlim _sendSemaphore;
         private bool _stopped;
-
-        public int CurrentConcurrency => _currentConcurrency;
-        public int MaxConcurrency => _maxConcurrency;
-
-
-        public IClientSession Session { get; }
 
         public SendQueue(IClientSession session)
         {
@@ -40,25 +33,28 @@ namespace MessageBroker.Core
             _queue = Channel.CreateUnbounded<SerializedPayload>(new UnboundedChannelOptions
             {
                 SingleReader = true,
-                SingleWriter = false,
+                SingleWriter = false
             });
             _messageQueue = Channel.CreateUnbounded<MessagePayload>();
             _semaphore = new SemaphoreSlim(1, 1);
-            _pendingMessages = new();
-            _maxConcurrency = -1; // no limit on concurrency
+            _pendingMessages = new ConcurrentDictionary<Guid, MessagePayload>();
 
-            _sendSemaphore = new SemaphoreSlim(1, 1);
+            _currentConcurrncyLevel = 10;
+            _sendSemaphore = new SemaphoreSlim(_currentConcurrncyLevel, _currentConcurrncyLevel);
 
             SetupQueueRunner();
             SetupMessageQueueRunner();
         }
-        
+
+
+        public IClientSession Session { get; }
+
+
         private void SetupQueueRunner()
         {
             Task.Factory.StartNew(async () =>
             {
                 while (true)
-                {
                     try
                     {
                         // if stopped, ignore
@@ -75,7 +71,6 @@ namespace MessageBroker.Core
                     {
                         // if there is an exception, just ignore
                     }
-                }
             }, TaskCreationOptions.LongRunning);
         }
 
@@ -84,14 +79,13 @@ namespace MessageBroker.Core
             Task.Factory.StartNew(async () =>
             {
                 while (true)
-                {
                     try
                     {
                         // if stopped, ignore
                         if (_stopped)
                             return;
 
-                        // if queue is full then wait for a little bit
+
                         await _sendSemaphore.WaitAsync();
 
                         // read the message from reader
@@ -104,21 +98,19 @@ namespace MessageBroker.Core
                     {
                         // if there is an exception, just ignore
                     }
-                }
             }, TaskCreationOptions.LongRunning);
         }
 
-        public void Configure(int concurrency, bool autoAck, int currentConcurrency = 0)
+        public void Configure(int concurrency, bool autoAck)
         {
-            _maxConcurrency = concurrency;
-            _currentConcurrency = currentConcurrency;
             _autoAck = autoAck;
-
-            _sendSemaphore = new SemaphoreSlim(0, concurrency);
+            _sendSemaphore = new SemaphoreSlim(concurrency - (_currentConcurrncyLevel - _sendSemaphore.CurrentCount),
+                concurrency);
+            _currentConcurrncyLevel = concurrency;
         }
 
         /// <summary>
-        /// Stop will send fail message event for all messages in queue and in pending messages list
+        ///     Stop will send fail message event for all messages in queue and in pending messages list
         /// </summary>
         public void Stop()
         {
@@ -133,10 +125,8 @@ namespace MessageBroker.Core
 
             // dispose payloads
             while (_queue.Reader.TryRead(out var sendPayload))
-            {
                 // return the send payload
                 ObjectPool.Shared.Return(sendPayload);
-            }
 
             // foreach pending message, requeue
             foreach (var (_, pendingQueueSendPayload) in _pendingMessages)
@@ -158,9 +148,8 @@ namespace MessageBroker.Core
 
         public void OnMessageAckReceived(Guid messageId)
         {
-            if (_pendingMessages.Remove(messageId, out var queueSendPayload))
+            if (_pendingMessages.TryRemove(messageId, out var queueSendPayload))
             {
-                Interlocked.Decrement(ref _currentConcurrency);
                 queueSendPayload.SetStatus(MessagePayloadStatus.Ack);
                 _sendSemaphore.Release();
                 queueSendPayload.Dispose();
@@ -171,7 +160,6 @@ namespace MessageBroker.Core
         {
             if (_pendingMessages.Remove(messageId, out var queueSendPayload))
             {
-                Interlocked.Decrement(ref _currentConcurrency);
                 queueSendPayload.SetStatus(MessagePayloadStatus.Nack);
                 _sendSemaphore.Release();
                 queueSendPayload.Dispose();
@@ -180,36 +168,27 @@ namespace MessageBroker.Core
 
         private async Task Send(MessagePayload messagePayload)
         {
-            
             await _semaphore.WaitAsync();
-            
+
             try
             {
-                if (!_autoAck)
-                {
-                    // increment the _currentConcurrency
-                    Interlocked.Increment(ref _currentConcurrency);
-                    
-                    _pendingMessages[messagePayload.SerializedPayload.Id] = messagePayload;
-                }
-                
+                if (!_autoAck) _pendingMessages[messagePayload.SerializedPayload.Id] = messagePayload;
+
                 // send the payload 
                 var success = await Session.SendAsync(messagePayload.SerializedPayload.Data);
-            
+
                 // notify message was sent or failed
                 if (success)
-                {
                     // if auto ack is active, then mark as acked
                     if (_autoAck)
                     {
                         messagePayload.SetStatus(MessagePayloadStatus.Ack);
-            
+
                         // return send payload to shared pool
                         messagePayload.Dispose();
 
                         _sendSemaphore.Release();
                     }
-                }
             }
             finally
             {
@@ -220,24 +199,21 @@ namespace MessageBroker.Core
         private async Task Send(SerializedPayload serializedPayload)
         {
             await _semaphore.WaitAsync();
-            
+
             try
             {
                 // send the payload 
                 var success = await Session.SendAsync(serializedPayload.Data);
-            
+
                 // notify message was sent or failed
                 if (success)
-                {
                     // return send payload to shared pool
                     ObjectPool.Shared.Return(serializedPayload);
-                }
             }
-            finally 
+            finally
             {
                 _semaphore.Release();
             }
-            
         }
     }
 }

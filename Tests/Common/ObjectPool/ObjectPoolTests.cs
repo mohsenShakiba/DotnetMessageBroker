@@ -5,7 +5,6 @@ namespace Tests.Common.ObjectPool
 {
     public class ObjectPoolTests
     {
-        
         [Fact]
         public void TestReuseObjects()
         {
@@ -15,7 +14,7 @@ namespace Tests.Common.ObjectPool
             objectPool.Return(rentedObject);
 
             _ = objectPool.Rent<SerializedPayload>();
-            
+
             Assert.Equal(1, objectPool.CreatedCount<SerializedPayload>());
         }
     }

@@ -4,7 +4,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
-using MessageBroker.Core.Persistence;
+using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.SessionPolicy;
 using MessageBroker.Models;
@@ -16,17 +16,12 @@ namespace MessageBroker.Core.Queues
     {
         private readonly MessageDispatcher _dispatcher;
         private readonly IMessageStore _messageStore;
+        private readonly Channel<Guid> _queue;
         private readonly IRouteMatcher _routeMatcher;
         private readonly ISerializer _serializer;
         private readonly ISessionPolicy _sessionPolicy;
-        private readonly Channel<Guid> _queue;
 
-        private string _name;
-        private string _route;
         private bool _stopped;
-
-        public string Name => _name;
-        public string Route => _route;
 
         public Queue(MessageDispatcher dispatcher, ISessionPolicy sessionPolicy,
             IMessageStore messageStore, IRouteMatcher routeMatcher, ISerializer serializer)
@@ -44,91 +39,34 @@ namespace MessageBroker.Core.Queues
             _stopped = true;
         }
 
+        public string Name { get; private set; }
+
+        public string Route { get; private set; }
+
         public void Setup(string name, string route)
         {
-            _name = name;
-            _route = route;
+            Name = name;
+            Route = route;
 
             ReadPayloadsFromMessageStore();
             SetupSendQueueProcessor();
-        }
-
-        private void ReadPayloadsFromMessageStore()
-        {
-            var messages = _messageStore.PendingMessages(int.MaxValue);
-
-            foreach (var message in messages)
-                _queue.Writer.TryWrite(message);
-            
-            Logger.LogInformation($"Queue: setting up messages, found {messages.Count()}");            
-        }
-
-        private void SetupSendQueueProcessor()
-        {
-            Task.Factory.StartNew(async () =>
-            {
-                while (true)
-                {
-                    if (_stopped)
-                        return;
-                    
-                    var messageIds = _queue.Reader.ReadAllAsync();
-                    
-                    await foreach (var messageId in messageIds)
-                    {
-                        ProcessMessage(messageId);
-                    }
-                }
-            }, TaskCreationOptions.LongRunning);
-        }
-
-        private void ProcessMessage(Guid messageId)
-        {
-            if (_messageStore.TryGetValue(messageId, out var message))
-            {
-                var sendPayload = _serializer.Serialize(message);
-                
-                SendMessage(sendPayload);
-                
-                message.Dispose();
-            }
         }
 
         public void OnMessage(Message message)
         {
             // create queue message from message
             var queueMessage = message.ToQueueMessage(Name);
-            
+
             // persist the message
             _messageStore.InsertAsync(queueMessage);
-            
+
             // add the message to queue chan
             _queue.Writer.TryWrite(queueMessage.Id);
         }
 
-        private void SendMessage(SerializedPayload serializedPayload)
-        {
-            var sessionId = _sessionPolicy.GetNextSession();
-
-            if (sessionId.HasValue)
-            {
-                var queueMessage = ObjectPool.Shared.Rent<MessagePayload>();
-
-                if (!queueMessage.HasSetupStatusChangeListener)
-                {
-                    queueMessage.OnStatusChanged += OnMessageStatusChanged;
-                    queueMessage.StatusChangeListenerIsSet();
-                }
-                
-                queueMessage.Setup(serializedPayload);
-                
-                _dispatcher.Dispatch(queueMessage, sessionId.Value);
-            };
-        }
-
         public bool MessageRouteMatch(string messageRoute)
         {
-            return _routeMatcher.Match(messageRoute, _route);
+            return _routeMatcher.Match(messageRoute, Route);
         }
 
         public void SessionDisconnected(Guid sessionId)
@@ -145,7 +83,67 @@ namespace MessageBroker.Core.Queues
         {
             SessionDisconnected(sessionId);
         }
-        
+
+        private void ReadPayloadsFromMessageStore()
+        {
+            var messages = _messageStore.PendingMessages(int.MaxValue);
+
+            foreach (var message in messages)
+                _queue.Writer.TryWrite(message);
+
+            Logger.LogInformation($"Queue: setting up messages, found {messages.Count()}");
+        }
+
+        private void SetupSendQueueProcessor()
+        {
+            Task.Factory.StartNew(async () =>
+            {
+                while (true)
+                {
+                    if (_stopped)
+                        return;
+
+                    var messageIds = _queue.Reader.ReadAllAsync();
+
+                    await foreach (var messageId in messageIds) ProcessMessage(messageId);
+                }
+            }, TaskCreationOptions.LongRunning);
+        }
+
+        private void ProcessMessage(Guid messageId)
+        {
+            if (_messageStore.TryGetValue(messageId, out var message))
+            {
+                var sendPayload = _serializer.Serialize(message);
+
+                SendMessage(sendPayload);
+
+                message.Dispose();
+            }
+        }
+
+        private void SendMessage(SerializedPayload serializedPayload)
+        {
+            var sessionId = _sessionPolicy.GetNextSession();
+
+            if (sessionId.HasValue)
+            {
+                var queueMessage = ObjectPool.Shared.Rent<MessagePayload>();
+
+                if (!queueMessage.HasSetupStatusChangeListener)
+                {
+                    queueMessage.OnStatusChanged += OnMessageStatusChanged;
+                    queueMessage.StatusChangeListenerIsSet();
+                }
+
+                queueMessage.Setup(serializedPayload);
+
+                _dispatcher.Dispatch(queueMessage, sessionId.Value);
+            }
+
+            ;
+        }
+
         private void OnMessageStatusChanged(Guid messageId, MessagePayloadStatus payloadStatus)
         {
             switch (payloadStatus)
@@ -168,6 +166,5 @@ namespace MessageBroker.Core.Queues
         {
             _queue.Writer.TryWrite(messageId);
         }
-
     }
 }

@@ -5,9 +5,9 @@ namespace MessageBroker.Common.Utils
 {
     public class DynamicBuffer
     {
-        private int _start;
-        private int _end;
         private byte[] _buffer;
+        private int _end;
+        private int _start;
 
         public DynamicBuffer()
         {
@@ -30,7 +30,7 @@ namespace MessageBroker.Common.Utils
         public void Write(Memory<byte> m)
         {
             ReorganizeBufferIfNeeded();
-            
+
             var remainingSize = _buffer.Length - _end;
 
             if (remainingSize >= m.Length)
@@ -42,6 +42,7 @@ namespace MessageBroker.Common.Utils
                 AllocateNewBufferWithExtraSize(m.Length);
                 m.CopyTo(_buffer.AsMemory(_end));
             }
+
             _end += m.Length;
         }
 
@@ -53,10 +54,7 @@ namespace MessageBroker.Common.Utils
 
         public bool CanRead(int size)
         {
-            if (_start + size <= _end)
-            {
-                return true;
-            }
+            if (_start + size <= _end) return true;
 
             return false;
         }
@@ -69,17 +67,17 @@ namespace MessageBroker.Common.Utils
             var m = _buffer.AsSpan(_start, size);
             _start += size;
 
-            
+
             return m;
         }
-        
+
         public Span<byte> Read(int size)
         {
             if (_start + size > _end)
                 throw new InvalidOperationException();
 
             var m = _buffer.AsSpan(_start, size);
-            
+
             return m;
         }
 

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using MessageBroker.Common.Logging;
 using MessageBroker.Core.Persistence.Redis;
 using MessageBroker.Core.Queues;
@@ -9,29 +8,28 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MessageBroker.Core.Persistence.Queues
 {
-    public class RedisQueueStore: IQueueStore
+    public class RedisQueueStore : IQueueStore
     {
+        private const string QueueNameKey = "MessageBroker.Queue.Set";
         private readonly IRedisConnectionProvider _redisConnectionProvider;
         private readonly IServiceProvider _serviceProvider;
-        private const string QueueNameKey = "MessageBroker.Queue.Set"; 
-        private List<IQueue> _queues;
+        private readonly List<IQueue> _queues;
 
         public RedisQueueStore(IRedisConnectionProvider redisConnectionProvider, IServiceProvider serviceProvider)
         {
             _redisConnectionProvider = redisConnectionProvider;
             _serviceProvider = serviceProvider;
-            _queues = new();
+            _queues = new List<IQueue>();
         }
-        
+
         public void Setup()
         {
             Logger.LogInformation("QueueStore: setting up");
-            
+
             var connection = _redisConnectionProvider.Get();
             var results = connection.GetDatabase().SetScan(QueueNameKey);
 
             foreach (var result in results)
-            {
                 try
                 {
                     var queue = DeserializeIQueue(result);
@@ -41,8 +39,7 @@ namespace MessageBroker.Core.Persistence.Queues
                 {
                     Logger.LogError("Failed to deserialize queue");
                 }
-            }
-            
+
             Logger.LogInformation($"QueueStore: found {results.Count()} queues");
         }
 
@@ -69,10 +66,10 @@ namespace MessageBroker.Core.Persistence.Queues
         public void Remove(string name)
         {
             var queueToRemove = _queues.FirstOrDefault(q => q.Name == name);
-            
+
             if (queueToRemove == null)
                 return;
-            
+
             _queues.Remove(queueToRemove);
             var connection = _redisConnectionProvider.Get();
             var serializedQueue = SerializeIQueue(queueToRemove);
@@ -87,7 +84,7 @@ namespace MessageBroker.Core.Persistence.Queues
         private IQueue DeserializeIQueue(string value)
         {
             var valueParts = value.Split(",");
-            
+
             var name = valueParts[0];
             var route = valueParts[1];
 
@@ -100,6 +97,5 @@ namespace MessageBroker.Core.Persistence.Queues
             queue.Setup(name, route);
             return queue;
         }
-
     }
 }

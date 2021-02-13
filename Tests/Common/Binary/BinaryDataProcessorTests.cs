@@ -14,7 +14,7 @@ namespace Tests.Common.Binary
             var size = 1000;
             var numberOfChunks = 10;
             var chunkSize = size / numberOfChunks;
-            
+
             var randomString = RandomStringGenerator.Generate(size);
 
             var binaryDataProcessor = new BinaryDataProcessor();
@@ -28,12 +28,12 @@ namespace Tests.Common.Binary
                 var chunk = binaryData.AsMemory(i * chunkSize, chunkSize);
                 binaryDataProcessor.Write(chunk);
             }
-            
+
             // write some random data at the end
             binaryDataProcessor.Write(Encoding.UTF8.GetBytes("meaningless data"));
 
             binaryDataProcessor.TryRead(out var data);
-            
+
             Assert.Equal(randomString, Encoding.UTF8.GetString(data.DataWithoutSize.Span));
         }
     }

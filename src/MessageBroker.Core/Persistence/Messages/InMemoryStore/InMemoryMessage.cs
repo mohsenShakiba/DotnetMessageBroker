@@ -2,18 +2,18 @@
 using System.Buffers;
 using MessageBroker.Models;
 
-namespace MessageBroker.Core.Persistence.InMemoryStore
+namespace MessageBroker.Core.Persistence.Messages.InMemoryStore
 {
     public class InMemoryMessage
     {
+        private byte[] _buffer;
+
+        private int _size;
         public Guid Id { get; private set; }
         public string Route { get; private set; }
         public string QueueName { get; private set; }
 
         public Memory<byte> Data => _buffer.AsMemory(0, _size);
-        
-        private int _size;
-        private byte[] _buffer;
 
 
         public void FillFrom(QueueMessage message, bool useDataInMessage = false)
@@ -28,7 +28,6 @@ namespace MessageBroker.Core.Persistence.InMemoryStore
             }
             else
             {
-            
                 if ((_buffer?.Length ?? 0) < messageSize)
                 {
                     if (_buffer != null)
@@ -45,6 +44,5 @@ namespace MessageBroker.Core.Persistence.InMemoryStore
             QueueName = message.QueueName;
             _size = messageSize;
         }
-    
     }
 }

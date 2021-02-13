@@ -1,12 +1,9 @@
-﻿using System;
-
-namespace MessageBroker.Client
+﻿namespace MessageBroker.Client
 {
     public class ClientConfiguration
     {
-
         private static ClientConfiguration _configuration;
-        
+
         public int SendMessageChannelSize { get; init; }
         public int ReceiveMessageChannelSize { get; init; }
         public int ReceiveDataBufferSize { get; init; }

@@ -5,16 +5,16 @@ using System.Collections.Generic;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
 
-namespace MessageBroker.Core.Persistence.InMemoryStore
+namespace MessageBroker.Core.Persistence.Messages.InMemoryStore
 {
     public class InMemoryMessageStore : IMessageStore
     {
         private readonly ConcurrentDictionary<Guid, InMemoryMessage> _store;
-        
+
 
         public InMemoryMessageStore()
         {
-            _store = new ();
+            _store = new ConcurrentDictionary<Guid, InMemoryMessage>();
         }
 
 
@@ -26,9 +26,9 @@ namespace MessageBroker.Core.Persistence.InMemoryStore
         public void InsertAsync(QueueMessage message)
         {
             var inMemoryMessage = ObjectPool.Shared.Rent<InMemoryMessage>();
-            
+
             inMemoryMessage.FillFrom(message);
-            
+
             _store[message.Id] = inMemoryMessage;
         }
 
@@ -37,7 +37,7 @@ namespace MessageBroker.Core.Persistence.InMemoryStore
             if (_store.TryGetValue(id, out var inMemoryMessage))
             {
                 var buff = ArrayPool<byte>.Shared.Rent(inMemoryMessage.Data.Length);
-                
+
                 inMemoryMessage.Data.CopyTo(buff);
 
                 message = new QueueMessage
@@ -59,16 +59,12 @@ namespace MessageBroker.Core.Persistence.InMemoryStore
 
         public void DeleteAsync(Guid id)
         {
-            if (_store.TryRemove(id, out var persistedMessage))
-            {
-                ObjectPool.Shared.Return(persistedMessage);
-            }
+            if (_store.TryRemove(id, out var persistedMessage)) ObjectPool.Shared.Return(persistedMessage);
         }
 
         public IEnumerable<Guid> PendingMessages(int count)
         {
             return new Guid[0];
         }
-
     }
 }

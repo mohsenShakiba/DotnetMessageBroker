@@ -5,18 +5,17 @@ using MessageBroker.Serialization;
 using Tests.Classes;
 using Xunit;
 
-namespace Tests
+namespace Tests.Serialization
 {
     public class SerializerTests
     {
-        
         private readonly Serializer _serializer;
 
         public SerializerTests()
         {
             _serializer = new Serializer();
         }
-        
+
         [Fact]
         public void TestParseMessage()
         {
@@ -63,7 +62,8 @@ namespace Tests
         [Fact]
         public void TestSubscribeQueue()
         {
-            var subscribeQueue = new SubscribeQueue {Id = Guid.NewGuid(), QueueName = RandomStringGenerator.Generate(10)};
+            var subscribeQueue = new SubscribeQueue
+                {Id = Guid.NewGuid(), QueueName = RandomStringGenerator.Generate(10)};
 
             var b = _serializer.Serialize(subscribeQueue);
 
@@ -76,7 +76,8 @@ namespace Tests
         [Fact]
         public void TestUnSubscribeQueue()
         {
-            var unsubscribeQueue = new SubscribeQueue {Id = Guid.NewGuid(), QueueName = RandomStringGenerator.Generate(10)};
+            var unsubscribeQueue = new SubscribeQueue
+                {Id = Guid.NewGuid(), QueueName = RandomStringGenerator.Generate(10)};
 
             var b = _serializer.Serialize(unsubscribeQueue);
 
@@ -104,7 +105,11 @@ namespace Tests
         [Fact]
         public void TestQueueDeclare()
         {
-            var queue = new QueueDeclare {Id = Guid.NewGuid(), Name = RandomStringGenerator.Generate(10), Route = RandomStringGenerator.Generate(10)};
+            var queue = new QueueDeclare
+            {
+                Id = Guid.NewGuid(), Name = RandomStringGenerator.Generate(10),
+                Route = RandomStringGenerator.Generate(10)
+            };
 
             var b = _serializer.Serialize(queue);
 
@@ -127,7 +132,7 @@ namespace Tests
             Assert.Equal(queue.Id, convertedQueueDelete.Id);
             Assert.Equal(queue.Name, convertedQueueDelete.Name);
         }
-        
+
         [Fact]
         public void TestError()
         {

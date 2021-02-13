@@ -1,24 +1,23 @@
 ﻿using System;
-using System.Buffers;
 using MessageBroker.Common.Logging;
-using MessageBroker.Core.Persistence;
+using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.Persistence.Queues;
-using MessageBroker.Core.Queues;
-using MessageBroker.Core.Socket;
-using MessageBroker.Core.Socket.Client;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
+using MessageBroker.Socket;
+using MessageBroker.Socket.Client;
 
 namespace MessageBroker.Core
 {
-    public class Coordinator : ISocketEventProcessor
+    public class Coordinator : ISocketEventProcessor, ISocketDataProcessor
     {
         private readonly MessageDispatcher _messageDispatcher;
-        private readonly IQueueStore _queueStore;
         private readonly IMessageStore _messageStore;
+        private readonly IQueueStore _queueStore;
         private readonly ISerializer _serializer;
 
-        public Coordinator(ISerializer serializer, MessageDispatcher messageDispatcher, IQueueStore queueStore, IMessageStore messageStore)
+        public Coordinator(ISerializer serializer, MessageDispatcher messageDispatcher, IQueueStore queueStore,
+            IMessageStore messageStore)
         {
             _serializer = serializer;
             _messageDispatcher = messageDispatcher;
@@ -26,10 +25,52 @@ namespace MessageBroker.Core
             _messageStore = messageStore;
         }
 
-        public void Setup()
+        public void DataReceived(Guid sessionId, Memory<byte> payloadData)
         {
-            _queueStore.Setup();
-            _messageStore.Setup();
+            try
+            {
+                var type = _serializer.ParsePayloadType(payloadData);
+
+                switch (type)
+                {
+                    case PayloadType.Msg:
+                        var message = _serializer.ToMessage(payloadData);
+                        OnMessage(sessionId, message);
+                        break;
+                    case PayloadType.Ack:
+                        var ack = _serializer.ToAck(payloadData);
+                        OnMessageAck(sessionId, ack);
+                        break;
+                    case PayloadType.Nack:
+                        var nack = _serializer.ToNack(payloadData);
+                        OnMessageNack(sessionId, nack);
+                        break;
+                    case PayloadType.SubscribeQueue:
+                        var subscribeQueue = _serializer.ToSubscribeQueue(payloadData);
+                        OnSubscribeQueue(sessionId, subscribeQueue);
+                        break;
+                    case PayloadType.UnSubscribeQueue:
+                        var unsubscribeQueue = _serializer.ToUnsubscribeQueue(payloadData);
+                        OnUnsubscribeQueue(sessionId, unsubscribeQueue);
+                        break;
+                    case PayloadType.ConfigureSubscription:
+                        var subscribe = _serializer.ToConfigureSubscription(payloadData);
+                        OnConfigureSubscription(sessionId, subscribe);
+                        break;
+                    case PayloadType.QueueCreate:
+                        var queueDeclare = _serializer.ToQueueDeclareModel(payloadData);
+                        OnDeclareQueue(sessionId, queueDeclare);
+                        break;
+                    case PayloadType.QueueDelete:
+                        var queueDelete = _serializer.ToQueueDeleteModel(payloadData);
+                        OnDeleteQueue(sessionId, queueDelete);
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.LogError($"An error occured while trying to dispatch messages, error: {e}");
+            }
         }
 
         public void ClientConnected(IClientSession clientSession)
@@ -41,61 +82,26 @@ namespace MessageBroker.Core
         public void ClientDisconnected(IClientSession clientSession)
         {
             Logger.LogInformation("client session disconnected, removing send queue");
-            
+
             foreach (var queue in _queueStore.GetAll())
                 queue.SessionDisconnected(clientSession.Id);
 
             _messageDispatcher.RemoveSession(clientSession);
         }
 
-        public void DataReceived(Guid sessionId, Memory<byte> payloadData)
+        public void Setup()
         {
-            var type = _serializer.ParsePayloadType(payloadData);
-
-            switch (type)
-            {
-                case PayloadType.Msg:
-                    var message = _serializer.ToMessage(payloadData);
-                    OnMessage(sessionId, message);
-                    break;
-                case PayloadType.Ack:
-                    var ack = _serializer.ToAck(payloadData);
-                    OnMessageAck(sessionId, ack);
-                    break;
-                case PayloadType.Nack:
-                    var nack = _serializer.ToAck(payloadData);
-                    OnMessageNack(sessionId, nack);
-                    break;
-                case PayloadType.SubscribeQueue:
-                    var subscribeQueue = _serializer.ToSubscribeQueue(payloadData);
-                    OnSubscribeQueue(sessionId, subscribeQueue);
-                    break;
-                case PayloadType.UnSubscribeQueue:
-                    var unsubscribeQueue = _serializer.ToUnsubscribeQueue(payloadData);
-                    OnUnsubscribeQueue(sessionId, unsubscribeQueue);
-                    break;
-                case PayloadType.ConfigureSubscription:
-                    var subscribe = _serializer.ToConfigureSubscription(payloadData);
-                    OnConfigureSubscription(sessionId, subscribe);
-                    break;
-                case PayloadType.QueueCreate:
-                    var queueDeclare = _serializer.ToQueueDeclareModel(payloadData);
-                    OnDeclareQueue(sessionId, queueDeclare);
-                    break;
-                case PayloadType.QueueDelete:
-                    var queueDelete = _serializer.ToQueueDeleteModel(payloadData);
-                    OnDeleteQueue(sessionId, queueDelete);
-                    break;
-            }
+            _queueStore.Setup();
+            _messageStore.Setup();
         }
 
         public void OnMessage(Guid sessionId, Message message)
         {
             // dispatch the message to matched queues
-            foreach(var queue in _queueStore.GetAll())
+            foreach (var queue in _queueStore.GetAll())
                 if (queue.MessageRouteMatch(message.Route))
                     queue.OnMessage(message);
-            
+
             // send received ack to publisher
             SendReceivedPayloadAck(sessionId, message.Id);
 
@@ -108,7 +114,7 @@ namespace MessageBroker.Core
             _messageDispatcher.OnMessageAck(ack.Id, sessionId);
         }
 
-        public void OnMessageNack(Guid sessionId, Ack nack)
+        public void OnMessageNack(Guid sessionId, Nack nack)
         {
             _messageDispatcher.OnMessageNack(nack.Id, sessionId);
         }
@@ -143,7 +149,7 @@ namespace MessageBroker.Core
         private void OnDeclareQueue(Guid sessionId, QueueDeclare queueDeclare)
         {
             Logger.LogInformation($"declaring queue with name {queueDeclare.Name}");
-            
+
             // if queue exists
             if (_queueStore.TryGetValue(queueDeclare.Name, out var queue))
             {
@@ -165,7 +171,7 @@ namespace MessageBroker.Core
         private void OnDeleteQueue(Guid sessionId, QueueDelete queueDelete)
         {
             Logger.LogInformation($"deleting queue with name {queueDelete.Name}");
-            
+
             _queueStore.Remove(queueDelete.Name);
 
             SendReceivedPayloadAck(sessionId, queueDelete.Id);
@@ -183,7 +189,7 @@ namespace MessageBroker.Core
 
         private void SendReceivedPayloadAck(Guid sessionId, Guid payloadId)
         {
-            var ack = new Ack
+            var ack = new Ok
             {
                 Id = payloadId
             };

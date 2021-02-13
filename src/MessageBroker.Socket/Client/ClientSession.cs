@@ -6,33 +6,68 @@ using MessageBroker.Common.Binary;
 using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
 
-namespace MessageBroker.Core.Socket.Client
+namespace MessageBroker.Socket.Client
 {
     public class ClientSession : IClientSession
     {
-        private readonly System.Net.Sockets.Socket _socket;
-        private readonly ISocketEventProcessor _eventProcessor;
         private readonly IBinaryDataProcessor _binaryDataProcessor;
-        
         private bool _connected;
-        
+        private System.Net.Sockets.Socket _socket;
+        private ISocketDataProcessor _socketDataProcessor;
+
+        private ISocketEventProcessor _socketEventProcessor;
+
+        public ClientSession(IBinaryDataProcessor binaryDataProcessor)
+        {
+            _binaryDataProcessor = binaryDataProcessor;
+
+            Id = Guid.NewGuid();
+        }
+
         public Guid Id { get; }
 
-        public ClientSession(ISocketEventProcessor eventProcessor, System.Net.Sockets.Socket socket)
+        public void Use(System.Net.Sockets.Socket socket)
         {
-            _binaryDataProcessor = new BinaryDataProcessor();
-
-            _eventProcessor = eventProcessor;
             _socket = socket;
-
             _connected = true;
-            Id = Guid.NewGuid();
+
+            if (_socketEventProcessor is null)
+                throw new Exception("The socket event processor isn't provided");
+
+            if (_socketDataProcessor is null)
+                throw new Exception("The socket data processor isn't provided");
 
             StartReceiveProcess();
         }
-        
+
+        public void ForwardEventsTo(ISocketEventProcessor socketEventProcessor)
+        {
+            _socketEventProcessor = socketEventProcessor;
+        }
+
+        public void ForwardDataTo(ISocketDataProcessor socketDataProcessor)
+        {
+            _socketDataProcessor = socketDataProcessor;
+        }
+
+        #region Close
+
+        public void Close()
+        {
+            Logger.LogInformation($"stopping client session {Id}");
+
+            _connected = false;
+
+            _socket.Close();
+            _socket.Dispose();
+
+            _socketEventProcessor.ClientDisconnected(this);
+        }
+
+        #endregion
+
         #region Receive
-        
+
         /// <summary>
         ///     this method will start recieving message from socket
         /// </summary>
@@ -68,10 +103,9 @@ namespace MessageBroker.Core.Socket.Client
         private void ProcessReceivedData()
         {
             while (true)
-            {
                 if (_binaryDataProcessor.TryRead(out var binaryPayload))
                 {
-                    _eventProcessor.DataReceived(Id, binaryPayload.DataWithoutSize);
+                    _socketDataProcessor.DataReceived(Id, binaryPayload.DataWithoutSize);
 
                     binaryPayload.Dispose();
 
@@ -81,7 +115,6 @@ namespace MessageBroker.Core.Socket.Client
                 {
                     break;
                 }
-            }
         }
 
         #endregion
@@ -96,7 +129,10 @@ namespace MessageBroker.Core.Socket.Client
             var sendSize = await _socket.SendAsync(payload, SocketFlags.None);
 
             if (sendSize < payload.Length)
+            {
                 Close();
+                return false;
+            }
 
             return true;
         }
@@ -107,23 +143,5 @@ namespace MessageBroker.Core.Socket.Client
         }
 
         #endregion
-        
-        #region Close
-
-        public void Close()
-        {
-            Logger.LogInformation($"stopping client session {Id}");
-
-            _connected = false;
-
-            _socket.Close();
-            _socket.Dispose();
-
-            _eventProcessor.ClientDisconnected(this);
-        }
-
-
-        #endregion
-
     }
 }

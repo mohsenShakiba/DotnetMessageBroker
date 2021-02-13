@@ -1,25 +1,26 @@
 ﻿using System;
+using System.Net.Sockets;
 using System.Threading.Tasks;
-using MessageBroker.Core.Socket.Client;
+using MessageBroker.Socket;
+using MessageBroker.Socket.Client;
 
 namespace Benchmarks
 {
     public class TestClientSession : IClientSession
     {
         public Guid Id { get; set; }
-        
-        public void SetupSendCompletedHandler(Action<Guid> onSendCompleted, Action<Guid> onMessageError)
+
+        public void Use(Socket socket)
         {
             // do nothing
         }
 
-        public void SetSendPayloadId(Guid sendPayloadId)
+        public void ForwardEventsTo(ISocketEventProcessor socketEventProcessor)
         {
             // do nothing
         }
 
-
-        public void Send(Memory<byte> payload)
+        public void ForwardDataTo(ISocketDataProcessor socketDataProcessor)
         {
             // do nothing
         }
@@ -30,11 +31,6 @@ namespace Benchmarks
         }
 
         public void Close()
-        {
-            // do nothing
-        }
-
-        public void Dispose()
         {
             // do nothing
         }

@@ -5,7 +5,7 @@ using System.Text;
 namespace MessageBroker.Serialization.Pools
 {
     /// <summary>
-    /// StringPool is a utility class to prevent string allocations
+    ///     StringPool is a utility class to prevent string allocations
     /// </summary>
     public class StringPool
     {

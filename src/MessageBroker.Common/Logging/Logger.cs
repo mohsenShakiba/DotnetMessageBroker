@@ -14,11 +14,8 @@ namespace MessageBroker.Common.Logging
 
         public static void AddConsole()
         {
-            var loggerFactory = LoggerFactory.Create((b) =>
-            {
-                b.AddConsole();
-            });
-            
+            var loggerFactory = LoggerFactory.Create(b => { b.AddConsole(); });
+
             _defaultLogger = loggerFactory.CreateLogger<Logger>();
         }
 
@@ -36,6 +33,5 @@ namespace MessageBroker.Common.Logging
         {
             _defaultLogger.LogError(template, arguments);
         }
-        
     }
 }

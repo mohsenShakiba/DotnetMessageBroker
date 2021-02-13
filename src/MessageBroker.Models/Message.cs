@@ -31,11 +31,10 @@ namespace MessageBroker.Models
                 OriginalMessageData = newData
             };
         }
-        
+
         public void Dispose()
         {
             ArrayPool<byte>.Shared.Return(OriginalMessageData);
         }
-        
     }
 }

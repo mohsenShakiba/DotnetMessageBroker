@@ -1,7 +1,6 @@
 ﻿using MessageBroker.Core;
-using MessageBroker.Core.Socket;
-using MessageBroker.Core.Socket.Server;
 using MessageBroker.Serialization;
+using MessageBroker.Socket;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

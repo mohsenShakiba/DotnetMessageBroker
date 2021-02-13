@@ -5,10 +5,12 @@ namespace MessageBroker.Common.Binary
 {
     public class BinaryPayload
     {
-        public Memory<byte> DataWithoutSize => _data.AsMemory(BinaryProtocolConfiguration.PayloadHeaderSize, _size - BinaryProtocolConfiguration.PayloadHeaderSize);
+        private byte[] _data;
 
         private int _size;
-        private byte[] _data;
+
+        public Memory<byte> DataWithoutSize => _data.AsMemory(BinaryProtocolConfiguration.PayloadHeaderSize,
+            _size - BinaryProtocolConfiguration.PayloadHeaderSize);
 
 
         public void Setup(byte[] data, int size)
@@ -20,6 +22,6 @@ namespace MessageBroker.Common.Binary
         public void Dispose()
         {
             ArrayPool<byte>.Shared.Return(_data);
-        } 
+        }
     }
 }

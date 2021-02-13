@@ -12,8 +12,8 @@ namespace MessageBroker.Common.Binary
 
         public BinaryDataProcessor()
         {
-            _dynamicBuffer = new();
-            _lock = new();
+            _dynamicBuffer = new DynamicBuffer();
+            _lock = new object();
         }
 
         public void Write(Memory<byte> chunk)
@@ -45,7 +45,7 @@ namespace MessageBroker.Common.Binary
                 var payload = _dynamicBuffer.ReadAndClear(BinaryProtocolConfiguration.PayloadHeaderSize + headerSize);
 
                 var receiveDataBuffer = ArrayPool<byte>.Shared.Rent(payload.Length);
-                
+
                 payload.CopyTo(receiveDataBuffer);
 
                 binaryPayload = ObjectPool.Shared.Rent<BinaryPayload>();

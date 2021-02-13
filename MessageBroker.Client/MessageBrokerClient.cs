@@ -2,47 +2,37 @@
 using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManager;
 using MessageBroker.Client.Models;
-using MessageBroker.Client.QueueConsumerCoordination;
+using MessageBroker.Client.QueueManagement;
 using MessageBroker.Client.ReceiveDataProcessing;
-using MessageBroker.Client.SocketClient;
 using MessageBroker.Client.TaskManager;
-using MessageBroker.Common.Binary;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MessageBroker.Client
 {
     public class MessageBrokerClient
     {
-        private readonly ISerializer _serializer;
-        private readonly ITaskManager _taskManager;
         private readonly IConnectionManager _connectionManager;
-        private readonly IReceiveDataProcessor _receiveDataProcessor;
-        private readonly IQueueConsumerCoordinator _queueConsumerCoordinator;
-        private readonly IBinaryDataProcessor _binaryDataProcessor;
-        
-        private ISocketClient _socketClient;
-        private ILoggerFactory _loggerFactory;
+        private readonly IReceiveDataProcessor _eceiveDataProcessor;
+        private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
+        private readonly ISerializer _serializer;
+        private readonly IServiceProvider _serviceProvider;
 
-        public MessageBrokerClient()
+
+        public MessageBrokerClient(ISerializer serializer, ISendPayloadTaskManager sendPayloadTaskManager,
+            IConnectionManager connectionManager, IServiceProvider serviceProvider)
         {
-            _serializer = new Serializer();
-            _taskManager = new DefaultTaskManager();
-            _queueConsumerCoordinator = new QueueConsumerCoordinator();
-            _connectionManager =
-                new ConnectionManager.ConnectionManager(NullLogger<ConnectionManager.ConnectionManager>.Instance);
-            _loggerFactory = NullLoggerFactory.Instance;
-            _binaryDataProcessor = new BinaryDataProcessor();
-            _receiveDataProcessor = new ReceiveDataProcessor(_binaryDataProcessor, _serializer, _queueConsumerCoordinator, _taskManager);
-            _socketClient = new SocketClient.SocketClient(_loggerFactory, _taskManager, _receiveDataProcessor, _connectionManager);
+            _serializer = serializer;
+            _sendPayloadTaskManager = sendPayloadTaskManager;
+            _connectionManager = connectionManager;
+            _serviceProvider = serviceProvider;
         }
 
 
         public void Connect(SocketConnectionConfiguration configuration)
         {
-            _socketClient.Connect(configuration);
+            _connectionManager.Connect(configuration);
         }
 
         public void Disconnect()
@@ -50,38 +40,53 @@ namespace MessageBroker.Client
             _connectionManager.Disconnect();
         }
 
-        public QueueManager GetQueueConsumer(string name, string route)
+        public IQueueManager GetQueueConsumer(string name, string route)
         {
-            var queueManager = new QueueManager(_serializer, _socketClient, _queueConsumerCoordinator);
+            var queueManager = _serviceProvider.GetRequiredService<IQueueManager>();
             queueManager.Setup(name, route);
             return queueManager;
         }
 
 
-        public Task<SendAsyncResult> PublishAsync(string route, byte[] data)
+        public Task<SendAsyncResult> PublishAsync(string route, byte[] data, bool completedOnAcknowledge = true)
         {
             var sendPayload = GetMessageData(route, data);
-            return _socketClient.SendAsync(sendPayload.Id, sendPayload.Data, true);
+            return SendAsync(sendPayload, completedOnAcknowledge);
         }
 
         public Task<SendAsyncResult> AckAsync(Guid messageId)
         {
             var sendPayload = GetAckData(messageId);
-            return _socketClient.SendAsync(sendPayload.Id, sendPayload.Data, false);
+            return SendAsync(sendPayload, false);
         }
 
         public Task<SendAsyncResult> NackAsync(Guid messageId)
         {
             var sendPayload = GetNackData(messageId);
-            return _socketClient.SendAsync(sendPayload.Id, sendPayload.Data, false);
+            return SendAsync(sendPayload, false);
         }
 
         public Task<SendAsyncResult> ConfigureClientAsync(int concurrency, bool autoAck)
         {
             var sendPayload = GetConfigureSubscriptionData(concurrency, autoAck);
-            return _socketClient.SendAsync(sendPayload.Id, sendPayload.Data, false);
+            return SendAsync(sendPayload, true);
         }
 
+        private async Task<SendAsyncResult> SendAsync(SerializedPayload serializedPayload, bool completeOnAcknowledge)
+        {
+            var clientSession = _connectionManager.ClientSession;
+
+            var sendPayloadTask = _sendPayloadTaskManager.Setup(serializedPayload.Id, completeOnAcknowledge);
+
+            var sendSuccess = await clientSession.SendAsync(serializedPayload.Data);
+
+            if (sendSuccess)
+                _sendPayloadTaskManager.OnPayloadSendSuccess(serializedPayload.Id);
+            else
+                _sendPayloadTaskManager.OnPayloadSendFailed(serializedPayload.Id);
+
+            return await sendPayloadTask;
+        }
 
         private SerializedPayload GetMessageData(string route, byte[] data)
         {
@@ -89,35 +94,35 @@ namespace MessageBroker.Client
             {
                 Id = Guid.NewGuid(),
                 Data = data,
-                Route = route,
+                Route = route
             };
 
             return _serializer.Serialize(msg);
         }
-        
+
         private SerializedPayload GetAckData(Guid messageId)
         {
             var msg = new Ack
             {
-                Id = messageId,
+                Id = messageId
             };
 
             return _serializer.Serialize(msg);
         }
-        
+
         private SerializedPayload GetNackData(Guid messageId)
         {
             var msg = new Nack
             {
-                Id = messageId,
+                Id = messageId
             };
 
             return _serializer.Serialize(msg);
         }
-        
+
         private SerializedPayload GetConfigureSubscriptionData(int concurrency, bool autoAck)
         {
-            var msg = new ConfigureSubscription()
+            var msg = new ConfigureSubscription
             {
                 Id = Guid.NewGuid(),
                 Concurrency = concurrency,
@@ -125,11 +130,6 @@ namespace MessageBroker.Client
             };
 
             return _serializer.Serialize(msg);
-        }
-
-        public void SetLoggerFactory(ILoggerFactory loggerFactory)
-        {
-            _loggerFactory = loggerFactory;
         }
     }
 }

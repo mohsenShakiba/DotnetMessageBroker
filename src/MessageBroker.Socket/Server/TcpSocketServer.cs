@@ -1,15 +1,19 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Net.Sockets;
 using MessageBroker.Common.Logging;
-using MessageBroker.Core.Socket.Client;
+using MessageBroker.Socket.Client;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace MessageBroker.Core.Socket.Server
+namespace MessageBroker.Socket.Server
 {
     /// <summary>
     ///     TCP implementation of ISocketServer
     /// </summary>
     public class TcpSocketServer : ISocketServer
     {
+        private readonly IServiceProvider _serviceProvider;
+        private readonly ISocketDataProcessor _socketDataProcessor;
         private readonly ISocketEventProcessor _socketEventProcessor;
         private IPEndPoint _endPoint;
         private bool _isAccepting;
@@ -17,11 +21,14 @@ namespace MessageBroker.Core.Socket.Server
         private System.Net.Sockets.Socket _socket;
         private SocketAsyncEventArgs _socketAsyncEventArgs;
 
-        public TcpSocketServer(ISocketEventProcessor socketEventProcessor)
+        public TcpSocketServer(ISocketEventProcessor socketEventProcessor, ISocketDataProcessor socketDataProcessor,
+            IServiceProvider serviceProvider)
         {
             _socketEventProcessor = socketEventProcessor;
+            _socketDataProcessor = socketDataProcessor;
+            _serviceProvider = serviceProvider;
         }
-        
+
 
         /// <summary>
         ///     This method will start the server and begin accepting connections
@@ -43,7 +50,7 @@ namespace MessageBroker.Core.Socket.Server
         public void Stop()
         {
             Logger.LogInformation("stopping socket server");
-            
+
             _isAccepting = false;
 
             _socketAsyncEventArgs.Completed -= OnAcceptCompleted;
@@ -65,7 +72,7 @@ namespace MessageBroker.Core.Socket.Server
             _socket = new System.Net.Sockets.Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             _socket.Bind(_endPoint);
             _socket.Listen();
-            
+
             Logger.LogInformation("started socket connection");
 
             AcceptConnection();
@@ -113,21 +120,23 @@ namespace MessageBroker.Core.Socket.Server
         private void OnAcceptSuccess(System.Net.Sockets.Socket socket)
         {
             Logger.LogInformation("accepted new socket connection");
-            
-            var session = new ClientSession(_socketEventProcessor, socket);
 
-            _socketEventProcessor.ClientConnected(session);
+            var client = _serviceProvider.GetRequiredService<IClientSession>();
+
+            client.ForwardEventsTo(_socketEventProcessor);
+            client.ForwardDataTo(_socketDataProcessor);
+            client.Use(socket);
+
+            _socketEventProcessor.ClientConnected(client);
         }
 
         /// <summary>
-        /// called when accepting socket fails
+        ///     called when accepting socket fails
         /// </summary>
         /// <param name="err"></param>
         private void OnAcceptError(SocketError err)
         {
             Logger.LogError($"failed to accept socket connection, error: {err}");
         }
-
-
     }
 }
