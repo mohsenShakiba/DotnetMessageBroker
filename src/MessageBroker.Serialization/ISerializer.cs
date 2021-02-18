@@ -1,5 +1,6 @@
 ﻿using System;
 using MessageBroker.Models;
+using MessageBroker.Models.BinaryPayload;
 
 namespace MessageBroker.Serialization
 {

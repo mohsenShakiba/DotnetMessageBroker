@@ -58,7 +58,7 @@ namespace Tests.Client
             serviceCollection.AddSingleton<StringPool>();
             serviceCollection.AddSingleton<MessageBrokerClient>();
             serviceCollection.AddSingleton<IBinaryDataProcessor, BinaryDataProcessor>();
-            serviceCollection.AddSingleton<MessageDispatcher>();
+            serviceCollection.AddSingleton<ISendQueueStore, SendQueueStore>();
 
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
@@ -74,7 +74,7 @@ namespace Tests.Client
             clientServiceCollection.AddTransient<IQueueManager, QueueManager>();
             clientServiceCollection.AddSingleton<StringPool>();
             clientServiceCollection.AddSingleton<MessageBrokerClient>();
-            clientServiceCollection.AddSingleton<MessageDispatcher>();
+            clientServiceCollection.AddSingleton<ISendQueueStore, SendQueueStore>();
 
             var clientServiceProvider = clientServiceCollection.BuildServiceProvider();
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers;
 using System.Text;
+using MessageBroker.Common.Pooling;
 using MessageBroker.Serialization.Pools;
 
 namespace MessageBroker.Serialization
@@ -8,12 +9,13 @@ namespace MessageBroker.Serialization
     /// <summary>
     ///     BinaryDeserializeHelper is a utility class to that provides helper methods to deserialize binary to payload
     /// </summary>
-    public class BinaryDeserializeHelper
+    public class BinaryDeserializeHelper: IPooledObject
     {
         private static byte[] _delimiter;
         private int _currentOffset;
-
         private Memory<byte> _receivedData;
+        
+        public bool IsReturnedToPool { get; private set; }
 
         public static Span<byte> Delimiter
         {
@@ -64,6 +66,11 @@ namespace MessageBroker.Serialization
             var arr = ArrayPool<byte>.Shared.Rent(indexOfDelimiter);
             data.Slice(0, indexOfDelimiter).CopyTo(arr);
             return (arr, indexOfDelimiter);
+        }
+
+        public void SetPooledStatus(bool isReturned)
+        {
+            IsReturnedToPool = isReturned;
         }
     }
 }

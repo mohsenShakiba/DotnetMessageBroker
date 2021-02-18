@@ -15,7 +15,7 @@ namespace Tests.Common.Binary
             var numberOfChunks = 10;
             var chunkSize = size / numberOfChunks;
 
-            var randomString = RandomStringGenerator.Generate(size);
+            var randomString = RandomGenerator.GenerateString(size);
 
             var binaryDataProcessor = new BinaryDataProcessor();
 

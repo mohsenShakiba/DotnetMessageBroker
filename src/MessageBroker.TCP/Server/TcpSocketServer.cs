@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using MessageBroker.Common.Logging;
 using MessageBroker.Socket.Client;
+using MessageBroker.Socket.SocketWrapper;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MessageBroker.Socket.Server
@@ -125,7 +126,9 @@ namespace MessageBroker.Socket.Server
 
             client.ForwardEventsTo(_socketEventProcessor);
             client.ForwardDataTo(_socketDataProcessor);
-            client.Use(socket);
+
+            var tcpSocket = new TcpSocket(socket);
+            client.Use(tcpSocket);
 
             _socketEventProcessor.ClientConnected(client);
         }

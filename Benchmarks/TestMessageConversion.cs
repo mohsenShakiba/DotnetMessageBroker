@@ -1,6 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
 using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
+using MessageBroker.Models.BinaryPayload;
 using MessageBroker.Serialization;
 
 namespace Benchmarks

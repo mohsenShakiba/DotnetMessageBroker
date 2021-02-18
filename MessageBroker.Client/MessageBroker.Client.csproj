@@ -12,7 +12,7 @@
     <ItemGroup>
       <ProjectReference Include="..\src\MessageBroker.Models\MessageBroker.Models.csproj" />
       <ProjectReference Include="..\src\MessageBroker.Serialization\MessageBroker.Serialization.csproj" />
-      <ProjectReference Include="..\src\MessageBroker.Socket\MessageBroker.Socket.csproj" />
+      <ProjectReference Include="..\src\MessageBroker.TCP\MessageBroker.TCP.csproj" />
     </ItemGroup>
     
     <ItemGroup>

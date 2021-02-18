@@ -26,14 +26,13 @@ namespace MessageBroker.Common.Pooling
             }
         }
 
-        public T Rent<T>() where T : new()
+        public T Rent<T>() where T : IPooledObject, new()
         {
             var type = typeof(T);
 
             if (!_objectTypeDict.ContainsKey(type))
             {
                 _objectTypeDict[type] = new ConcurrentQueue<object>();
-
 #if DEBUG
                 _objectTypeStatDict[type] = 0;
 #endif
@@ -41,7 +40,12 @@ namespace MessageBroker.Common.Pooling
 
             var bag = _objectTypeDict[type];
 
-            if (bag.TryDequeue(out var o)) return (T) o;
+            if (bag.TryDequeue(out var o))
+            {
+                var i = (T) o;
+                i.SetPooledStatus(false);
+                return i;
+            };
 
 #if DEBUG
             _objectTypeStatDict[type] += 1;
@@ -50,10 +54,12 @@ namespace MessageBroker.Common.Pooling
             return new T();
         }
 
-        public void Return<T>(T o)
+        public void Return<T>(T o) where T: IPooledObject
         {
             var type = typeof(T);
 
+            o.SetPooledStatus(true);
+            
             _objectTypeDict[type].Enqueue(o);
         }
 

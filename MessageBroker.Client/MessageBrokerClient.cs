@@ -6,6 +6,7 @@ using MessageBroker.Client.QueueManagement;
 using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Models;
+using MessageBroker.Models.BinaryPayload;
 using MessageBroker.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 

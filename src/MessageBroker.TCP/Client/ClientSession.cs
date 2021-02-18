@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
+using MessageBroker.Socket.SocketWrapper;
 
 namespace MessageBroker.Socket.Client
 {
@@ -12,7 +13,7 @@ namespace MessageBroker.Socket.Client
     {
         private readonly IBinaryDataProcessor _binaryDataProcessor;
         private bool _connected;
-        private System.Net.Sockets.Socket _socket;
+        private ITcpSocket _socket;
         private ISocketDataProcessor _socketDataProcessor;
 
         private ISocketEventProcessor _socketEventProcessor;
@@ -26,7 +27,7 @@ namespace MessageBroker.Socket.Client
 
         public Guid Id { get; }
 
-        public void Use(System.Net.Sockets.Socket socket)
+        public void Use(ITcpSocket socket)
         {
             _socket = socket;
             _connected = true;
@@ -59,7 +60,6 @@ namespace MessageBroker.Socket.Client
             _connected = false;
 
             _socket.Close();
-            _socket.Dispose();
 
             _socketEventProcessor.ClientDisconnected(this);
         }
@@ -89,7 +89,7 @@ namespace MessageBroker.Socket.Client
         {
             var receiveBuffer = ArrayPool<byte>.Shared.Rent(BinaryProtocolConfiguration.ReceiveDataSize);
 
-            var receivedSize = await _socket.ReceiveAsync(receiveBuffer, SocketFlags.None);
+            var receivedSize = await _socket.ReceiveAsync(receiveBuffer);
 
             if (receivedSize == 0)
             {
@@ -126,7 +126,7 @@ namespace MessageBroker.Socket.Client
             if (!_connected)
                 return false;
 
-            var sendSize = await _socket.SendAsync(payload, SocketFlags.None);
+            var sendSize = await _socket.SendAsync(payload);
 
             if (sendSize < payload.Length)
             {

@@ -4,18 +4,21 @@ using System.Text;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
+using MessageBroker.Models.BinaryPayload;
 
 namespace MessageBroker.Serialization
 {
     /// <summary>
     ///     BinarySerializeHelper is a utility class that provides method for serialize a payload to binary
     /// </summary>
-    public class BinarySerializeHelper : IDisposable
+    public class BinarySerializeHelper : IPooledObject, IDisposable
     {
         private byte[] _buffer;
         private int _currentBufferOffset;
         private Guid _id;
         private PayloadType _type;
+        
+        public bool IsReturnedToPool { get; private set; }
 
         public void Dispose()
         {
@@ -117,6 +120,11 @@ namespace MessageBroker.Serialization
                 ArrayPool<byte>.Shared.Return(_buffer);
                 _buffer = newBuffer;
             }
+        }
+
+        public void SetPooledStatus(bool isReturned)
+        {
+            IsReturnedToPool = isReturned;
         }
     }
 }

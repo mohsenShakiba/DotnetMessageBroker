@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Buffers;
+using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
 
 namespace MessageBroker.Core.Persistence.Messages.InMemoryStore
 {
-    public class InMemoryMessage
+    public class InMemoryMessage: IPooledObject
     {
         private byte[] _buffer;
 
@@ -14,7 +15,7 @@ namespace MessageBroker.Core.Persistence.Messages.InMemoryStore
         public string QueueName { get; private set; }
 
         public Memory<byte> Data => _buffer.AsMemory(0, _size);
-
+        public bool IsReturnedToPool { get; private set; }
 
         public void FillFrom(QueueMessage message, bool useDataInMessage = false)
         {
@@ -43,6 +44,11 @@ namespace MessageBroker.Core.Persistence.Messages.InMemoryStore
             Route = message.Route;
             QueueName = message.QueueName;
             _size = messageSize;
+        }
+
+        public void SetPooledStatus(bool isReturned)
+        {
+            IsReturnedToPool = isReturned;
         }
     }
 }

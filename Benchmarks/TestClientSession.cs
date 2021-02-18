@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using MessageBroker.Socket;
 using MessageBroker.Socket.Client;
+using MessageBroker.Socket.SocketWrapper;
 
 namespace Benchmarks
 {
@@ -13,6 +14,11 @@ namespace Benchmarks
         public void Use(Socket socket)
         {
             // do nothing
+        }
+
+        public void Use(ITcpSocket socket)
+        {
+            throw new NotImplementedException();
         }
 
         public void ForwardEventsTo(ISocketEventProcessor socketEventProcessor)

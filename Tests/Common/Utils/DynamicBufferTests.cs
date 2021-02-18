@@ -22,7 +22,7 @@ namespace Tests.Common.Utils
             for (var i = 0; i <= 1000; i++)
             {
                 var randomStringLength = random.Next(0, 100);
-                randomData.Add(RandomStringGenerator.Generate(randomStringLength, random));
+                randomData.Add(RandomGenerator.GenerateString(randomStringLength, random));
             }
 
             foreach (var randomItem in randomData)

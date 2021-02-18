@@ -5,6 +5,7 @@ using MessageBroker.Client.Models;
 using MessageBroker.Client.QueueConsumerCoordination;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Models;
+using MessageBroker.Models.BinaryPayload;
 using MessageBroker.Serialization;
 
 namespace MessageBroker.Client.QueueManagement

@@ -22,8 +22,8 @@ namespace Tests.Serialization
             var msg = new Message
             {
                 Id = Guid.NewGuid(),
-                Route = RandomStringGenerator.Generate(10),
-                Data = Encoding.UTF8.GetBytes(RandomStringGenerator.Generate(10))
+                Route = RandomGenerator.GenerateString(10),
+                Data = Encoding.UTF8.GetBytes(RandomGenerator.GenerateString(10))
             };
 
             var b = _serializer.Serialize(msg);
@@ -63,7 +63,7 @@ namespace Tests.Serialization
         public void TestSubscribeQueue()
         {
             var subscribeQueue = new SubscribeQueue
-                {Id = Guid.NewGuid(), QueueName = RandomStringGenerator.Generate(10)};
+                {Id = Guid.NewGuid(), QueueName = RandomGenerator.GenerateString(10)};
 
             var b = _serializer.Serialize(subscribeQueue);
 
@@ -77,7 +77,7 @@ namespace Tests.Serialization
         public void TestUnSubscribeQueue()
         {
             var unsubscribeQueue = new SubscribeQueue
-                {Id = Guid.NewGuid(), QueueName = RandomStringGenerator.Generate(10)};
+                {Id = Guid.NewGuid(), QueueName = RandomGenerator.GenerateString(10)};
 
             var b = _serializer.Serialize(unsubscribeQueue);
 
@@ -107,8 +107,8 @@ namespace Tests.Serialization
         {
             var queue = new QueueDeclare
             {
-                Id = Guid.NewGuid(), Name = RandomStringGenerator.Generate(10),
-                Route = RandomStringGenerator.Generate(10)
+                Id = Guid.NewGuid(), Name = RandomGenerator.GenerateString(10),
+                Route = RandomGenerator.GenerateString(10)
             };
 
             var b = _serializer.Serialize(queue);
@@ -123,7 +123,7 @@ namespace Tests.Serialization
         [Fact]
         public void TestQueueDelete()
         {
-            var queue = new QueueDelete {Id = Guid.NewGuid(), Name = RandomStringGenerator.Generate(10)};
+            var queue = new QueueDelete {Id = Guid.NewGuid(), Name = RandomGenerator.GenerateString(10)};
 
             var b = _serializer.Serialize(queue);
 
@@ -136,7 +136,7 @@ namespace Tests.Serialization
         [Fact]
         public void TestError()
         {
-            var error = new Error {Id = Guid.NewGuid(), Message = RandomStringGenerator.Generate(10)};
+            var error = new Error {Id = Guid.NewGuid(), Message = RandomGenerator.GenerateString(10)};
 
             var b = _serializer.Serialize(error);
 

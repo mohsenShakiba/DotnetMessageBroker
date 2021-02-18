@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Common.Logging;
 using MessageBroker.Socket.Client;
+using MessageBroker.Socket.SocketWrapper;
 
 namespace MessageBroker.Client.ConnectionManager
 {
@@ -135,7 +136,8 @@ namespace MessageBroker.Client.ConnectionManager
             _clientSession.ForwardEventsTo(this);
             _clientSession.ForwardDataTo(_receiveDataProcessor);
 
-            _clientSession.Use(_socket);
+            var tcpSocket = new TcpSocket(_socket);
+            _clientSession.Use(tcpSocket);
 
             _connectionReady = true;
         }

@@ -8,14 +8,15 @@ using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.SessionPolicy;
 using MessageBroker.Models;
+using MessageBroker.Models.BinaryPayload;
 using MessageBroker.Serialization;
 
 namespace MessageBroker.Core.Queues
 {
     public class Queue : IQueue, IDisposable
     {
-        private readonly MessageDispatcher _dispatcher;
         private readonly IMessageStore _messageStore;
+        private readonly ISendQueueStore _sendQueueStore;
         private readonly Channel<Guid> _queue;
         private readonly IRouteMatcher _routeMatcher;
         private readonly ISerializer _serializer;
@@ -23,12 +24,12 @@ namespace MessageBroker.Core.Queues
 
         private bool _stopped;
 
-        public Queue(MessageDispatcher dispatcher, ISessionPolicy sessionPolicy,
-            IMessageStore messageStore, IRouteMatcher routeMatcher, ISerializer serializer)
+        public Queue(ISessionPolicy sessionPolicy,
+            IMessageStore messageStore, ISendQueueStore sendQueueStore, IRouteMatcher routeMatcher, ISerializer serializer)
         {
-            _dispatcher = dispatcher;
             _sessionPolicy = sessionPolicy;
             _messageStore = messageStore;
+            _sendQueueStore = sendQueueStore;
             _routeMatcher = routeMatcher;
             _serializer = serializer;
             _queue = Channel.CreateUnbounded<Guid>();
@@ -126,32 +127,23 @@ namespace MessageBroker.Core.Queues
         {
             var sessionId = _sessionPolicy.GetNextSession();
 
-            if (sessionId.HasValue)
+            if (sessionId.HasValue && _sendQueueStore.TryGet(sessionId.Value, out var sendQueue))
             {
-                var queueMessage = ObjectPool.Shared.Rent<MessagePayload>();
-
-                if (!queueMessage.HasSetupStatusChangeListener)
-                {
-                    queueMessage.OnStatusChanged += OnMessageStatusChanged;
-                    queueMessage.StatusChangeListenerIsSet();
-                }
-
-                queueMessage.Setup(serializedPayload);
-
-                _dispatcher.Dispatch(queueMessage, sessionId.Value);
+                serializedPayload.ClearStatusListener();
+                serializedPayload.OnStatusChanged += OnMessageStatusChanged;
+                
+                sendQueue.Enqueue(serializedPayload);
             }
-
-            ;
         }
 
-        private void OnMessageStatusChanged(Guid messageId, MessagePayloadStatus payloadStatus)
+        private void OnMessageStatusChanged(Guid messageId, SerializedPayloadStatusUpdate payloadStatusUpdate)
         {
-            switch (payloadStatus)
+            switch (payloadStatusUpdate)
             {
-                case MessagePayloadStatus.Ack:
+                case SerializedPayloadStatusUpdate.Ack:
                     OnMessageAck(messageId);
                     break;
-                case MessagePayloadStatus.Nack:
+                case SerializedPayloadStatusUpdate.Nack:
                     OnMessageNack(messageId);
                     break;
             }

@@ -11,16 +11,16 @@ namespace MessageBroker.Core
 {
     public class Coordinator : ISocketEventProcessor, ISocketDataProcessor
     {
-        private readonly MessageDispatcher _messageDispatcher;
+        private readonly ISendQueueStore _sendQueueStore;
         private readonly IMessageStore _messageStore;
         private readonly IQueueStore _queueStore;
         private readonly ISerializer _serializer;
 
-        public Coordinator(ISerializer serializer, MessageDispatcher messageDispatcher, IQueueStore queueStore,
+        public Coordinator(ISerializer serializer, ISendQueueStore sendQueueStore, IQueueStore queueStore,
             IMessageStore messageStore)
         {
             _serializer = serializer;
-            _messageDispatcher = messageDispatcher;
+            _sendQueueStore = sendQueueStore;
             _queueStore = queueStore;
             _messageStore = messageStore;
         }
@@ -70,13 +70,14 @@ namespace MessageBroker.Core
             catch (Exception e)
             {
                 Logger.LogError($"An error occured while trying to dispatch messages, error: {e}");
+                SendReceivePayloadError(sessionId, Guid.Empty, "An error occured while trying to process payload");
             }
         }
 
         public void ClientConnected(IClientSession clientSession)
         {
             Logger.LogInformation("client session connected, added send queue");
-            _messageDispatcher.AddSession(clientSession);
+            _sendQueueStore.Add(clientSession);
         }
 
         public void ClientDisconnected(IClientSession clientSession)
@@ -86,7 +87,7 @@ namespace MessageBroker.Core
             foreach (var queue in _queueStore.GetAll())
                 queue.SessionDisconnected(clientSession.Id);
 
-            _messageDispatcher.RemoveSession(clientSession);
+            _sendQueueStore.Remove(clientSession);
         }
 
         public void Setup()
@@ -111,12 +112,14 @@ namespace MessageBroker.Core
 
         public void OnMessageAck(Guid sessionId, Ack ack)
         {
-            _messageDispatcher.OnMessageAck(ack.Id, sessionId);
+            if (_sendQueueStore.TryGet(sessionId, out var sendQueue))
+                sendQueue.OnMessageAckReceived(ack.Id);
         }
 
         public void OnMessageNack(Guid sessionId, Nack nack)
         {
-            _messageDispatcher.OnMessageNack(nack.Id, sessionId);
+            if (_sendQueueStore.TryGet(sessionId, out var sendQueue))
+                sendQueue.OnMessageNackReceived(nack.Id);
         }
 
         public void OnSubscribeQueue(Guid sessionId, SubscribeQueue subscribeQueue)
@@ -179,37 +182,37 @@ namespace MessageBroker.Core
 
         private void OnConfigureSubscription(Guid sessionId, ConfigureSubscription configureSubscription)
         {
-            _messageDispatcher.ConfigureSubscription(
-                sessionId,
-                configureSubscription.Concurrency,
-                configureSubscription.AutoAck);
-
-            SendReceivedPayloadAck(sessionId, configureSubscription.Id);
+            if (_sendQueueStore.TryGet(sessionId, out var sendQueue))
+            {
+                sendQueue.Configure(configureSubscription.Concurrency, configureSubscription.AutoAck);
+                SendReceivedPayloadAck(sessionId, configureSubscription.Id);
+            }
         }
 
         private void SendReceivedPayloadAck(Guid sessionId, Guid payloadId)
         {
-            var ack = new Ok
+            if (_sendQueueStore.TryGet(sessionId, out var sendQueue))
             {
-                Id = payloadId
-            };
-
-            var sendPayload = _serializer.Serialize(ack);
-
-            _messageDispatcher.Dispatch(sendPayload, sessionId);
+                var ok = new Ok
+                {
+                    Id = payloadId
+                };
+                var sendPayload = _serializer.Serialize(ok);
+                sendQueue.Enqueue(sendPayload);
+            }
         }
 
         private void SendReceivePayloadError(Guid sessionId, Guid payloadId, string message)
         {
-            var nack = new Error
+            if (_sendQueueStore.TryGet(sessionId, out var sendQueue))
             {
-                Id = payloadId,
-                Message = message
-            };
-
-            var sendPayload = _serializer.Serialize(nack);
-
-            _messageDispatcher.Dispatch(sendPayload, sessionId);
+                var error = new Error
+                {
+                    Id = payloadId
+                };
+                var sendPayload = _serializer.Serialize(error);
+                sendQueue.Enqueue(sendPayload);
+            }
         }
     }
 }

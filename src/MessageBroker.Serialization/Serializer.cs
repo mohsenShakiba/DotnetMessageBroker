@@ -2,11 +2,15 @@
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
+using MessageBroker.Models.BinaryPayload;
 
 namespace MessageBroker.Serialization
 {
-    public class Serializer : ISerializer
+    public class Serializer :  IPooledObject, ISerializer
     {
+        
+        public bool IsReturnedToPool { get; private set; }
+
         public PayloadType ParsePayloadType(Memory<byte> b)
         {
             var messageType =
@@ -397,5 +401,10 @@ namespace MessageBroker.Serialization
         }
 
         #endregion
+
+        public void SetPooledStatus(bool isReturned)
+        {
+            IsReturnedToPool = isReturned;
+        }
     }
 }
