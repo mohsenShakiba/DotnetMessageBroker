@@ -7,7 +7,7 @@
 
         public static SendAsyncResult AlreadyCompleted => new()
         {
-            IsSuccess = false,
+            IsSuccess = true,
             InternalErrorCode = "Already completed, cannot re-process"
         };
     }

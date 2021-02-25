@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using MessageBroker.Socket;
-using MessageBroker.Socket.Client;
-using MessageBroker.Socket.SocketWrapper;
+using MessageBroker.TCP;
+using MessageBroker.TCP.Client;
+using MessageBroker.TCP.SocketWrapper;
 
 namespace Benchmarks
 {

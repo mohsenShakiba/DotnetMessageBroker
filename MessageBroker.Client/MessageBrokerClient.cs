@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using MessageBroker.Client.ConnectionManager;
+using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.QueueManagement;
 using MessageBroker.Client.ReceiveDataProcessing;
@@ -41,7 +41,7 @@ namespace MessageBroker.Client
             _connectionManager.Disconnect();
         }
 
-        public IQueueManager GetQueueConsumer(string name, string route)
+        public IQueueManager GetQueueManager(string name, string route)
         {
             var queueManager = _serviceProvider.GetRequiredService<IQueueManager>();
             queueManager.Setup(name, route);

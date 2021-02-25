@@ -6,6 +6,7 @@ namespace MessageBroker.Core.SessionPolicy
     {
         void AddSession(Guid sessionId);
         void RemoveSession(Guid sessionId);
+        bool HasSession();
         Guid? GetNextSession();
     }
 }

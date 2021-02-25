@@ -2,11 +2,11 @@
 using System.Net;
 using System.Net.Sockets;
 using MessageBroker.Common.Logging;
-using MessageBroker.Socket.Client;
-using MessageBroker.Socket.SocketWrapper;
+using MessageBroker.TCP.Client;
+using MessageBroker.TCP.SocketWrapper;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace MessageBroker.Socket.Server
+namespace MessageBroker.TCP.Server
 {
     /// <summary>
     ///     TCP implementation of ISocketServer

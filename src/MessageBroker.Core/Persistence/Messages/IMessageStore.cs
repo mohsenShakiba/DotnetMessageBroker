@@ -7,9 +7,9 @@ namespace MessageBroker.Core.Persistence.Messages
     public interface IMessageStore
     {
         void Setup();
-        void InsertAsync(QueueMessage message);
+        void Add(QueueMessage message);
         bool TryGetValue(Guid id, out QueueMessage message);
-        void DeleteAsync(Guid id);
+        void Delete(Guid id);
         IEnumerable<Guid> PendingMessages(int count);
     }
 }

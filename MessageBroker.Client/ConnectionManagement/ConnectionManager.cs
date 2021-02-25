@@ -1,30 +1,23 @@
 ﻿using System;
 using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
 using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Common.Logging;
-using MessageBroker.Socket.Client;
-using MessageBroker.Socket.SocketWrapper;
+using MessageBroker.TCP.Client;
+using MessageBroker.TCP.SocketWrapper;
 
-namespace MessageBroker.Client.ConnectionManager
+namespace MessageBroker.Client.ConnectionManagement
 {
     public class ConnectionManager : IConnectionManager
     {
         private readonly IClientSession _clientSession;
         private readonly IReceiveDataProcessor _receiveDataProcessor;
 
-        private readonly System.Net.Sockets.Socket _socket;
-        private bool _closed;
-
         private SocketConnectionConfiguration _configuration;
+        private ITcpSocket _tcpSocket;
+        private bool _closed;
         private bool _connectionReady;
-
-
-        public ConnectionManager(IClientSession clientSession, IReceiveDataProcessor receiveDataProcessor)
-        {
-            _socket = new System.Net.Sockets.Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            _clientSession = clientSession;
-            _receiveDataProcessor = receiveDataProcessor;
-        }
 
         public IClientSession ClientSession
         {
@@ -40,6 +33,28 @@ namespace MessageBroker.Client.ConnectionManager
             }
         }
 
+        public bool Connected => _connectionReady;
+
+
+        public ConnectionManager(IClientSession clientSession, IReceiveDataProcessor receiveDataProcessor)
+        {
+            _clientSession = clientSession;
+            _receiveDataProcessor = receiveDataProcessor;
+            
+            SetDefaultTcpSocket();
+        }
+
+        private void SetDefaultTcpSocket()
+        {
+            var tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            _tcpSocket = new TcpSocket(tcpSocket);
+        }
+
+        public void SetAlternativeTcpSocketForTesting(ITcpSocket tcpSocket)
+        {
+            _tcpSocket = tcpSocket;
+        }
+
         public void Connect(SocketConnectionConfiguration configuration)
         {
             _ = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -51,7 +66,7 @@ namespace MessageBroker.Client.ConnectionManager
 
         public void Reconnect()
         {
-            if (_socket.Connected)
+            if (_tcpSocket.Connected)
             {
                 Logger.LogWarning("socket, already connected");
                 return;
@@ -73,7 +88,7 @@ namespace MessageBroker.Client.ConnectionManager
 
         public void Disconnect()
         {
-            _socket.Disconnect(true);
+            _tcpSocket.Disconnect(true);
             _clientSession.Close();
             _closed = true;
         }
@@ -99,13 +114,13 @@ namespace MessageBroker.Client.ConnectionManager
                     if (_closed)
                         throw new Exception("ConnectionManager is closed");
 
-                    if (_socket.Connected)
+                    if (_tcpSocket.Connected)
                     {
                         Logger.LogWarning("failed to reconnect, socket already connected");
                         return;
                     }
 
-                    _socket.Connect(_configuration.IpEndPoint);
+                    _tcpSocket.Connect(_configuration.IpEndPoint);
 
                     OnConnected();
 
@@ -117,6 +132,8 @@ namespace MessageBroker.Client.ConnectionManager
 
                     if (!_configuration.RetryOnFailure)
                         break;
+
+                    Thread.Sleep(100);
 
                     throw;
                 }
@@ -135,9 +152,7 @@ namespace MessageBroker.Client.ConnectionManager
 
             _clientSession.ForwardEventsTo(this);
             _clientSession.ForwardDataTo(_receiveDataProcessor);
-
-            var tcpSocket = new TcpSocket(_socket);
-            _clientSession.Use(tcpSocket);
+            _clientSession.Use(_tcpSocket);
 
             _connectionReady = true;
         }

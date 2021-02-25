@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
-using MessageBroker.Socket.SocketWrapper;
+using MessageBroker.TCP.SocketWrapper;
 
-namespace MessageBroker.Socket.Client
+namespace MessageBroker.TCP.Client
 {
     public interface IClientSession
     {

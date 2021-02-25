@@ -6,17 +6,12 @@ namespace MessageBroker.Models
     /// <summary>
     ///     the message contains data that is sent by publisher and received by subscriber
     /// </summary>
-    public ref struct Message
+    public struct Message
     {
         public Guid Id { get; set; }
         public string Route { get; init; }
         public Memory<byte> Data { get; init; }
         public byte[] OriginalMessageData { get; init; }
-
-        public void SetNewId()
-        {
-            Id = Guid.NewGuid();
-        }
 
         public QueueMessage ToQueueMessage(string queueName)
         {
@@ -34,7 +29,8 @@ namespace MessageBroker.Models
 
         public void Dispose()
         {
-            ArrayPool<byte>.Shared.Return(OriginalMessageData);
+            if (OriginalMessageData is not null)
+                ArrayPool<byte>.Shared.Return(OriginalMessageData);
         }
     }
 }

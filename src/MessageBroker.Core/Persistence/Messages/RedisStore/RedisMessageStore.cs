@@ -28,13 +28,13 @@ namespace MessageBroker.Core.Persistence.Messages.RedisStore
             foreach (var messageData in messages)
             {
                 var message = Deserialize((byte[]) messageData);
-                _inMemoryMessageStore.InsertAsync(message);
+                _inMemoryMessageStore.Add(message);
             }
         }
 
-        public void InsertAsync(QueueMessage message)
+        public void Add(QueueMessage message)
         {
-            _inMemoryMessageStore.InsertAsync(message);
+            _inMemoryMessageStore.Add(message);
             var connection = _redisConnectionProvider.Get();
             var serializedMessage = Serialize(message);
             connection.GetDatabase().SetAdd(MessageRedisKey, serializedMessage);
@@ -45,7 +45,7 @@ namespace MessageBroker.Core.Persistence.Messages.RedisStore
             return _inMemoryMessageStore.TryGetValue(id, out message);
         }
 
-        public void DeleteAsync(Guid id)
+        public void Delete(Guid id)
         {
             if (_inMemoryMessageStore.TryGetValue(id, out var message))
             {
@@ -53,7 +53,7 @@ namespace MessageBroker.Core.Persistence.Messages.RedisStore
                 var serializedMessage = Serialize(message);
                 connection.GetDatabase().SetRemove(MessageRedisKey, serializedMessage);
 
-                _inMemoryMessageStore.DeleteAsync(id);
+                _inMemoryMessageStore.Delete(id);
                 message.Dispose();
             }
         }

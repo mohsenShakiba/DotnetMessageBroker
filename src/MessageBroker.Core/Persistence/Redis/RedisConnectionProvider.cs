@@ -16,5 +16,6 @@ namespace MessageBroker.Core.Persistence.Redis
         {
             return _connection ??= ConnectionMultiplexer.Connect(_urlConnection);
         }
+
     }
 }

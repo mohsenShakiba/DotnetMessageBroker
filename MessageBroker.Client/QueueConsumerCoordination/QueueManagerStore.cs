@@ -4,11 +4,11 @@ using MessageBroker.Models;
 
 namespace MessageBroker.Client.QueueConsumerCoordination
 {
-    public class QueueConsumerCoordinator : IQueueConsumerCoordinator
+    public class QueueManagerStore : IQueueManagerStore
     {
         private readonly ConcurrentDictionary<string, QueueManager> _queueDict;
 
-        public QueueConsumerCoordinator()
+        public QueueManagerStore()
         {
             _queueDict = new ConcurrentDictionary<string, QueueManager>();
         }

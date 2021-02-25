@@ -5,16 +5,16 @@ using System.Threading;
 
 namespace MessageBroker.Core.SessionPolicy
 {
-    public class RandomSessionPolicy : ISessionPolicy
+    public class RoundRobinSessionPolicy : ISessionPolicy
     {
-        private readonly List<Guid> _hashTable;
-        private readonly Random _random;
+        private readonly List<Guid> _sessions;
         private readonly ReaderWriterLockSlim _wrLock;
 
-        public RandomSessionPolicy()
+        private int _currentIndex;
+
+        public RoundRobinSessionPolicy()
         {
-            _hashTable = new List<Guid>();
-            _random = new Random();
+            _sessions = new List<Guid>();
             _wrLock = new ReaderWriterLockSlim();
         }
 
@@ -23,7 +23,11 @@ namespace MessageBroker.Core.SessionPolicy
             try
             {
                 _wrLock.EnterWriteLock();
-                _hashTable.Add(sessionId);
+                
+                if (_sessions.Contains(sessionId))
+                    throw new Exception("The session already exists");
+                
+                _sessions.Add(sessionId);
             }
             finally
             {
@@ -31,16 +35,34 @@ namespace MessageBroker.Core.SessionPolicy
             }
         }
 
+        public bool HasSession()
+        {
+            try
+            {
+                _wrLock.EnterReadLock();
+
+                return _sessions.Any();
+            }
+            finally
+            {
+                _wrLock.ExitReadLock();
+            } 
+        }
+
         public Guid? GetNextSession()
         {
             try
             {
                 _wrLock.EnterReadLock();
-                if (_hashTable.Count == 0)
+                if (_sessions.Count == 0)
                     return null;
 
-                var randomIndex = _random.Next(0, _hashTable.Count());
-                var guid = _hashTable[randomIndex];
+                if (_currentIndex >= _sessions.Count)
+                {
+                    _currentIndex = 0;
+                }
+                
+                var guid = _sessions[_currentIndex++];
                 return guid;
             }
             finally
@@ -54,7 +76,7 @@ namespace MessageBroker.Core.SessionPolicy
             try
             {
                 _wrLock.EnterWriteLock();
-                _hashTable.Remove(sessionId);
+                _sessions.Remove(sessionId);
             }
             finally
             {

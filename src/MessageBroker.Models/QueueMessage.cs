@@ -3,7 +3,7 @@ using System.Buffers;
 
 namespace MessageBroker.Models
 {
-    public ref struct QueueMessage
+    public struct QueueMessage
     {
         public Guid Id { get; init; }
         public string QueueName { get; init; }
@@ -16,4 +16,5 @@ namespace MessageBroker.Models
             ArrayPool<byte>.Shared.Return(OriginalMessageData);
         }
     }
+
 }

@@ -2,6 +2,6 @@
 {
     public interface IRouteMatcher
     {
-        bool Match(string messageRoute, string subscriberRoute);
+        bool Match(string messageRoute, string queueRoute);
     }
 }

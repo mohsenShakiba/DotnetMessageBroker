@@ -1,7 +1,7 @@
 ﻿using System;
-using MessageBroker.Socket.Client;
+using MessageBroker.TCP.Client;
 
-namespace MessageBroker.Socket
+namespace MessageBroker.TCP
 {
     public interface ISocketEventProcessor
     {

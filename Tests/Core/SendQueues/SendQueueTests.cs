@@ -6,8 +6,7 @@ using MessageBroker.Core.Queues;
 using MessageBroker.Models;
 using MessageBroker.Models.BinaryPayload;
 using MessageBroker.Serialization;
-using MessageBroker.Socket.Client;
-using MessageBroker.Socket.SocketWrapper;
+using MessageBroker.TCP.Client;
 using Moq;
 using Tests.Classes;
 using Xunit;
@@ -21,8 +20,8 @@ namespace Tests.Core
         {
             var clientSession = new Mock<IClientSession>();
             
-            var serializedMessagePayload = RandomGenerator.SerializedPayload(10, PayloadType.Msg);
-            var serializedNonMessagePayload = RandomGenerator.SerializedPayload(10, PayloadType.Ok);
+            var serializedMessagePayload = RandomGenerator.SerializedPayload(PayloadType.Msg);
+            var serializedNonMessagePayload = RandomGenerator.SerializedPayload(PayloadType.Ok);
             
             var sendQueue = new SendQueue(clientSession.Object);
             
@@ -31,7 +30,7 @@ namespace Tests.Core
             sendQueue.Enqueue(serializedMessagePayload);
             sendQueue.Enqueue(serializedNonMessagePayload);
             
-            Thread.Sleep(100);
+            Thread.Sleep(1000);
             
             clientSession.Verify(s => s.SendAsync(serializedMessagePayload.Data));
             clientSession.Verify(s => s.SendAsync(serializedNonMessagePayload.Data));

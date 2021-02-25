@@ -1,14 +1,14 @@
-﻿using MessageBroker.Socket;
-using MessageBroker.Socket.Client;
+﻿using MessageBroker.TCP;
+using MessageBroker.TCP.Client;
 
-namespace MessageBroker.Client.ConnectionManager
+namespace MessageBroker.Client.ConnectionManagement
 {
     public interface IConnectionManager : ISocketEventProcessor
     {
         public IClientSession ClientSession { get; }
+        public bool Connected { get; }
 
         void Connect(SocketConnectionConfiguration configuration);
-        void Reconnect();
         void Disconnect();
     }
 }

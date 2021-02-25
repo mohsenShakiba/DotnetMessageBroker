@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Buffers;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
-using MessageBroker.Socket.SocketWrapper;
+using MessageBroker.TCP.SocketWrapper;
 
-namespace MessageBroker.Socket.Client
+namespace MessageBroker.TCP.Client
 {
     public class ClientSession : IClientSession
     {

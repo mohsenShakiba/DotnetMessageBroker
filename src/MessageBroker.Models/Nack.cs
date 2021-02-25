@@ -5,7 +5,7 @@ namespace MessageBroker.Models
     /// <summary>
     ///     indicating the payload process failed
     /// </summary>
-    public ref struct Nack
+    public struct Nack
     {
         public Guid Id { get; init; }
     }

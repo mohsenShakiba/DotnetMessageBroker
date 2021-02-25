@@ -8,18 +8,17 @@ namespace MessageBroker.Client.ReceiveDataProcessing
 {
     public class ReceiveDataProcessor : IReceiveDataProcessor
     {
-        private readonly IQueueConsumerCoordinator _queueConsumerCoordinator;
+        private readonly IQueueManagerStore _queueManagerStore;
         private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
         private readonly ISerializer _serializer;
 
         public ReceiveDataProcessor(ISerializer serializer,
-            IQueueConsumerCoordinator queueConsumerCoordinator, ISendPayloadTaskManager sendPayloadTaskManager)
+            IQueueManagerStore queueManagerStore, ISendPayloadTaskManager sendPayloadTaskManager)
         {
             _serializer = serializer;
-            _queueConsumerCoordinator = queueConsumerCoordinator;
+            _queueManagerStore = queueManagerStore;
             _sendPayloadTaskManager = sendPayloadTaskManager;
         }
-
 
         public void DataReceived(Guid sessionId, Memory<byte> data)
         {
@@ -44,7 +43,7 @@ namespace MessageBroker.Client.ReceiveDataProcessing
         private void OnMessage(Memory<byte> payloadData)
         {
             var queueMessage = _serializer.ToQueueMessage(payloadData);
-            _queueConsumerCoordinator.OnMessage(queueMessage);
+            _queueManagerStore.OnMessage(queueMessage);
         }
 
         private void OnOk(Memory<byte> payloadData)

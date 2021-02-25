@@ -2,7 +2,7 @@
 
 namespace MessageBroker.Models
 {
-    public ref struct Ok
+    public struct Ok
     {
         public Guid Id { get; init; }
     }

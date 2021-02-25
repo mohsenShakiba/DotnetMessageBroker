@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
-using MessageBroker.Client.ConnectionManager;
+using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.QueueConsumerCoordination;
 using MessageBroker.Client.TaskManager;
@@ -13,21 +13,17 @@ namespace MessageBroker.Client.QueueManagement
     public class QueueManager : IQueueManager
     {
         private readonly IConnectionManager _connectionManager;
-        private readonly IQueueConsumerCoordinator _queueConsumerCoordinator;
+        private readonly IQueueManagerStore _queueManagerStore;
         private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
         private readonly ISerializer _serializer;
 
-
-        private bool _queueDeclared;
-        private bool _queueSubscribed;
-
         public QueueManager(ISerializer serializer, IConnectionManager connectionManager,
-            ISendPayloadTaskManager sendPayloadTaskManager, IQueueConsumerCoordinator queueConsumerCoordinator)
+            ISendPayloadTaskManager sendPayloadTaskManager, IQueueManagerStore queueManagerStore)
         {
             _serializer = serializer;
             _connectionManager = connectionManager;
             _sendPayloadTaskManager = sendPayloadTaskManager;
-            _queueConsumerCoordinator = queueConsumerCoordinator;
+            _queueManagerStore = queueManagerStore;
         }
 
         public string Name { get; private set; }
@@ -40,19 +36,14 @@ namespace MessageBroker.Client.QueueManagement
         {
             Route = route;
             Name = name;
-            _queueConsumerCoordinator.Add(this);
+            _queueManagerStore.Add(this);
         }
 
         public async Task<SendAsyncResult> DeclareQueue()
         {
-            if (_queueDeclared)
-                return SendAsyncResult.AlreadyCompleted;
+            var serializedPayload = QueueDeclareSerializedPayload();
 
-            var sendPayload = QueueDeclareSendPayload();
-
-            var result = await SendAsync(sendPayload);
-
-            if (result.IsSuccess) _queueDeclared = true;
+            var result = await SendAsync(serializedPayload);
 
             return result;
         }
@@ -63,41 +54,23 @@ namespace MessageBroker.Client.QueueManagement
 
             var result = await SendAsync(sendPayload);
 
-            if (result.IsSuccess)
-            {
-                _queueDeclared = false;
-                _queueSubscribed = false;
-            }
-
             return result;
         }
 
         public async Task<SendAsyncResult> SubscribeQueue()
         {
-            if (_queueSubscribed)
-                return SendAsyncResult.AlreadyCompleted;
-
             var sendPayload = SubscribeSendPayload();
 
             var result = await SendAsync(sendPayload);
-
-            if (result.IsSuccess)
-                _queueSubscribed = true;
 
             return result;
         }
 
         public async Task<SendAsyncResult> UnSubscribeQueue()
         {
-            if (!_queueSubscribed)
-                return SendAsyncResult.AlreadyCompleted;
-
             var sendPayload = UnSubscribeSendPayload();
 
             var result = await SendAsync(sendPayload);
-
-            if (result.IsSuccess)
-                _queueSubscribed = false;
 
             return result;
         }
@@ -118,7 +91,7 @@ namespace MessageBroker.Client.QueueManagement
             return await sendPayloadTask;
         }
 
-        private SerializedPayload QueueDeclareSendPayload()
+        private SerializedPayload QueueDeclareSerializedPayload()
         {
             var payload = new QueueDeclare
             {

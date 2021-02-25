@@ -38,7 +38,7 @@ namespace MessageBroker.Core.Persistence.Queues
             return queue != null;
         }
 
-        public void Remove(string name)
+        public void Delete(string name)
         {
             var queueToRemove = _queues.FirstOrDefault(q => q.Name == name);
 

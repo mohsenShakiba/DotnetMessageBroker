@@ -23,7 +23,7 @@ namespace Tests.Classes
             return Encoding.UTF8.GetBytes(GenerateString(length, random));
         }
 
-        public static SerializedPayload SerializedPayload(int dataSize = 10, PayloadType type = PayloadType.Msg)
+        public static SerializedPayload SerializedPayload(PayloadType type = PayloadType.Msg, int dataSize = 10)
         {
             var sp = ObjectPool.Shared.Rent<SerializedPayload>();
             sp.FillFrom(GenerateBytes(dataSize), dataSize, Guid.NewGuid(), type);

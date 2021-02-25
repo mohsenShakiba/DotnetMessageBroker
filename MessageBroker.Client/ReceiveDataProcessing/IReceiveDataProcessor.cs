@@ -1,4 +1,4 @@
-﻿using MessageBroker.Socket;
+﻿using MessageBroker.TCP;
 
 namespace MessageBroker.Client.ReceiveDataProcessing
 {

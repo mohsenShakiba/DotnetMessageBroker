@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Common.Logging;
@@ -25,7 +26,8 @@ namespace MessageBroker.Core.Queues
         private bool _stopped;
 
         public Queue(ISessionPolicy sessionPolicy,
-            IMessageStore messageStore, ISendQueueStore sendQueueStore, IRouteMatcher routeMatcher, ISerializer serializer)
+            IMessageStore messageStore, ISendQueueStore sendQueueStore, IRouteMatcher routeMatcher,
+            ISerializer serializer)
         {
             _sessionPolicy = sessionPolicy;
             _messageStore = messageStore;
@@ -59,7 +61,7 @@ namespace MessageBroker.Core.Queues
             var queueMessage = message.ToQueueMessage(Name);
 
             // persist the message
-            _messageStore.InsertAsync(queueMessage);
+            _messageStore.Add(queueMessage);
 
             // add the message to queue chan
             _queue.Writer.TryWrite(queueMessage.Id);
@@ -104,9 +106,16 @@ namespace MessageBroker.Core.Queues
                     if (_stopped)
                         return;
 
+                    if (!_sessionPolicy.HasSession())
+                    {
+                        await Task.Delay(100);
+                        continue;
+                    }
+
                     var messageIds = _queue.Reader.ReadAllAsync();
 
-                    await foreach (var messageId in messageIds) ProcessMessage(messageId);
+                    await foreach (var messageId in messageIds) 
+                        ProcessMessage(messageId);
                 }
             }, TaskCreationOptions.LongRunning);
         }
@@ -127,11 +136,17 @@ namespace MessageBroker.Core.Queues
         {
             var sessionId = _sessionPolicy.GetNextSession();
 
-            if (sessionId.HasValue && _sendQueueStore.TryGet(sessionId.Value, out var sendQueue))
+            if (!sessionId.HasValue)
+            {
+                OnMessageNack(serializedPayload.Id);
+                return;
+            }
+
+            if (_sendQueueStore.TryGet(sessionId.Value, out var sendQueue))
             {
                 serializedPayload.ClearStatusListener();
                 serializedPayload.OnStatusChanged += OnMessageStatusChanged;
-                
+
                 sendQueue.Enqueue(serializedPayload);
             }
         }
@@ -151,7 +166,7 @@ namespace MessageBroker.Core.Queues
 
         private void OnMessageAck(Guid messageId)
         {
-            _messageStore.DeleteAsync(messageId);
+            _messageStore.Delete(messageId);
         }
 
         private void OnMessageNack(Guid messageId)

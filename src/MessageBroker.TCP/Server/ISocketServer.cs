@@ -1,6 +1,6 @@
 ﻿using System.Net;
 
-namespace MessageBroker.Socket.Server
+namespace MessageBroker.TCP.Server
 {
     public interface ISocketServer
     {

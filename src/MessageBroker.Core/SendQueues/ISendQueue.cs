@@ -1,6 +1,6 @@
 ﻿using System;
 using MessageBroker.Models.BinaryPayload;
-using MessageBroker.Socket.Client;
+using MessageBroker.TCP.Client;
 
 namespace MessageBroker.Core
 {

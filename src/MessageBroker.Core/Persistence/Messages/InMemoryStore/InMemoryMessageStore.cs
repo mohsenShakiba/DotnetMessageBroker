@@ -23,7 +23,7 @@ namespace MessageBroker.Core.Persistence.Messages.InMemoryStore
             // do nothing
         }
 
-        public void InsertAsync(QueueMessage message)
+        public void Add(QueueMessage message)
         {
             var inMemoryMessage = ObjectPool.Shared.Rent<InMemoryMessage>();
 
@@ -57,14 +57,14 @@ namespace MessageBroker.Core.Persistence.Messages.InMemoryStore
             return false;
         }
 
-        public void DeleteAsync(Guid id)
+        public void Delete(Guid id)
         {
             if (_store.TryRemove(id, out var persistedMessage)) ObjectPool.Shared.Return(persistedMessage);
         }
 
         public IEnumerable<Guid> PendingMessages(int count)
         {
-            return new Guid[0];
+            return _store.Keys;
         }
     }
 }

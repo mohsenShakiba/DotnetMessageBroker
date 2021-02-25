@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Buffers;
+using System.Net;
 using System.Threading.Tasks;
-using MessageBroker.Socket.SocketWrapper;
+using MessageBroker.TCP.SocketWrapper;
 using Xunit.Sdk;
 
 namespace Tests.Classes
@@ -12,16 +13,34 @@ namespace Tests.Classes
         private Memory<byte> _memory;
         private int _offset;
         private object _lock;
+
+        private bool _connected;
+        public bool AllowConnect { get; set; } = true;
         
         public TestTcpSocket()
         {
             _memory = ArrayPool<byte>.Shared.Rent(1024);
             _lock = new();
         }
-        
+
+        public bool Connected => _connected;
+
         public void Close()
         {
             // nothing
+        }
+
+        public void Connect(IPEndPoint ipEndPoint)
+        {
+            if (!AllowConnect)
+                throw new Exception("Socket cannot be connected at this time");
+            
+            _connected = true;
+        }
+
+        public void Disconnect(bool reuseSocket)
+        {
+            _connected = false;
         }
 
         public ValueTask<int> SendAsync(Memory<byte> data)

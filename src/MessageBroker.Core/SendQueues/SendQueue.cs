@@ -9,7 +9,7 @@ using MessageBroker.Core.Queues;
 using MessageBroker.Models;
 using MessageBroker.Models.BinaryPayload;
 using MessageBroker.Serialization;
-using MessageBroker.Socket.Client;
+using MessageBroker.TCP.Client;
 
 namespace MessageBroker.Core
 {

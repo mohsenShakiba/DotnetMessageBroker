@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using MessageBroker.Socket.Client;
+using MessageBroker.TCP.Client;
 
 namespace MessageBroker.Core
 {
@@ -15,9 +15,9 @@ namespace MessageBroker.Core
         }
         
 
-        public void Add(IClientSession clientSession)
+        public void Add(IClientSession clientSession, ISendQueue sendQueue = null)
         {
-            var sendQueue = new SendQueue(clientSession);
+            sendQueue ??= new SendQueue(clientSession);
             _sendQueues[clientSession.Id] = sendQueue;
         }
 
