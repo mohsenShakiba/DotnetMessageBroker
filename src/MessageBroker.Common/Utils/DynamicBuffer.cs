@@ -27,6 +27,11 @@ namespace MessageBroker.Common.Utils
             }
         }
 
+        public int Length()
+        {
+            return _end - _start;
+        }
+
         public void Write(Memory<byte> m)
         {
             ReorganizeBufferIfNeeded();
@@ -71,12 +76,12 @@ namespace MessageBroker.Common.Utils
             return m;
         }
 
-        public Span<byte> Read(int size)
+        public Memory<byte> Read(int size)
         {
             if (_start + size > _end)
                 throw new InvalidOperationException();
 
-            var m = _buffer.AsSpan(_start, size);
+            var m = _buffer.AsMemory(_start, size);
 
             return m;
         }

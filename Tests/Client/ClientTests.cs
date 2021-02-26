@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Client;
 using MessageBroker.Client.ConnectionManagement;
@@ -29,8 +27,9 @@ using MessageBroker.TCP.Client;
 using MessageBroker.TCP.Server;
 using Microsoft.Extensions.DependencyInjection;
 using Tests.Classes;
+using System.Linq;
+using MessageBroker.Common.Logging;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Tests.Client
 {
@@ -38,7 +37,7 @@ namespace Tests.Client
     {
 
         [Theory]
-        [InlineData(100, 10)]
+        [InlineData(1000, 10)]
         public async Task TestClientSimpleScenario(int messageCount, int nackRation)
         {
             
@@ -51,6 +50,7 @@ namespace Tests.Client
             var destination = new IPEndPoint(IPAddress.Loopback, 8000);
             var serverServiceProvider = GetServerServiceProvider();
             var clientServiceProvider = GetClientServiceProvider();
+            var clientServiceProvider2 = GetClientServiceProvider();
             var connectionConfiguration = new SocketConnectionConfiguration
             {
                 IpEndPoint = destination,
@@ -61,15 +61,19 @@ namespace Tests.Client
             var server = serverServiceProvider.GetRequiredService<ISocketServer>();
             server.Start(destination);
             
-            // setup client
-            var client = clientServiceProvider.GetRequiredService<MessageBrokerClient>();
-            client.Connect(connectionConfiguration);
+            // setup send client
+            var subscriberClient = clientServiceProvider.GetRequiredService<MessageBrokerClient>();
+            subscriberClient.Connect(connectionConfiguration, true);
+            
+            // setup receive client
+            var publisherClient = clientServiceProvider2.GetRequiredService<MessageBrokerClient>();
+            publisherClient.Connect(connectionConfiguration, false);
 
             // setup reset event
             var manualResetEvent = new ManualResetEventSlim(false);
             
             // setup queue 
-            var queueManager = client.GetQueueManager(queueName, queueRoute);
+            var queueManager = subscriberClient.GetQueueManager(queueName, queueRoute);
             var declareResult = await queueManager.DeclareQueue();
             var subscribeResult = await queueManager.SubscribeQueue();
 
@@ -85,8 +89,6 @@ namespace Tests.Client
             queueManager.MessageReceived += async msg =>
             {
                 
-                manualResetEvent.Set();
-                
                 // var ratio = random.Next(0, 100);
                 //
                 // if (ratio < nackRation)
@@ -94,37 +96,39 @@ namespace Tests.Client
                 //     await client.NackAsync(msg.MessageId);
                 //     return;
                 // }
-                //
-                // try
-                // {
-                //     lock (messageStoreLock)
-                //     {
-                //         var messageStr = Encoding.UTF8.GetString(msg.Data.Span);
-                //
-                //         if (messageStore.ContainsKey(messageStr))
-                //         {
-                //             messageStore[messageStr] -= 1;
-                //         }
-                //         
-                //         var receivedMessagesCount = messageStore.Values.Count(v => v == 0);
-                //
-                //         Console.WriteLine($"received message count is {receivedMessagesCount}");
-                //         using(var sw = File.AppendText(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\test.txt"))
-                //         {
-                //             sw.WriteLine($"received message count is {receivedMessagesCount} {messageStr}");
-                //         }
-                //
-                //         if (receivedMessagesCount == messageCount)
-                //             manualResetEvent.Set();
-                //     }
-                //     
-                //     await client.AckAsync(msg.MessageId);
-                // }
-                // catch (Exception e)
-                // {
-                //     Console.WriteLine(e);
-                //     throw;
-                // }
+                
+                try
+                {
+                    lock (messageStoreLock)
+                    {
+                        var messageStr = Encoding.UTF8.GetString(msg.Data.Span);
+                
+                        if (messageStore.ContainsKey(messageStr))
+                        {
+                            messageStore[messageStr] -= 1;
+                        }
+                        
+                        var receivedMessagesCount = messageStore.Values.Count(v => v == 0);
+                
+                        using(var sw = File.AppendText(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\test_client.txt"))
+                        {
+                            sw.WriteLine($"received message in client count is {receivedMessagesCount} {messageStr}");
+                        }
+                
+                        if (receivedMessagesCount == messageCount)
+                            manualResetEvent.Set();
+                    }
+                    
+                    await subscriberClient.AckAsync(msg.MessageId);
+                }
+                catch (Exception e)
+                {
+                    using(var sw = File.AppendText(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\error.txt"))
+                    {
+                        sw.WriteLine($"error was received");
+                    }
+                    throw;
+                }
             };
 
             for (var i = 0; i < messageCount; i++)
@@ -141,7 +145,7 @@ namespace Tests.Client
                         messageStore[randomString] = 1;
                 }
                 
-                var publishResult = await client.PublishAsync(queueRoute, randomData);
+                var publishResult = await publisherClient.PublishAsync(queueRoute, randomData);
 
                 if (!publishResult.IsSuccess)
                     throw new Exception($"publish message failed with error {publishResult.InternalErrorCode}");
@@ -197,6 +201,9 @@ namespace Tests.Client
             serviceCollection.AddSingleton<StringPool>();
             serviceCollection.AddSingleton<MessageBrokerClient>();
             serviceCollection.AddSingleton<ISendQueueStore, SendQueueStore>();
+            
+            Logger.AddFileLogger();
+            
             return serviceCollection.BuildServiceProvider();
         }
     }

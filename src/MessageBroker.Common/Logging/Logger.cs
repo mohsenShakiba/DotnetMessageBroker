@@ -18,6 +18,15 @@ namespace MessageBroker.Common.Logging
 
             _defaultLogger = loggerFactory.CreateLogger<Logger>();
         }
+        
+        public static void AddFileLogger()
+        {
+            var loggerFactory = LoggerFactory.Create(b =>
+            {
+                b.AddFile(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\logger.txt"); });
+
+            _defaultLogger = loggerFactory.CreateLogger<Logger>();
+        }
 
         public static void LogInformation(string template, params object[] arguments)
         {

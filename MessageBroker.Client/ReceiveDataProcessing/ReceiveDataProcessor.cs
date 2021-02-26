@@ -1,6 +1,10 @@
 ﻿using System;
+using System.IO;
+using System.Text;
+using System.Threading;
 using MessageBroker.Client.QueueConsumerCoordination;
 using MessageBroker.Client.TaskManager;
+using MessageBroker.Common.Logging;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
 
@@ -11,6 +15,8 @@ namespace MessageBroker.Client.ReceiveDataProcessing
         private readonly IQueueManagerStore _queueManagerStore;
         private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
         private readonly ISerializer _serializer;
+
+        private int _receivedMessagesCount;
 
         public ReceiveDataProcessor(ISerializer serializer,
             IQueueManagerStore queueManagerStore, ISendPayloadTaskManager sendPayloadTaskManager)
@@ -23,6 +29,7 @@ namespace MessageBroker.Client.ReceiveDataProcessing
         public void DataReceived(Guid sessionId, Memory<byte> data)
         {
             var payloadType = _serializer.ParsePayloadType(data);
+            Logger.LogInformation($"data received type is {payloadType}");
             switch (payloadType)
             {
                 case PayloadType.Ok:
@@ -42,8 +49,10 @@ namespace MessageBroker.Client.ReceiveDataProcessing
 
         private void OnMessage(Memory<byte> payloadData)
         {
+            Interlocked.Increment(ref _receivedMessagesCount);
             var queueMessage = _serializer.ToQueueMessage(payloadData);
             _queueManagerStore.OnMessage(queueMessage);
+            Logger.LogInformation($"received data {Encoding.UTF8.GetString(queueMessage.Data.Span)}");
         }
 
         private void OnOk(Memory<byte> payloadData)

@@ -16,6 +16,7 @@ namespace MessageBroker.TCP.Client
         private ISocketDataProcessor _socketDataProcessor;
 
         private ISocketEventProcessor _socketEventProcessor;
+        public bool Debug { get; set; }
 
         public ClientSession(IBinaryDataProcessor binaryDataProcessor)
         {
@@ -48,6 +49,7 @@ namespace MessageBroker.TCP.Client
         public void ForwardDataTo(ISocketDataProcessor socketDataProcessor)
         {
             _socketDataProcessor = socketDataProcessor;
+            _binaryDataProcessor.Debug = Debug;
         }
 
         #region Close
@@ -97,12 +99,22 @@ namespace MessageBroker.TCP.Client
             }
 
             _binaryDataProcessor.Write(receiveBuffer.AsMemory(0, receivedSize));
+            
+            Logger.LogInformation($"write from client session is {receivedSize}");
+
+            ArrayPool<byte>.Shared.Return(receiveBuffer);
         }
 
         private void ProcessReceivedData()
         {
+            Logger.LogInformation($"reading from binary data processor");
             while (true)
-                if (_binaryDataProcessor.TryRead(out var binaryPayload))
+            {
+                var canRead = _binaryDataProcessor.TryRead(out var binaryPayload);
+                
+                Logger.LogInformation($"Can read from client session is {canRead}");
+                
+                if (canRead)
                 {
                     _socketDataProcessor.DataReceived(Id, binaryPayload.DataWithoutSize);
 
@@ -114,6 +126,8 @@ namespace MessageBroker.TCP.Client
                 {
                     break;
                 }
+            }
+                
         }
 
         #endregion

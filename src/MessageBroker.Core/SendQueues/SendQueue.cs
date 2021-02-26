@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -27,6 +28,7 @@ namespace MessageBroker.Core
         private SemaphoreSlim _sendSemaphore;
         private bool _autoAck;
         private int _currentConcurrencyLevel;
+        private int _sendMessageCount;
 
         public int Available => _sendSemaphore.CurrentCount;
         public IClientSession Session { get; }
@@ -139,6 +141,12 @@ namespace MessageBroker.Core
                 
                 // send the payload 
                 var success = await Session.SendAsync(serializedPayload.Data);
+                
+                Interlocked.Increment(ref _sendMessageCount);
+                using(var sw = File.AppendText(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\send_queue.txt"))
+                {
+                    sw.WriteLine($"received message in client count is {_sendMessageCount} {success}");
+                }
 
                 // notify message ack it is auto ack
                 if (success && _autoAck)

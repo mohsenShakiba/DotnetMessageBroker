@@ -31,9 +31,9 @@ namespace MessageBroker.Client
         }
 
 
-        public void Connect(SocketConnectionConfiguration configuration)
+        public void Connect(SocketConnectionConfiguration configuration, bool debug)
         {
-            _connectionManager.Connect(configuration);
+            _connectionManager.Connect(configuration, debug);
         }
 
         public void Disconnect()

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +19,7 @@ namespace MessageBroker.Client.ConnectionManagement
         private ITcpSocket _tcpSocket;
         private bool _closed;
         private bool _connectionReady;
+        private bool _debug;
 
         public IClientSession ClientSession
         {
@@ -55,8 +57,9 @@ namespace MessageBroker.Client.ConnectionManagement
             _tcpSocket = tcpSocket;
         }
 
-        public void Connect(SocketConnectionConfiguration configuration)
+        public void Connect(SocketConnectionConfiguration configuration, bool debug = false)
         {
+            _debug = debug;
             _ = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
             _configuration = configuration;
@@ -149,7 +152,7 @@ namespace MessageBroker.Client.ConnectionManagement
         private void OnConnected()
         {
             Logger.LogInformation("socket successfully connected to endpoint");
-
+            _clientSession.Debug = _debug;
             _clientSession.ForwardEventsTo(this);
             _clientSession.ForwardDataTo(_receiveDataProcessor);
             _clientSession.Use(_tcpSocket);

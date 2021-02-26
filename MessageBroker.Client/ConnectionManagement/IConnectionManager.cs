@@ -8,7 +8,7 @@ namespace MessageBroker.Client.ConnectionManagement
         public IClientSession ClientSession { get; }
         public bool Connected { get; }
 
-        void Connect(SocketConnectionConfiguration configuration);
+        void Connect(SocketConnectionConfiguration configuration, bool debug);
         void Disconnect();
     }
 }

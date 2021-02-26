@@ -10,6 +10,7 @@ namespace Benchmarks
     public class TestClientSession : IClientSession
     {
         public Guid Id { get; set; }
+        public bool Debug { get; set; }
 
         public void Use(Socket socket)
         {

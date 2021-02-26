@@ -7,6 +7,7 @@ namespace MessageBroker.TCP.Client
     public interface IClientSession
     {
         Guid Id { get; }
+        bool Debug { get; set; }
         void Use(ITcpSocket socket);
         void ForwardEventsTo(ISocketEventProcessor socketEventProcessor);
         void ForwardDataTo(ISocketDataProcessor socketDataProcessor);
