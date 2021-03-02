@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -22,7 +23,7 @@ namespace MessageBroker.Core.Queues
         private readonly IRouteMatcher _routeMatcher;
         private readonly ISerializer _serializer;
         private readonly ISessionPolicy _sessionPolicy;
-
+        
         private bool _stopped;
 
         public Queue(ISessionPolicy sessionPolicy,
@@ -74,16 +75,19 @@ namespace MessageBroker.Core.Queues
 
         public void SessionDisconnected(Guid sessionId)
         {
+            Logger.LogInformation($"Queue -> Session added {sessionId}");
             _sessionPolicy.RemoveSession(sessionId);
         }
 
         public void SessionSubscribed(Guid sessionId)
         {
+            Logger.LogInformation($"Queue -> Session added {sessionId}");
             _sessionPolicy.AddSession(sessionId);
         }
 
         public void SessionUnSubscribed(Guid sessionId)
         {
+            Logger.LogInformation($"Queue -> Session removed {sessionId}");
             SessionDisconnected(sessionId);
         }
 
@@ -105,17 +109,18 @@ namespace MessageBroker.Core.Queues
                 {
                     if (_stopped)
                         return;
-
+                    
                     if (!_sessionPolicy.HasSession())
                     {
-                        await Task.Delay(100);
+                        await Task.Delay(1000);
+                        Logger.LogInformation("Queue -> Skipping due to insufficient session with msg count: " + _queue.Reader.Count);
                         continue;
                     }
 
-                    var messageIds = _queue.Reader.ReadAllAsync();
-
-                    await foreach (var messageId in messageIds) 
+                    if (_queue.Reader.TryRead(out var messageId))
+                    {
                         ProcessMessage(messageId);
+                    }
                 }
             }, TaskCreationOptions.LongRunning);
         }
@@ -144,9 +149,13 @@ namespace MessageBroker.Core.Queues
 
             if (_sendQueueStore.TryGet(sessionId.Value, out var sendQueue))
             {
+                if (_messageStore.TryGetValue(serializedPayload.Id, out var msg))
+                {
+                    Logger.LogInformation($"Queue -> Sending msg: {Encoding.UTF8.GetString(msg.Data.Span)} with {serializedPayload.Id}");
+                }
+                
                 serializedPayload.ClearStatusListener();
                 serializedPayload.OnStatusChanged += OnMessageStatusChanged;
-
                 sendQueue.Enqueue(serializedPayload);
             }
         }
@@ -166,11 +175,19 @@ namespace MessageBroker.Core.Queues
 
         private void OnMessageAck(Guid messageId)
         {
+            if (_messageStore.TryGetValue(messageId, out var msg))
+            {
+                Logger.LogInformation($"Queue -> Ack msg: {Encoding.UTF8.GetString(msg.Data.Span)}");
+            }
             _messageStore.Delete(messageId);
         }
 
         private void OnMessageNack(Guid messageId)
         {
+            if (_messageStore.TryGetValue(messageId, out var msg))
+            {
+                Logger.LogInformation($"Queue -> Nack msg: {Encoding.UTF8.GetString(msg.Data.Span)}");
+            }
             _queue.Writer.TryWrite(messageId);
         }
     }

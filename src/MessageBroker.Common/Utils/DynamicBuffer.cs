@@ -14,24 +14,6 @@ namespace MessageBroker.Common.Utils
             _buffer = ArrayPool<byte>.Shared.Rent(DynamicBufferConfiguration.StartBufferSize);
         }
 
-        public Memory<byte> ReadAndClearAll()
-        {
-            try
-            {
-                return _buffer.AsMemory(_start, _end);
-            }
-            finally
-            {
-                _start = 0;
-                _end = 0;
-            }
-        }
-
-        public int Length()
-        {
-            return _end - _start;
-        }
-
         public void Write(Memory<byte> m)
         {
             ReorganizeBufferIfNeeded();
@@ -76,12 +58,12 @@ namespace MessageBroker.Common.Utils
             return m;
         }
 
-        public Memory<byte> Read(int size)
+        public Span<byte> Read(int size)
         {
             if (_start + size > _end)
                 throw new InvalidOperationException();
 
-            var m = _buffer.AsMemory(_start, size);
+            var m = _buffer.AsSpan(_start, size);
 
             return m;
         }

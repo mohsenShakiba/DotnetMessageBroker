@@ -8,14 +8,14 @@ namespace MessageBroker.TCP.SocketWrapper
     public class TcpSocket: ITcpSocket
     {
 
-        private readonly Socket _socket;
+        private Socket _socket;
 
-        public TcpSocket(Socket socket)
+        public TcpSocket(Socket socket = null)
         {
             _socket = socket;
         }
 
-        public bool Connected => _socket.Connected;
+        public bool Connected => _socket?.Connected ?? false;
 
         public void Close()
         {
@@ -24,22 +24,44 @@ namespace MessageBroker.TCP.SocketWrapper
 
         public void Connect(IPEndPoint ipEndPoint)
         {
+            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             _socket.Connect(ipEndPoint);
         }
 
         public void Disconnect(bool reuseSocket)
         {
-            _socket.Disconnect(reuseSocket);
+            try
+            {
+                _socket.Disconnect(reuseSocket);
+            }
+            catch
+            {
+                // do nothing
+            }
         }
 
-        public ValueTask<int> SendAsync(Memory<byte> data)
+        public async ValueTask<int> SendAsync(Memory<byte> data)
         {
-            return _socket.SendAsync(data, SocketFlags.None);
+            try
+            {
+                return await _socket.SendAsync(data, SocketFlags.None);
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
-        public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
+        public async ValueTask<int> ReceiveAsync(Memory<byte> buffer)
         {
-            return _socket.ReceiveAsync(buffer, SocketFlags.None);
+            try
+            {
+                return await _socket.ReceiveAsync(buffer, SocketFlags.None);
+            }
+            catch
+            {
+                return 0;
+            }
         }
     }
 }

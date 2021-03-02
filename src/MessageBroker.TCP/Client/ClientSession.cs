@@ -12,6 +12,7 @@ namespace MessageBroker.TCP.Client
     {
         private readonly IBinaryDataProcessor _binaryDataProcessor;
         private bool _connected;
+        private object _lock;
         private ITcpSocket _socket;
         private ISocketDataProcessor _socketDataProcessor;
 
@@ -21,14 +22,19 @@ namespace MessageBroker.TCP.Client
         public ClientSession(IBinaryDataProcessor binaryDataProcessor)
         {
             _binaryDataProcessor = binaryDataProcessor;
-
             Id = Guid.NewGuid();
+            _lock = new();
         }
 
         public Guid Id { get; }
 
         public void Use(ITcpSocket socket)
         {
+            if (_connected)
+                return;
+
+            Logger.LogInformation($"client session -> {Debug} start receive process for {Id}");
+
             _socket = socket;
             _connected = true;
 
@@ -60,9 +66,15 @@ namespace MessageBroker.TCP.Client
 
             _connected = false;
 
-            _socket.Close();
-
-            _socketEventProcessor.ClientDisconnected(this);
+            lock (_lock)
+            {
+                if (_connected)
+                    return;
+                
+                _socket.Close();
+            
+                _socketEventProcessor.ClientDisconnected(this);
+            }
         }
 
         #endregion
@@ -70,12 +82,10 @@ namespace MessageBroker.TCP.Client
         #region Receive
 
         /// <summary>
-        ///     this method will start recieving message from socket
+        ///     this method will start receiving message from socket
         /// </summary>
         private void StartReceiveProcess()
         {
-            Logger.LogInformation($"starting client session {Id}");
-
             Task.Factory.StartNew(async () =>
             {
                 while (_connected)
@@ -99,21 +109,16 @@ namespace MessageBroker.TCP.Client
             }
 
             _binaryDataProcessor.Write(receiveBuffer.AsMemory(0, receivedSize));
-            
-            Logger.LogInformation($"write from client session is {receivedSize}");
 
             ArrayPool<byte>.Shared.Return(receiveBuffer);
         }
 
         private void ProcessReceivedData()
         {
-            Logger.LogInformation($"reading from binary data processor");
             while (true)
             {
                 var canRead = _binaryDataProcessor.TryRead(out var binaryPayload);
-                
-                Logger.LogInformation($"Can read from client session is {canRead}");
-                
+
                 if (canRead)
                 {
                     _socketDataProcessor.DataReceived(Id, binaryPayload.DataWithoutSize);
@@ -127,7 +132,6 @@ namespace MessageBroker.TCP.Client
                     break;
                 }
             }
-                
         }
 
         #endregion
@@ -148,11 +152,6 @@ namespace MessageBroker.TCP.Client
             }
 
             return true;
-        }
-
-        public bool Send(Memory<byte> payload)
-        {
-            return SendAsync(payload).Result;
         }
 
         #endregion

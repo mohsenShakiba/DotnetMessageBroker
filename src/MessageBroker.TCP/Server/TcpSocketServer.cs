@@ -118,7 +118,7 @@ namespace MessageBroker.TCP.Server
         ///     this method will create a session
         /// </summary>
         /// <param name="socket"></param>
-        private void OnAcceptSuccess(System.Net.Sockets.Socket socket)
+        private void OnAcceptSuccess(Socket socket)
         {
             Logger.LogInformation("accepted new socket connection");
 

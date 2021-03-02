@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Tasks;
 using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Common.Logging;
 using MessageBroker.TCP.Client;
@@ -19,7 +17,8 @@ namespace MessageBroker.Client.ConnectionManagement
         private ITcpSocket _tcpSocket;
         private bool _closed;
         private bool _connectionReady;
-        private bool _debug;
+        private bool _reconnecting;
+        private object _lock;
 
         public IClientSession ClientSession
         {
@@ -28,12 +27,18 @@ namespace MessageBroker.Client.ConnectionManagement
                 if (_closed)
                     throw new Exception("The connection manager has been closed");
 
-                if (!_connectionReady)
-                    TryConnect();
-
-                return _clientSession;
+                while (true)
+                {
+                    if (_connectionReady)
+                        return _clientSession;
+                    
+                    Thread.Sleep(1000);
+                    Console.WriteLine("sleeping");
+                }
             }
         }
+
+        public event Action OnClientConnected;
 
         public bool Connected => _connectionReady;
 
@@ -42,14 +47,15 @@ namespace MessageBroker.Client.ConnectionManagement
         {
             _clientSession = clientSession;
             _receiveDataProcessor = receiveDataProcessor;
-            
+            _lock = new();
             SetDefaultTcpSocket();
+            
+            Console.WriteLine($"connection manager -> creating client session with id {_clientSession.Id}");
         }
 
         private void SetDefaultTcpSocket()
         {
-            var tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            _tcpSocket = new TcpSocket(tcpSocket);
+            _tcpSocket = new TcpSocket();
         }
 
         public void SetAlternativeTcpSocketForTesting(ITcpSocket tcpSocket)
@@ -57,34 +63,11 @@ namespace MessageBroker.Client.ConnectionManagement
             _tcpSocket = tcpSocket;
         }
 
-        public void Connect(SocketConnectionConfiguration configuration, bool debug = false)
+        public void Connect(SocketConnectionConfiguration configuration)
         {
-            _debug = debug;
             _ = configuration ?? throw new ArgumentNullException(nameof(configuration));
 
             _configuration = configuration;
-
-            TryConnect();
-        }
-
-        public void Reconnect()
-        {
-            if (_tcpSocket.Connected)
-            {
-                Logger.LogWarning("socket, already connected");
-                return;
-            }
-
-            if (!_configuration.RetryOnFailure)
-            {
-                Logger.LogWarning("connection failed");
-                return;
-            }
-
-            Logger.LogWarning("attempting to reconnect to endpoint");
-
-            _closed = false;
-            _connectionReady = false;
 
             TryConnect();
         }
@@ -96,10 +79,26 @@ namespace MessageBroker.Client.ConnectionManagement
             _closed = true;
         }
 
+        public void SimulateConnectionDisconnection()
+        {
+            _tcpSocket.Disconnect(true);
+        }
+
         public void ClientDisconnected(IClientSession clientSession)
         {
+            Console.WriteLine($"client disconnected called {clientSession.Id}");
+            // do nothing
             if (_closed)
                 return;
+
+            lock (_lock)
+            {
+                Console.WriteLine($"client disconnected called after {_reconnecting}");
+                if (_reconnecting)
+                    return;
+
+                _reconnecting = true;
+            }
 
             TryConnect();
         }
@@ -111,6 +110,7 @@ namespace MessageBroker.Client.ConnectionManagement
 
         private void TryConnect()
         {
+            Console.WriteLine($"Try connect called {_clientSession.Id}");
             while (true)
                 try
                 {
@@ -137,27 +137,32 @@ namespace MessageBroker.Client.ConnectionManagement
                         break;
 
                     Thread.Sleep(100);
-
-                    throw;
                 }
         }
 
         private void OnConnectionFailed(SocketException e)
         {
             Logger.LogError($"failed to connect to endpoint, socket error: {e}");
-
             _connectionReady = false;
         }
 
         private void OnConnected()
         {
             Logger.LogInformation("socket successfully connected to endpoint");
-            _clientSession.Debug = _debug;
+
             _clientSession.ForwardEventsTo(this);
             _clientSession.ForwardDataTo(_receiveDataProcessor);
+            Console.WriteLine($"calling use for {_clientSession.Id}");
             _clientSession.Use(_tcpSocket);
 
+            lock (_lock)
+            {
+                _reconnecting = false;
+            }
+
             _connectionReady = true;
+            
+            OnClientConnected?.Invoke();
         }
     }
 }

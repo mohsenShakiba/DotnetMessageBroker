@@ -1,6 +1,4 @@
 ﻿using System;
-using System.IO;
-using System.Threading;
 using MessageBroker.Common.Logging;
 using MessageBroker.Core.Persistence.Queues;
 using MessageBroker.Models;
@@ -13,8 +11,6 @@ namespace MessageBroker.Core.PayloadProcessing
         private readonly ISerializer _serializer;
         private readonly ISendQueueStore _sendQueueStore;
         private readonly IQueueStore _queueStore;
-
-        private int _receivedMessageCount;
 
         public PayloadProcessor(ISerializer serializer, ISendQueueStore sendQueueStore, IQueueStore queueStore)
         {
@@ -67,11 +63,6 @@ namespace MessageBroker.Core.PayloadProcessing
 
         private void OnMessage(Guid sessionId, Message message)
         {
-            Interlocked.Increment(ref _receivedMessageCount);
-            using(var sw = File.AppendText(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\test.txt"))
-            {
-                sw.WriteLine($"received message count is {_receivedMessageCount}");
-            }
             // dispatch the message to matched queues
             foreach (var queue in _queueStore.GetAll())
                 if (queue.MessageRouteMatch(message.Route))

@@ -29,7 +29,6 @@ namespace MessageBroker.Client.ReceiveDataProcessing
         public void DataReceived(Guid sessionId, Memory<byte> data)
         {
             var payloadType = _serializer.ParsePayloadType(data);
-            Logger.LogInformation($"data received type is {payloadType}");
             switch (payloadType)
             {
                 case PayloadType.Ok:
@@ -52,7 +51,6 @@ namespace MessageBroker.Client.ReceiveDataProcessing
             Interlocked.Increment(ref _receivedMessagesCount);
             var queueMessage = _serializer.ToQueueMessage(payloadData);
             _queueManagerStore.OnMessage(queueMessage);
-            Logger.LogInformation($"received data {Encoding.UTF8.GetString(queueMessage.Data.Span)}");
         }
 
         private void OnOk(Memory<byte> payloadData)

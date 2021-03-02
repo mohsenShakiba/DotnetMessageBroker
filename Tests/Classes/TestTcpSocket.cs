@@ -38,6 +38,11 @@ namespace Tests.Classes
             _connected = true;
         }
 
+        public void Reconnect(IPEndPoint ipEndPoint)
+        {
+            Connect(ipEndPoint);
+        }
+
         public void Disconnect(bool reuseSocket)
         {
             _connected = false;

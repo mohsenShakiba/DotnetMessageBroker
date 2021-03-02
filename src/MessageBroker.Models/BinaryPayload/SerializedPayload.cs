@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers;
 using MessageBroker.Common.Binary;
+using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
 
 namespace MessageBroker.Models.BinaryPayload
@@ -21,6 +22,10 @@ namespace MessageBroker.Models.BinaryPayload
 
         public void FillFrom(byte[] data, int size, Guid id, PayloadType type)
         {
+            if (Id != Guid.Empty)
+            {
+                Logger.LogInformation($"SerializedPayload -> changing the id from {Id} to {id} {IsReturnedToPool}");
+            }
             if ((_buffer?.Length ?? 0) < size)
             {
                 if (_buffer != null)
@@ -47,6 +52,11 @@ namespace MessageBroker.Models.BinaryPayload
 
         public void SetPooledStatus(bool isReturned)
         {
+            if (isReturned && IsReturnedToPool)
+            {
+                throw new Exception();
+            }
+            Logger.LogInformation($"SerializedPayload -> Return called for {Id} with {isReturned}");
             IsReturnedToPool = isReturned;
         }
     }

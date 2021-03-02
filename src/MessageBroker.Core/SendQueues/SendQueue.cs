@@ -1,15 +1,13 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
-using MessageBroker.Core.Queues;
 using MessageBroker.Models;
 using MessageBroker.Models.BinaryPayload;
-using MessageBroker.Serialization;
 using MessageBroker.TCP.Client;
 
 namespace MessageBroker.Core
@@ -18,17 +16,18 @@ namespace MessageBroker.Core
     ///     SendQueue is in charge of sending messages to subscribers
     ///     it will handle how many messages has been sent based on the concurrency requested
     /// </summary>
-    public class SendQueue: ISendQueue
+    public class SendQueue : ISendQueue
     {
         private readonly ConcurrentDictionary<Guid, SerializedPayload> _pendingMessages;
         private readonly Channel<SerializedPayload> _queue;
         private readonly SemaphoreSlim _semaphore;
         private readonly CancellationTokenSource _cancellationTokenSource;
-        
+
         private SemaphoreSlim _sendSemaphore;
         private bool _autoAck;
         private int _currentConcurrencyLevel;
-        private int _sendMessageCount;
+        private bool _stopped;
+        private object _lock;
 
         public int Available => _sendSemaphore.CurrentCount;
         public IClientSession Session { get; }
@@ -36,14 +35,15 @@ namespace MessageBroker.Core
         public SendQueue(IClientSession session)
         {
             Session = session;
-            _cancellationTokenSource = new CancellationTokenSource();
+            _cancellationTokenSource = new();
+            _lock = new();
+            _pendingMessages = new();
             _queue = Channel.CreateUnbounded<SerializedPayload>(new UnboundedChannelOptions
             {
                 SingleReader = true,
                 SingleWriter = true
             });
             _semaphore = new SemaphoreSlim(1, 1);
-            _pendingMessages = new ConcurrentDictionary<Guid, SerializedPayload>();
 
             _currentConcurrencyLevel = 10;
             _sendSemaphore = new SemaphoreSlim(_currentConcurrencyLevel, _currentConcurrencyLevel);
@@ -86,46 +86,73 @@ namespace MessageBroker.Core
         /// </summary>
         public void Stop()
         {
-            // cancel all pending process
-            _cancellationTokenSource.Cancel();
-            
-            // dispose serialized payloads
-            while (_queue.Reader.TryRead(out var serializedPayload))
+            lock (_lock)
             {
-                serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
-                ObjectPool.Shared.Return(serializedPayload);
-            }
+                _stopped = true;
+                
+                Logger.LogInformation($"SendQueue -> Begin stopping {Session.Id}");
+                // cancel all pending process
+                _cancellationTokenSource.Cancel();
 
-            // foreach pending message, requeue
-            foreach (var (_, serializedPayload) in _pendingMessages)
-            {
-                serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
-                ObjectPool.Shared.Return(serializedPayload);
+                // foreach pending message, requeue
+                foreach (var (_, serializedPayload) in _pendingMessages)
+                {
+                    serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
+                    Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} was nacked from send queue stop");
+                    ObjectPool.Shared.Return(serializedPayload);
+                }
+                
+                // dispose serialized payloads
+                while (_queue.Reader.TryRead(out var serializedPayload))
+                {
+                    serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
+                    Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} was nacked from send queue stop");
+                    ObjectPool.Shared.Return(serializedPayload);
+                }
+                Logger.LogInformation($"SendQueue -> End stopping {Session.Id}");
             }
         }
 
         public void Enqueue(SerializedPayload serializedPayload)
         {
-            _queue.Writer.TryWrite(serializedPayload);
+            lock (_lock)
+            {
+                if (_stopped)
+                {
+                    serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
+                    ObjectPool.Shared.Return(serializedPayload);
+                    return;
+                }
+                Logger.LogInformation($"SendQueue -> Received payload: {serializedPayload.Id} {Session.Id} {_stopped}");
+                _queue.Writer.TryWrite(serializedPayload);
+            }
         }
 
         public void OnMessageAckReceived(Guid messageId)
         {
-            if (_pendingMessages.TryRemove(messageId, out var serializedPayload))
+            lock (_lock)
             {
-                serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Ack);
-                ObjectPool.Shared.Return(serializedPayload);
-                _sendSemaphore.Release();
+                if (_pendingMessages.TryRemove(messageId, out var serializedPayload))
+                {
+                    serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Ack);
+                    Logger.LogInformation($"SendQueue -> acked payload: {serializedPayload.Id}");
+                    ObjectPool.Shared.Return(serializedPayload);
+                    _sendSemaphore.Release();
+                }
             }
         }
 
         public void OnMessageNackReceived(Guid messageId)
         {
-            if (_pendingMessages.Remove(messageId, out var serializedPayload))
+            lock (_lock)
             {
-                serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
-                ObjectPool.Shared.Return(serializedPayload);
-                _sendSemaphore.Release();
+                if (_pendingMessages.Remove(messageId, out var serializedPayload))
+                {
+                    serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
+                    Logger.LogInformation($"SendQueue -> nacked payload: {serializedPayload.Id}");
+                    ObjectPool.Shared.Return(serializedPayload);
+                    _sendSemaphore.Release();
+                }
             }
         }
 
@@ -133,19 +160,23 @@ namespace MessageBroker.Core
         {
             try
             {
+                Logger.LogInformation($"SendQueue -> preparing payload: {serializedPayload.Id}");
                 await _semaphore.WaitAsync(_cancellationTokenSource.Token);
                 await _sendSemaphore.WaitAsync(_cancellationTokenSource.Token);
 
-                // add message to pending message dict
-                _pendingMessages[serializedPayload.Id] = serializedPayload;
-                
                 // send the payload 
                 var success = await Session.SendAsync(serializedPayload.Data);
                 
-                Interlocked.Increment(ref _sendMessageCount);
-                using(var sw = File.AppendText(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\send_queue.txt"))
+                // add message to pending message dict
+                _pendingMessages[serializedPayload.Id] = serializedPayload;
+
+                if (success)
                 {
-                    sw.WriteLine($"received message in client count is {_sendMessageCount} {success}");
+                    Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} was sent");
+                }
+                else
+                {
+                    Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} was not sent");
                 }
 
                 // notify message ack it is auto ack
@@ -157,6 +188,7 @@ namespace MessageBroker.Core
             }
             catch
             {
+                Logger.LogInformation($"SendQueue -> nacked payload: {serializedPayload.Id} from catch");
                 serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
                 ObjectPool.Shared.Return(serializedPayload);
             }
@@ -171,9 +203,12 @@ namespace MessageBroker.Core
             try
             {
                 await _semaphore.WaitAsync(_cancellationTokenSource.Token);
-                
+
                 await Session.SendAsync(serializedPayload.Data);
-     
+                
+                Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} disposed");
+
+
                 ObjectPool.Shared.Return(serializedPayload);
             }
             finally

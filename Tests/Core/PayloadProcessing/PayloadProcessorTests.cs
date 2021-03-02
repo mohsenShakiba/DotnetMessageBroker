@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading;
 using MessageBroker.Core;
-using MessageBroker.Core.PayloadHandlers;
 using MessageBroker.Core.PayloadProcessing;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.Persistence.Messages.InMemoryStore;

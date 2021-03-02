@@ -26,7 +26,6 @@ namespace MessageBroker.Core
             if (_sendQueues.TryRemove(clientSession.Id, out var sendQueue))
             {
                 sendQueue.Stop();
-                clientSession.Close();
             }
         }
 

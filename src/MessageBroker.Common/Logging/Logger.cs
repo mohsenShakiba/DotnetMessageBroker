@@ -19,11 +19,12 @@ namespace MessageBroker.Common.Logging
             _defaultLogger = loggerFactory.CreateLogger<Logger>();
         }
         
-        public static void AddFileLogger()
+        public static void AddFileLogger(string path)
         {
             var loggerFactory = LoggerFactory.Create(b =>
             {
-                b.AddFile(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\logger.txt"); });
+                b.AddFile(path);
+            });
 
             _defaultLogger = loggerFactory.CreateLogger<Logger>();
         }

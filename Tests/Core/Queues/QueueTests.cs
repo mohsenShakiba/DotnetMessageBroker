@@ -98,7 +98,7 @@ namespace Tests.Core.Queues
             sendQueueStore.Add(clientSession.Object);
             queue.SessionSubscribed(activeSessionId);
             
-            Thread.Sleep(1000);
+            Thread.Sleep(100);
 
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
         }

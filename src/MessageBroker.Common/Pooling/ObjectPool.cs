@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace MessageBroker.Common.Pooling
 {
@@ -7,12 +8,12 @@ namespace MessageBroker.Common.Pooling
     {
         private static ObjectPool _shared;
 
-        private readonly ConcurrentDictionary<Type, ConcurrentQueue<object>> _objectTypeDict;
+        private readonly Dictionary<Type, Queue<object>> _objectTypeDict;
         private readonly ConcurrentDictionary<Type, int> _objectTypeStatDict;
 
         public ObjectPool()
         {
-            _objectTypeDict = new ConcurrentDictionary<Type, ConcurrentQueue<object>>();
+            _objectTypeDict = new Dictionary<Type, Queue<object>>();
             _objectTypeStatDict = new ConcurrentDictionary<Type, int>();
         }
 
@@ -28,39 +29,53 @@ namespace MessageBroker.Common.Pooling
 
         public T Rent<T>() where T : IPooledObject, new()
         {
-            var type = typeof(T);
-
-            if (!_objectTypeDict.ContainsKey(type))
+            lock (_objectTypeDict)
             {
-                _objectTypeDict[type] = new ConcurrentQueue<object>();
+                var type = typeof(T);
+
+                if (!_objectTypeDict.ContainsKey(type))
+                {
+                    _objectTypeDict[type] = new Queue<object>();
 #if DEBUG
                 _objectTypeStatDict[type] = 0;
 #endif
-            }
+                }
 
-            var bag = _objectTypeDict[type];
+                var bag = _objectTypeDict[type];
 
-            if (bag.TryDequeue(out var o))
-            {
-                var i = (T) o;
-                i.SetPooledStatus(false);
-                return i;
-            };
+                if (bag.TryDequeue(out var o))
+                {
+                    var i = (T) o;
+
+                    if (!i.IsReturnedToPool)
+                    {
+                        throw new Exception();
+                    }
+
+                    i.SetPooledStatus(false);
+                    return i;
+                }
+
+                ;
 
 #if DEBUG
             _objectTypeStatDict[type] += 1;
 #endif
 
-            return new T();
+                return new T();
+            }
         }
 
-        public void Return<T>(T o) where T: IPooledObject
+        public void Return<T>(T o) where T : IPooledObject
         {
-            var type = typeof(T);
+            lock (_objectTypeDict)
+            {
+                var type = typeof(T);
 
-            o.SetPooledStatus(true);
-            
-            _objectTypeDict[type].Enqueue(o);
+                o.SetPooledStatus(true);
+
+                _objectTypeDict[type].Enqueue(o);
+            }
         }
 
 #if DEBUG
