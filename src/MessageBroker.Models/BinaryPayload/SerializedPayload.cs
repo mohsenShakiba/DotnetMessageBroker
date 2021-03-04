@@ -15,10 +15,16 @@ namespace MessageBroker.Models.BinaryPayload
 
         public PayloadType Type { get; private set; }
         public Guid Id { get; set; }
+        public Guid PoolId { get; }
         public bool IsReturnedToPool { get; private set; }
 
         public Memory<byte> Data => _buffer.AsMemory(0, _size);
         public Memory<byte> DataWithoutSize => Data.Slice(BinaryProtocolConfiguration.PayloadHeaderSize);
+
+        public SerializedPayload()
+        {
+            PoolId = Guid.NewGuid();
+        }
 
         public void FillFrom(byte[] data, int size, Guid id, PayloadType type)
         {
@@ -54,7 +60,7 @@ namespace MessageBroker.Models.BinaryPayload
         {
             if (isReturned && IsReturnedToPool)
             {
-                throw new Exception();
+                Logger.LogInformation($"SerializedPayload -> invalid reserve ");
             }
             Logger.LogInformation($"SerializedPayload -> Return called for {Id} with {isReturned}");
             IsReturnedToPool = isReturned;

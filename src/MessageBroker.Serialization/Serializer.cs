@@ -6,9 +6,8 @@ using MessageBroker.Models.BinaryPayload;
 
 namespace MessageBroker.Serialization
 {
-    public class Serializer :  IPooledObject, ISerializer
+    public class Serializer : ISerializer
     {
-        
         public bool IsReturnedToPool { get; private set; }
 
         public PayloadType ParsePayloadType(Memory<byte> b)
@@ -17,7 +16,7 @@ namespace MessageBroker.Serialization
                 (PayloadType) BitConverter.ToInt32(b.Slice(0, BinaryProtocolConfiguration.PayloadHeaderSize).Span);
             return messageType;
         }
-
+        
         #region Serialize
 
         public SerializedPayload Serialize(Message msg)

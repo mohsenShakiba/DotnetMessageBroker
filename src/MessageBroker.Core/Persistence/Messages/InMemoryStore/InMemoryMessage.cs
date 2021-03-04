@@ -15,7 +15,13 @@ namespace MessageBroker.Core.Persistence.Messages.InMemoryStore
         public string QueueName { get; private set; }
 
         public Memory<byte> Data => _buffer.AsMemory(0, _size);
+        public Guid PoolId { get; }
         public bool IsReturnedToPool { get; private set; }
+
+        public InMemoryMessage()
+        {
+            PoolId = Guid.NewGuid();
+        }
 
         public void FillFrom(QueueMessage message, bool useDataInMessage = false)
         {

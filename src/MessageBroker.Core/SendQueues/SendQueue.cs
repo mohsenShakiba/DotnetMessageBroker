@@ -110,6 +110,8 @@ namespace MessageBroker.Core
                     ObjectPool.Shared.Return(serializedPayload);
                 }
                 Logger.LogInformation($"SendQueue -> End stopping {Session.Id}");
+                
+                _pendingMessages.Clear();
             }
         }
 
@@ -139,6 +141,10 @@ namespace MessageBroker.Core
                     ObjectPool.Shared.Return(serializedPayload);
                     _sendSemaphore.Release();
                 }
+                else
+                {
+                    Logger.LogInformation($"SendQueue -> ack not released {messageId}");
+                }
             }
         }
 
@@ -153,6 +159,10 @@ namespace MessageBroker.Core
                     ObjectPool.Shared.Return(serializedPayload);
                     _sendSemaphore.Release();
                 }
+                else
+                {
+                    Logger.LogInformation($"SendQueue -> nack not released {messageId}");
+                }
             }
         }
 
@@ -160,15 +170,20 @@ namespace MessageBroker.Core
         {
             try
             {
-                Logger.LogInformation($"SendQueue -> preparing payload: {serializedPayload.Id}");
+                Logger.LogInformation($"SendQueue -> preparing payload: {serializedPayload.Id} {_sendSemaphore.CurrentCount}");
                 await _semaphore.WaitAsync(_cancellationTokenSource.Token);
+                Logger.LogInformation($"SendQueue -> preparing payload 1: {serializedPayload.Id} {_sendSemaphore.CurrentCount}");
                 await _sendSemaphore.WaitAsync(_cancellationTokenSource.Token);
+                Logger.LogInformation($"SendQueue -> preparing payload 2: {serializedPayload.Id} {_sendSemaphore.CurrentCount}");
+                
+                lock (_lock)
+                {
+                    // add message to pending message dict
+                    _pendingMessages[serializedPayload.Id] = serializedPayload;
+                }
 
                 // send the payload 
                 var success = await Session.SendAsync(serializedPayload.Data);
-                
-                // add message to pending message dict
-                _pendingMessages[serializedPayload.Id] = serializedPayload;
 
                 if (success)
                 {
@@ -178,7 +193,7 @@ namespace MessageBroker.Core
                 {
                     Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} was not sent");
                 }
-
+                
                 // notify message ack it is auto ack
                 if (success && _autoAck)
                     OnMessageAckReceived(serializedPayload.Id);

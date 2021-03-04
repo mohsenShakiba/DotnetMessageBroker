@@ -135,6 +135,15 @@ namespace Tests.Client
             manualResetEvent.Wait();
         }
 
+        [Fact]
+        public async Task ContinuesTest()
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                await EndToEndTest_SingleSubscriberSinglePublisherWithSubscriberInterrupts_AllMessagesAreReceivedBySubscriber(100, 10);
+            }
+        }
+
         [Theory]
         [InlineData(100, 10)]
         public async Task EndToEndTest_SingleSubscriberSinglePublisherWithSubscriberInterrupts_AllMessagesAreReceivedBySubscriber(int messageCount, int nackRation)
@@ -199,6 +208,7 @@ namespace Tests.Client
                 
                 if (ratio < nackRation)
                 {
+                    Logger.LogInformation($"Client -> Nacking {msg.MessageId}");
                     await subscriberClient.NackAsync(msg.MessageId);
                     return;
                 }
@@ -231,7 +241,7 @@ namespace Tests.Client
                         return;
                     }
 
-                    Logger.LogInformation($"Client -> Received msg: {messageStr} with valid: {receivedMessagesCount} and invalid: {invalidMessageCount}");
+                    Logger.LogInformation($"Client -> Received msg: {messageStr} id: {msg.MessageId} with valid: {receivedMessagesCount} and invalid: {invalidMessageCount}");
                 }
                 
                 await subscriberClient.AckAsync(msg.MessageId);
@@ -272,6 +282,7 @@ namespace Tests.Client
             }
             
             manualResetEvent.Wait();
+            server.Stop();
         }
         
         // EndToEndTest_MultipleSubscribersMultiplePublishersNoInterrupt_AllMessagesAreReceivedBuSubscriber
@@ -296,7 +307,7 @@ namespace Tests.Client
             serviceCollection.AddSingleton<StringPool>();
             serviceCollection.AddTransient<IBinaryDataProcessor, BinaryDataProcessor>();
             serviceCollection.AddSingleton<ISendQueueStore, SendQueueStore>();
-
+            
             return serviceCollection.BuildServiceProvider();
         }
 

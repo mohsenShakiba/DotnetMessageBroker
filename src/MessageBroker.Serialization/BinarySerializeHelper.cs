@@ -17,9 +17,15 @@ namespace MessageBroker.Serialization
         private int _currentBufferOffset;
         private Guid _id;
         private PayloadType _type;
-        
+        public Guid PoolId { get; }
+
         public bool IsReturnedToPool { get; private set; }
 
+        public BinarySerializeHelper()
+        {
+            PoolId = Guid.NewGuid();
+        }
+        
         public void Dispose()
         {
             ArrayPool<byte>.Shared.Return(_buffer);

@@ -14,7 +14,7 @@ namespace MessageBroker.Serialization
         private static byte[] _delimiter;
         private int _currentOffset;
         private Memory<byte> _receivedData;
-        
+        public Guid PoolId { get; }
         public bool IsReturnedToPool { get; private set; }
 
         public static Span<byte> Delimiter
@@ -28,6 +28,11 @@ namespace MessageBroker.Serialization
                 _delimiter = delimiterB;
                 return delimiterB;
             }
+        }
+
+        public BinaryDeserializeHelper()
+        {
+            PoolId = Guid.NewGuid();
         }
 
         public void Setup(Memory<byte> data)

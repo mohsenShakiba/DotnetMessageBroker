@@ -8,9 +8,14 @@ namespace MessageBroker.Common.Binary
     {
         private byte[] _data;
         private int _size;
-        
+
+        public Guid PoolId { get; }
         public bool IsReturnedToPool { get; private set; }
 
+        public BinaryPayload()
+        {
+            PoolId = Guid.NewGuid();
+        }
 
         public Memory<byte> DataWithoutSize => _data.AsMemory(BinaryProtocolConfiguration.PayloadHeaderSize,
             _size - BinaryProtocolConfiguration.PayloadHeaderSize);

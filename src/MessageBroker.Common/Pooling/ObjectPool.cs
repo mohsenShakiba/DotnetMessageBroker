@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using MessageBroker.Common.Logging;
 
 namespace MessageBroker.Common.Pooling
 {
@@ -37,7 +38,7 @@ namespace MessageBroker.Common.Pooling
                 {
                     _objectTypeDict[type] = new Queue<object>();
 #if DEBUG
-                _objectTypeStatDict[type] = 0;
+                    _objectTypeStatDict[type] = 0;
 #endif
                 }
 
@@ -53,16 +54,24 @@ namespace MessageBroker.Common.Pooling
                     }
 
                     i.SetPooledStatus(false);
+
+                    Logger.LogInformation($"ObjectPool -> using {i.PoolId}");
+
                     return i;
                 }
 
                 ;
 
 #if DEBUG
-            _objectTypeStatDict[type] += 1;
+                _objectTypeStatDict[type] += 1;
 #endif
 
-                return new T();
+                var newInstance = new T();
+
+                // todo: write test to verify any object returns has status equal to false
+                newInstance.SetPooledStatus(false);
+
+                return newInstance;
             }
         }
 
@@ -71,6 +80,8 @@ namespace MessageBroker.Common.Pooling
             lock (_objectTypeDict)
             {
                 var type = typeof(T);
+
+                Logger.LogInformation($"ObjectPool -> reserving {o.PoolId}");
 
                 o.SetPooledStatus(true);
 
