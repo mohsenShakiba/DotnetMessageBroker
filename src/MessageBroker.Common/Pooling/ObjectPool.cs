@@ -55,8 +55,6 @@ namespace MessageBroker.Common.Pooling
 
                     i.SetPooledStatus(false);
 
-                    Logger.LogInformation($"ObjectPool -> using {i.PoolId}");
-
                     return i;
                 }
 
@@ -80,8 +78,6 @@ namespace MessageBroker.Common.Pooling
             lock (_objectTypeDict)
             {
                 var type = typeof(T);
-
-                Logger.LogInformation($"ObjectPool -> reserving {o.PoolId}");
 
                 o.SetPooledStatus(true);
 

@@ -70,6 +70,8 @@ namespace MessageBroker.Core
                     {
                         // if there is an exception, just ignore
                     }
+                
+                Logger.LogInformation($"Exited {Session.Id}");
             }, TaskCreationOptions.LongRunning);
         }
 
@@ -98,7 +100,6 @@ namespace MessageBroker.Core
                 foreach (var (_, serializedPayload) in _pendingMessages)
                 {
                     serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
-                    Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} was nacked from send queue stop");
                     ObjectPool.Shared.Return(serializedPayload);
                 }
                 
@@ -106,7 +107,6 @@ namespace MessageBroker.Core
                 while (_queue.Reader.TryRead(out var serializedPayload))
                 {
                     serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
-                    Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} was nacked from send queue stop");
                     ObjectPool.Shared.Return(serializedPayload);
                 }
                 Logger.LogInformation($"SendQueue -> End stopping {Session.Id}");
@@ -125,7 +125,6 @@ namespace MessageBroker.Core
                     ObjectPool.Shared.Return(serializedPayload);
                     return;
                 }
-                Logger.LogInformation($"SendQueue -> Received payload: {serializedPayload.Id} {Session.Id} {_stopped}");
                 _queue.Writer.TryWrite(serializedPayload);
             }
         }
@@ -137,7 +136,6 @@ namespace MessageBroker.Core
                 if (_pendingMessages.TryRemove(messageId, out var serializedPayload))
                 {
                     serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Ack);
-                    Logger.LogInformation($"SendQueue -> acked payload: {serializedPayload.Id}");
                     ObjectPool.Shared.Return(serializedPayload);
                     _sendSemaphore.Release();
                 }
@@ -155,7 +153,6 @@ namespace MessageBroker.Core
                 if (_pendingMessages.Remove(messageId, out var serializedPayload))
                 {
                     serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
-                    Logger.LogInformation($"SendQueue -> nacked payload: {serializedPayload.Id}");
                     ObjectPool.Shared.Return(serializedPayload);
                     _sendSemaphore.Release();
                 }
@@ -170,11 +167,8 @@ namespace MessageBroker.Core
         {
             try
             {
-                Logger.LogInformation($"SendQueue -> preparing payload: {serializedPayload.Id} {_sendSemaphore.CurrentCount}");
                 await _semaphore.WaitAsync(_cancellationTokenSource.Token);
-                Logger.LogInformation($"SendQueue -> preparing payload 1: {serializedPayload.Id} {_sendSemaphore.CurrentCount}");
                 await _sendSemaphore.WaitAsync(_cancellationTokenSource.Token);
-                Logger.LogInformation($"SendQueue -> preparing payload 2: {serializedPayload.Id} {_sendSemaphore.CurrentCount}");
                 
                 lock (_lock)
                 {
@@ -185,15 +179,6 @@ namespace MessageBroker.Core
                 // send the payload 
                 var success = await Session.SendAsync(serializedPayload.Data);
 
-                if (success)
-                {
-                    Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} was sent");
-                }
-                else
-                {
-                    Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} was not sent");
-                }
-                
                 // notify message ack it is auto ack
                 if (success && _autoAck)
                     OnMessageAckReceived(serializedPayload.Id);
@@ -203,7 +188,6 @@ namespace MessageBroker.Core
             }
             catch
             {
-                Logger.LogInformation($"SendQueue -> nacked payload: {serializedPayload.Id} from catch");
                 serializedPayload.SetStatus(SerializedPayloadStatusUpdate.Nack);
                 ObjectPool.Shared.Return(serializedPayload);
             }
@@ -221,9 +205,6 @@ namespace MessageBroker.Core
 
                 await Session.SendAsync(serializedPayload.Data);
                 
-                Logger.LogInformation($"SendQueue -> payload: {serializedPayload.Id} disposed");
-
-
                 ObjectPool.Shared.Return(serializedPayload);
             }
             finally

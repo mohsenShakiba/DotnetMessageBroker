@@ -2,6 +2,7 @@
 using System.Net.Sockets;
 using System.Threading;
 using MessageBroker.Client.ReceiveDataProcessing;
+using MessageBroker.Common.Binary;
 using MessageBroker.Common.Logging;
 using MessageBroker.TCP.Client;
 using MessageBroker.TCP.SocketWrapper;
@@ -10,7 +11,7 @@ namespace MessageBroker.Client.ConnectionManagement
 {
     public class ConnectionManager : IConnectionManager
     {
-        private readonly IClientSession _clientSession;
+        private IClientSession _clientSession;
         private readonly IReceiveDataProcessor _receiveDataProcessor;
 
         private SocketConnectionConfiguration _configuration;
@@ -86,14 +87,14 @@ namespace MessageBroker.Client.ConnectionManagement
 
         public void ClientDisconnected(IClientSession clientSession)
         {
-            Console.WriteLine($"client disconnected called {clientSession.Id}");
+            Logger.LogWarning($"client disconnected called {clientSession.Id}");
             // do nothing
             if (_closed)
                 return;
 
             lock (_lock)
             {
-                Console.WriteLine($"client disconnected called after {_reconnecting}");
+                Logger.LogWarning($"client disconnected called after {_reconnecting}");
                 if (_reconnecting)
                     return;
 
@@ -110,7 +111,7 @@ namespace MessageBroker.Client.ConnectionManagement
 
         private void TryConnect()
         {
-            Console.WriteLine($"Try connect called {_clientSession.Id}");
+            Logger.LogWarning($"Try connect called {_clientSession.Id}");
             while (true)
                 try
                 {
@@ -125,9 +126,12 @@ namespace MessageBroker.Client.ConnectionManagement
 
                     _tcpSocket.Connect(_configuration.IpEndPoint);
 
-                    OnConnected();
+                    if (_tcpSocket.Connected)
+                    {
+                        OnConnected();
+                        break;
+                    }
 
-                    break;
                 }
                 catch (SocketException e)
                 {
@@ -149,11 +153,14 @@ namespace MessageBroker.Client.ConnectionManagement
         private void OnConnected()
         {
             Logger.LogInformation("socket successfully connected to endpoint");
-
+            // todo: fix
+            var binaryDataProcessor = new BinaryDataProcessor();
+            _clientSession = new ClientSession(binaryDataProcessor);
             _clientSession.ForwardEventsTo(this);
             _clientSession.ForwardDataTo(_receiveDataProcessor);
-            Console.WriteLine($"calling use for {_clientSession.Id}");
+            var isConnected = _tcpSocket.Connected;
             _clientSession.Use(_tcpSocket);
+            Logger.LogWarning($"calling use for {_clientSession.Id}");
 
             lock (_lock)
             {
@@ -163,6 +170,7 @@ namespace MessageBroker.Client.ConnectionManagement
             _connectionReady = true;
             
             OnClientConnected?.Invoke();
+
         }
     }
 }

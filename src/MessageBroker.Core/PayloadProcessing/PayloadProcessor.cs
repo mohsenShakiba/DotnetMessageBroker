@@ -22,6 +22,8 @@ namespace MessageBroker.Core.PayloadProcessing
         public void OnDataReceived(Guid sessionId, Memory<byte> data)
         {
             var type = _serializer.ParsePayloadType(data);
+            
+            Logger.LogInformation($"received type {type}");
 
             switch (type)
             {

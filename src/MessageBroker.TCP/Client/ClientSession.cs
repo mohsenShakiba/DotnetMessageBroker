@@ -12,18 +12,17 @@ namespace MessageBroker.TCP.Client
     {
         private readonly IBinaryDataProcessor _binaryDataProcessor;
         private bool _connected;
-        private object _lock;
         private ITcpSocket _socket;
         private ISocketDataProcessor _socketDataProcessor;
-
         private ISocketEventProcessor _socketEventProcessor;
+        private object _lock;
         public bool Debug { get; set; }
 
         public ClientSession(IBinaryDataProcessor binaryDataProcessor)
         {
             _binaryDataProcessor = binaryDataProcessor;
             Id = Guid.NewGuid();
-            _lock = new();
+            _lock = new object();
         }
 
         public Guid Id { get; }
@@ -33,7 +32,7 @@ namespace MessageBroker.TCP.Client
             if (_connected)
                 return;
 
-            Logger.LogInformation($"client session -> {Debug} start receive process for {Id}");
+            Logger.LogInformation($"SendQueue -> client session -> {Debug} start receive process for {Id}");
 
             _socket = socket;
             _connected = true;
@@ -62,18 +61,29 @@ namespace MessageBroker.TCP.Client
 
         public void Close()
         {
-            Logger.LogInformation($"stopping client session {Id}");
-
-            _connected = false;
-
             lock (_lock)
             {
-                if (_connected)
+                if (!_connected)
                     return;
                 
-                _socket.Close();
+                Logger.LogInformation($"SendQueue -> stopping client session {Id}");
+
+                _connected = false;
             
-                _socketEventProcessor.ClientDisconnected(this);
+                try
+                {
+                    if (_connected)
+                        return;
+                
+                    _socket.Close();
+            
+                    _socketEventProcessor.ClientDisconnected(this);
+                    Logger.LogInformation($"SendQueue -> stopping event notified {Id}");
+                }
+                catch (Exception e)
+                {
+                    Logger.LogInformation($"SendQueue -> stopping event cause exception {e}");
+                }
             }
         }
 

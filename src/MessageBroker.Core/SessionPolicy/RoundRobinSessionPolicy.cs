@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using MessageBroker.Common.Logging;
 
 namespace MessageBroker.Core.SessionPolicy
 {
@@ -22,12 +23,14 @@ namespace MessageBroker.Core.SessionPolicy
         {
             try
             {
+                Logger.LogInformation($"SessionPolicy -> Added session {sessionId}");
                 _wrLock.EnterWriteLock();
                 
                 if (_sessions.Contains(sessionId))
                     throw new Exception("The session already exists");
                 
                 _sessions.Add(sessionId);
+                Logger.LogInformation($"SessionPolicy -> Added session completed {sessionId}");
             }
             finally
             {
@@ -76,6 +79,7 @@ namespace MessageBroker.Core.SessionPolicy
             try
             {
                 _wrLock.EnterWriteLock();
+                Logger.LogInformation($"SessionPolicy -> Removed session completed {sessionId}");
                 _sessions.Remove(sessionId);
             }
             finally

@@ -138,14 +138,14 @@ namespace Tests.Client
         [Fact]
         public async Task ContinuesTest()
         {
-            for (var i = 0; i < 10; i++)
+            for (var i = 0; i < 100; i++)
             {
                 await EndToEndTest_SingleSubscriberSinglePublisherWithSubscriberInterrupts_AllMessagesAreReceivedBySubscriber(100, 10);
             }
         }
 
         [Theory]
-        [InlineData(100, 10)]
+        [InlineData(1000, 5)]
         public async Task EndToEndTest_SingleSubscriberSinglePublisherWithSubscriberInterrupts_AllMessagesAreReceivedBySubscriber(int messageCount, int nackRation)
         {
             // declare variables
@@ -195,7 +195,9 @@ namespace Tests.Client
 
             subscriberConnectionManager.OnClientConnected += () =>
             {
-                queueManager.SubscribeQueue();
+                Logger.LogInformation("Client -> OnClientConnected");
+                var res = queueManager.SubscribeQueue();
+                Logger.LogInformation($"Client -> Subscription called with result {res.Result.IsSuccess} {res.Result.InternalErrorCode}");
             };
 
             var shit = 0;

@@ -75,7 +75,7 @@ namespace MessageBroker.Core.Queues
 
         public void SessionDisconnected(Guid sessionId)
         {
-            Logger.LogInformation($"Queue -> Session added {sessionId}");
+            Logger.LogInformation($"Queue -> Session disconnection {sessionId}");
             _sessionPolicy.RemoveSession(sessionId);
         }
 
@@ -97,8 +97,6 @@ namespace MessageBroker.Core.Queues
 
             foreach (var message in messages)
                 _queue.Writer.TryWrite(message);
-
-            Logger.LogInformation($"Queue: setting up messages, found {messages.Count()}");
         }
 
         private void SetupSendQueueProcessor()
@@ -149,11 +147,6 @@ namespace MessageBroker.Core.Queues
 
             if (_sendQueueStore.TryGet(sessionId.Value, out var sendQueue))
             {
-                if (_messageStore.TryGetValue(serializedPayload.Id, out var msg))
-                {
-                    Logger.LogInformation($"Queue -> Sending msg: {Encoding.UTF8.GetString(msg.Data.Span)} with {serializedPayload.Id}");
-                }
-                
                 serializedPayload.ClearStatusListener();
                 serializedPayload.OnStatusChanged += OnMessageStatusChanged;
                 sendQueue.Enqueue(serializedPayload);
@@ -175,19 +168,11 @@ namespace MessageBroker.Core.Queues
 
         private void OnMessageAck(Guid messageId)
         {
-            if (_messageStore.TryGetValue(messageId, out var msg))
-            {
-                Logger.LogInformation($"Queue -> Ack msg: {Encoding.UTF8.GetString(msg.Data.Span)}");
-            }
             _messageStore.Delete(messageId);
         }
 
         private void OnMessageNack(Guid messageId)
         {
-            if (_messageStore.TryGetValue(messageId, out var msg))
-            {
-                Logger.LogInformation($"Queue -> Nack msg: {Encoding.UTF8.GetString(msg.Data.Span)}");
-            }
             _queue.Writer.TryWrite(messageId);
         }
     }
