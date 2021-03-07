@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using MessageBroker.TCP;
 using MessageBroker.TCP.Client;
 
@@ -7,10 +8,9 @@ namespace MessageBroker.Client.ConnectionManagement
     public interface IConnectionManager : ISocketEventProcessor
     {
         public IClientSession ClientSession { get; }
-        public event Action OnClientConnected;
         public bool Connected { get; }
-        void Connect(SocketConnectionConfiguration configuration);
+        void Connect(IPEndPoint ipEndPoint);
         void Disconnect();
-        void SimulateConnectionDisconnection();
+        void SimulateInterrupt();
     }
 }

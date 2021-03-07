@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.QueueConsumerCoordination;
-using MessageBroker.Client.QueueManagement;
+using MessageBroker.Client.Subscription;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
@@ -24,7 +24,7 @@ namespace Tests.Client.QueueManagement
             // create mocks
             var serializer = new Mock<ISerializer>();
             var connectionManager = new Mock<IConnectionManager>();
-            var queueManagerStore = new Mock<IQueueManagerStore>();
+            var queueManagerStore = new Mock<ISubscriberStore>();
             var sendPayloadTaskManager = new Mock<ISendPayloadTaskManager>();
             var clientSession = new Mock<IClientSession>();
             
@@ -41,7 +41,7 @@ namespace Tests.Client.QueueManagement
             clientSession.Setup(cs => cs.SendAsync(It.IsAny<Memory<byte>>())).ReturnsAsync(true);
 
             // setup UUT
-            var queueManager = new QueueManager(serializer.Object, 
+            var queueManager = new Subscriber(serializer.Object, 
                 connectionManager.Object,
                 sendPayloadTaskManager.Object,
                 queueManagerStore.Object);
@@ -65,7 +65,7 @@ namespace Tests.Client.QueueManagement
             // create mocks
             var serializer = new Mock<ISerializer>();
             var connectionManager = new Mock<IConnectionManager>();
-            var queueManagerStore = new Mock<IQueueManagerStore>();
+            var queueManagerStore = new Mock<ISubscriberStore>();
             var sendPayloadTaskManager = new Mock<ISendPayloadTaskManager>();
             var clientSession = new Mock<IClientSession>();
             
@@ -82,7 +82,7 @@ namespace Tests.Client.QueueManagement
             clientSession.Setup(cs => cs.SendAsync(It.IsAny<Memory<byte>>())).ReturnsAsync(true);
 
             // setup UUT
-            var queueManager = new QueueManager(serializer.Object, 
+            var queueManager = new Subscriber(serializer.Object, 
                 connectionManager.Object,
                 sendPayloadTaskManager.Object,
                 queueManagerStore.Object);
@@ -106,7 +106,7 @@ namespace Tests.Client.QueueManagement
             // create mocks
             var serializer = new Mock<ISerializer>();
             var connectionManager = new Mock<IConnectionManager>();
-            var queueManagerStore = new Mock<IQueueManagerStore>();
+            var queueManagerStore = new Mock<ISubscriberStore>();
             var sendPayloadTaskManager = new Mock<ISendPayloadTaskManager>();
             var clientSession = new Mock<IClientSession>();
             
@@ -123,7 +123,7 @@ namespace Tests.Client.QueueManagement
             clientSession.Setup(cs => cs.SendAsync(It.IsAny<Memory<byte>>())).ReturnsAsync(true);
 
             // setup UUT
-            var queueManager = new QueueManager(serializer.Object, 
+            var queueManager = new Subscriber(serializer.Object, 
                 connectionManager.Object,
                 sendPayloadTaskManager.Object,
                 queueManagerStore.Object);
@@ -146,7 +146,7 @@ namespace Tests.Client.QueueManagement
             // create mocks
             var serializer = new Mock<ISerializer>();
             var connectionManager = new Mock<IConnectionManager>();
-            var queueManagerStore = new Mock<IQueueManagerStore>();
+            var queueManagerStore = new Mock<ISubscriberStore>();
             var sendPayloadTaskManager = new Mock<ISendPayloadTaskManager>();
             var clientSession = new Mock<IClientSession>();
             
@@ -163,7 +163,7 @@ namespace Tests.Client.QueueManagement
             clientSession.Setup(cs => cs.SendAsync(It.IsAny<Memory<byte>>())).ReturnsAsync(true);
 
             // setup UUT
-            var queueManager = new QueueManager(serializer.Object, 
+            var queueManager = new Subscriber(serializer.Object, 
                 connectionManager.Object,
                 sendPayloadTaskManager.Object,
                 queueManagerStore.Object);

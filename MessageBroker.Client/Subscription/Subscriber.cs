@@ -8,39 +8,43 @@ using MessageBroker.Models;
 using MessageBroker.Models.BinaryPayload;
 using MessageBroker.Serialization;
 
-namespace MessageBroker.Client.QueueManagement
+namespace MessageBroker.Client.Subscription
 {
-    public class QueueManager : IQueueManager
+    public class Subscriber : ISubscriber
     {
         private readonly IConnectionManager _connectionManager;
-        private readonly IQueueManagerStore _queueManagerStore;
+        private readonly ISubscriberStore _subscriberStore;
         private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
         private readonly ISerializer _serializer;
+        
+        private bool _disposed;
+        public event Action<QueueConsumerMessage> MessageReceived;
+        public event Action SubscriptionFailed;
+        
+        public string Name { get; private set; }
+        public string Route { get; private set; }
 
-        public QueueManager(ISerializer serializer, IConnectionManager connectionManager,
-            ISendPayloadTaskManager sendPayloadTaskManager, IQueueManagerStore queueManagerStore)
+
+        public Subscriber(ISerializer serializer, IConnectionManager connectionManager,
+            ISendPayloadTaskManager sendPayloadTaskManager, ISubscriberStore subscriberStore)
         {
             _serializer = serializer;
             _connectionManager = connectionManager;
             _sendPayloadTaskManager = sendPayloadTaskManager;
-            _queueManagerStore = queueManagerStore;
+            _subscriberStore = subscriberStore;
         }
-
-        public string Name { get; private set; }
-
-        public string Route { get; private set; }
-
-        public event Action<QueueConsumerMessage> MessageReceived;
 
         public void Setup(string name, string route)
         {
             Route = route;
             Name = name;
-            _queueManagerStore.Add(this);
+            _subscriberStore.Add(this);
         }
 
         public async Task<SendAsyncResult> DeclareQueue()
         {
+            MakeSureNotDisposed();
+            
             var serializedPayload = QueueDeclareSerializedPayload();
 
             var result = await SendAsync(serializedPayload);
@@ -50,6 +54,8 @@ namespace MessageBroker.Client.QueueManagement
 
         public async Task<SendAsyncResult> DeleteQueue()
         {
+            MakeSureNotDisposed();
+            
             var sendPayload = QueueDeleteSendPayload();
 
             var result = await SendAsync(sendPayload);
@@ -59,6 +65,8 @@ namespace MessageBroker.Client.QueueManagement
 
         public async Task<SendAsyncResult> SubscribeQueue()
         {
+            MakeSureNotDisposed();
+            
             var sendPayload = SubscribeSendPayload();
 
             var result = await SendAsync(sendPayload);
@@ -68,6 +76,8 @@ namespace MessageBroker.Client.QueueManagement
 
         public async Task<SendAsyncResult> UnSubscribeQueue()
         {
+            MakeSureNotDisposed();
+            
             var sendPayload = UnSubscribeSendPayload();
 
             var result = await SendAsync(sendPayload);
@@ -77,6 +87,7 @@ namespace MessageBroker.Client.QueueManagement
 
         private async Task<SendAsyncResult> SendAsync(SerializedPayload serializedPayload)
         {
+            
             var clientSession = _connectionManager.ClientSession;
 
             var sendPayloadTask = _sendPayloadTaskManager.Setup(serializedPayload.Id, true);
@@ -147,6 +158,23 @@ namespace MessageBroker.Client.QueueManagement
             };
 
             MessageReceived?.Invoke(queueConsumerMessage);
+        }
+
+        private void MakeSureNotDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(Subscriber));
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                throw new Exception("Subscriber already disposed");
+
+            _disposed = true;
+
+            MessageReceived = null;
+            SubscriptionFailed = null;
         }
     }
 }

@@ -16,7 +16,7 @@ namespace Tests.Client.ReceiveDataProcessing
         public void DataReceived_DataIsMessage_DispatchToQueueManagerStore()
         {
             var serializer = new Serializer();
-            var queueManagerStore = new Mock<IQueueManagerStore>();
+            var queueManagerStore = new Mock<ISubscriberStore>();
             var sendPayloadTaskManager = new Mock<ISendPayloadTaskManager>();
 
             var receiveDataProcessor = new ReceiveDataProcessor(serializer,
@@ -43,7 +43,7 @@ namespace Tests.Client.ReceiveDataProcessing
         public void DataReceived_DataIsOk_TaskManagerIsCalled()
         {
             var serializer = new Serializer();
-            var queueManagerStore = new Mock<IQueueManagerStore>();
+            var queueManagerStore = new Mock<ISubscriberStore>();
             var sendPayloadTaskManager = new Mock<ISendPayloadTaskManager>();
 
             var receiveDataProcessor = new ReceiveDataProcessor(serializer,
@@ -67,7 +67,7 @@ namespace Tests.Client.ReceiveDataProcessing
         public void DataReceived_DataIsError_TaskManagerIsCalled()
         {
             var serializer = new Serializer();
-            var queueManagerStore = new Mock<IQueueManagerStore>();
+            var queueManagerStore = new Mock<ISubscriberStore>();
             var sendPayloadTaskManager = new Mock<ISendPayloadTaskManager>();
 
             var receiveDataProcessor = new ReceiveDataProcessor(serializer,

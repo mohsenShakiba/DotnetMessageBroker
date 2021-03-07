@@ -12,17 +12,17 @@ namespace MessageBroker.Client.ReceiveDataProcessing
 {
     public class ReceiveDataProcessor : IReceiveDataProcessor
     {
-        private readonly IQueueManagerStore _queueManagerStore;
+        private readonly ISubscriberStore _subscriberStore;
         private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
         private readonly ISerializer _serializer;
 
         private int _receivedMessagesCount;
 
         public ReceiveDataProcessor(ISerializer serializer,
-            IQueueManagerStore queueManagerStore, ISendPayloadTaskManager sendPayloadTaskManager)
+            ISubscriberStore subscriberStore, ISendPayloadTaskManager sendPayloadTaskManager)
         {
             _serializer = serializer;
-            _queueManagerStore = queueManagerStore;
+            _subscriberStore = subscriberStore;
             _sendPayloadTaskManager = sendPayloadTaskManager;
         }
 
@@ -50,7 +50,7 @@ namespace MessageBroker.Client.ReceiveDataProcessing
         {
             Interlocked.Increment(ref _receivedMessagesCount);
             var queueMessage = _serializer.ToQueueMessage(payloadData);
-            _queueManagerStore.OnMessage(queueMessage);
+            _subscriberStore.OnMessage(queueMessage);
         }
 
         private void OnOk(Memory<byte> payloadData)

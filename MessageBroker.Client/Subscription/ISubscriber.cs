@@ -2,11 +2,12 @@
 using System.Threading.Tasks;
 using MessageBroker.Client.Models;
 
-namespace MessageBroker.Client.QueueManagement
+namespace MessageBroker.Client.Subscription
 {
-    public interface IQueueManager
+    public interface ISubscriber: IDisposable
     {
         event Action<QueueConsumerMessage> MessageReceived;
+        event Action SubscriptionFailed; 
         void Setup(string name, string route);
         Task<SendAsyncResult> DeclareQueue();
         Task<SendAsyncResult> DeleteQueue();

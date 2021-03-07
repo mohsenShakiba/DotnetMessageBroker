@@ -1,9 +1,10 @@
 ﻿using System;
+using System.Net;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Models;
-using MessageBroker.Client.QueueManagement;
-using MessageBroker.Client.ReceiveDataProcessing;
+using MessageBroker.Client.Subscription;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Models;
 using MessageBroker.Models.BinaryPayload;
@@ -15,11 +16,9 @@ namespace MessageBroker.Client
     public class MessageBrokerClient
     {
         private readonly IConnectionManager _connectionManager;
-        private readonly IReceiveDataProcessor _eceiveDataProcessor;
         private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
         private readonly ISerializer _serializer;
         private readonly IServiceProvider _serviceProvider;
-
 
         public MessageBrokerClient(ISerializer serializer, ISendPayloadTaskManager sendPayloadTaskManager,
             IConnectionManager connectionManager, IServiceProvider serviceProvider)
@@ -31,9 +30,9 @@ namespace MessageBroker.Client
         }
 
 
-        public void Connect(SocketConnectionConfiguration configuration)
+        public void Connect(IPEndPoint ipEndPoint)
         {
-            _connectionManager.Connect(configuration);
+            _connectionManager.Connect(ipEndPoint);
         }
 
         public void Disconnect()
@@ -41,13 +40,12 @@ namespace MessageBroker.Client
             _connectionManager.Disconnect();
         }
 
-        public IQueueManager GetQueueManager(string name, string route)
+        public ISubscriber GetQueueSubscriber(string name, string route)
         {
-            var queueManager = _serviceProvider.GetRequiredService<IQueueManager>();
+            var queueManager = _serviceProvider.GetRequiredService<ISubscriber>();
             queueManager.Setup(name, route);
             return queueManager;
         }
-
 
         public Task<SendAsyncResult> PublishAsync(string route, byte[] data, bool completedOnAcknowledge = true)
         {
@@ -65,6 +63,11 @@ namespace MessageBroker.Client
         {
             var sendPayload = GetNackData(messageId);
             return SendAsync(sendPayload, false);
+        }
+
+        public QueueSubscription SubscribeAsync(string queueName)
+        {
+            return new 
         }
 
         public Task<SendAsyncResult> ConfigureClientAsync(int concurrency, bool autoAck)
