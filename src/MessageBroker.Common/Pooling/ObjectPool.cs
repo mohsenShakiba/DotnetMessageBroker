@@ -58,8 +58,6 @@ namespace MessageBroker.Common.Pooling
                     return i;
                 }
 
-                ;
-
 #if DEBUG
                 _objectTypeStatDict[type] += 1;
 #endif

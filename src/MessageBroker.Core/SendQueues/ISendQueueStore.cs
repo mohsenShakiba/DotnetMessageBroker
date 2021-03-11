@@ -5,8 +5,8 @@ namespace MessageBroker.Core
 {
     public interface ISendQueueStore
     {
-        void Add(IClientSession clientSession, ISendQueue sendQueue = null);
-        void Remove(IClientSession clientSession);
+        ISendQueue Add(IClientSession clientSession, ISendQueue sendQueue = null);
+        ISendQueue Remove(IClientSession clientSession);
         bool TryGet(Guid sessionId, out ISendQueue sendQueue);
     }
 }

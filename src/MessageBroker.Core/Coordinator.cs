@@ -3,6 +3,8 @@ using MessageBroker.Common.Logging;
 using MessageBroker.Core.PayloadProcessing;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.Persistence.Queues;
+using MessageBroker.Models;
+using MessageBroker.Serialization;
 using MessageBroker.TCP;
 using MessageBroker.TCP.Client;
 
@@ -13,15 +15,17 @@ namespace MessageBroker.Core
         private readonly IPayloadProcessor _payloadProcessor;
         private readonly ISendQueueStore _sendQueueStore;
         private readonly IMessageStore _messageStore;
+        private readonly ISerializer _serializer;
         private readonly IQueueStore _queueStore;
 
         public Coordinator(IPayloadProcessor payloadProcessor, ISendQueueStore sendQueueStore, IQueueStore queueStore,
-            IMessageStore messageStore)
+            IMessageStore messageStore, ISerializer serializer)
         {
             _payloadProcessor = payloadProcessor;
             _sendQueueStore = sendQueueStore;
             _queueStore = queueStore;
             _messageStore = messageStore;
+            _serializer = serializer;
         }
 
         public void Setup()
@@ -44,8 +48,12 @@ namespace MessageBroker.Core
 
         public void ClientConnected(IClientSession clientSession)
         {
-            Logger.LogInformation("client session connected, added send queue");
-            _sendQueueStore.Add(clientSession);
+            Logger.LogInformation($"client session connected, added send queue {clientSession.Id}");
+            
+            // todo: better implementation
+            var sendQueue = _sendQueueStore.Add(clientSession);
+            var serializedPayload = _serializer.Serialize(new Ready());
+            sendQueue.Enqueue(serializedPayload);
         }
 
         public void ClientDisconnected(IClientSession clientSession)

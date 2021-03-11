@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Net;
-using MessageBroker.Client.QueueConsumerCoordination;
+using System.Threading;
+using System.Threading.Tasks;
+using MessageBroker.Client.Exceptions;
 using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Common.Binary;
+using MessageBroker.Common.Logging;
 using MessageBroker.TCP.Client;
 using MessageBroker.TCP.SocketWrapper;
 
@@ -15,7 +18,12 @@ namespace MessageBroker.Client.ConnectionManagement
 
         private IClientSession _clientSession;
         private ITcpSocket _tcpSocket;
-        
+        private IPEndPoint _endPoint;
+        private bool _ready;
+
+        public event Action OnConnected;
+        public event Action OnDisconnected;
+
         public IClientSession ClientSession => _clientSession;
         public bool Connected => _tcpSocket.Connected;
 
@@ -30,6 +38,8 @@ namespace MessageBroker.Client.ConnectionManagement
         private void SetDefaultTcpSocket()
         {
             _tcpSocket = new TcpSocket();
+
+            _receiveDataProcessor.OnReadyReceived += MarkAsReady;
         }
 
         public void SetAlternativeTcpSocketForTesting(ITcpSocket tcpSocket)
@@ -41,13 +51,22 @@ namespace MessageBroker.Client.ConnectionManagement
         {
             _ = ipEndPoint ?? throw new ArgumentNullException(nameof(ipEndPoint));
 
+            _endPoint = ipEndPoint;
+
             _tcpSocket.Connect(ipEndPoint);
-            
+
             _clientSession = new ClientSession(_binaryDataProcessor);
-            
+
             _clientSession.ForwardEventsTo(this);
             _clientSession.ForwardDataTo(_receiveDataProcessor);
             _clientSession.Use(_tcpSocket);
+
+            ClientConnected(_clientSession);
+        }
+
+        public void Reconnect()
+        {
+            Connect(_endPoint);
         }
 
         public void Disconnect()
@@ -61,14 +80,45 @@ namespace MessageBroker.Client.ConnectionManagement
             _tcpSocket.Disconnect(true);
         }
 
+        public async ValueTask WaitForReadyAsync(CancellationToken cancellationToken)
+        {
+            if (_ready)
+            {
+                return;
+            }
+
+            if (!Connected)
+            {
+                throw new SocketNotConnectionException();
+            }
+
+            while (!cancellationToken.IsCancellationRequested && !_ready)
+            {
+                Logger.LogInformation("waiting for ready signal");
+                await Task.Delay(1000, cancellationToken);
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+                throw new TaskCanceledException();
+            
+        }
+
+        public void MarkAsReady()
+        {
+            _ready = true;
+        }
+
         public void ClientDisconnected(IClientSession clientSession)
         {
-            // do nothing
+            Logger.LogInformation("Client disconnected");
+            OnDisconnected?.Invoke();
+            _ready = false;
         }
 
         public void ClientConnected(IClientSession clientSession)
         {
-            // do nothing
+            Logger.LogInformation("Client connected");
+            OnConnected?.Invoke();
         }
     }
 }

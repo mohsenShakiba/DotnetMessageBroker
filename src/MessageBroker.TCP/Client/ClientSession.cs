@@ -32,7 +32,7 @@ namespace MessageBroker.TCP.Client
             if (_connected)
                 return;
 
-            Logger.LogInformation($"SendQueue -> client session -> {Debug} start receive process for {Id}");
+            Logger.LogInformation($"SendQueue -> client session -> start receive process for {Id}");
 
             _socket = socket;
             _connected = true;

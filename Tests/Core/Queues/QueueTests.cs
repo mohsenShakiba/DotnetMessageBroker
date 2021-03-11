@@ -56,7 +56,7 @@ namespace Tests.Core.Queues
 
             queue.OnMessage(sampleMessage);
             
-            Thread.Sleep(1000);
+            queue.ReadNextMessage();
 
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
         }
@@ -93,13 +93,12 @@ namespace Tests.Core.Queues
 
             queue.OnMessage(sampleMessage);
             
-            Thread.Sleep(100);
-            
             sendQueueStore.Add(clientSession.Object);
+            
             queue.SessionSubscribed(activeSessionId);
             
-            Thread.Sleep(100);
-
+            queue.ReadNextMessage();
+            
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
         }
 
@@ -186,11 +185,11 @@ namespace Tests.Core.Queues
 
             queue.OnMessage(sampleMessage);
 
-            Thread.Sleep(1000);
-
+            queue.ReadNextMessage();
+            
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
             
-            Thread.Sleep(1000);
+            queue.ReadNextMessage();
             
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
         }
@@ -239,8 +238,10 @@ namespace Tests.Core.Queues
 
             queue.OnMessage(sampleMessage);
 
-            Thread.Sleep(1000);
-
+            queue.ReadNextMessage();
+            
+            sendQueue.
+            
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
             messageStore.Verify(cs => cs.Delete(It.IsAny<Guid>()));
         }
@@ -313,7 +314,7 @@ namespace Tests.Core.Queues
             sendQueueStore.Add(clientSession.Object);
             queue.SessionSubscribed(activeSessionId);
 
-            Thread.Sleep(1000);
+            queue.ReadNextMessage();
 
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
         }

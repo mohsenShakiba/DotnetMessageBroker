@@ -58,13 +58,7 @@ namespace MessageBroker.Core
                 while (!_cancellationTokenSource.Token.IsCancellationRequested)
                     try
                     {
-                        // read the serialized payload from reader
-                        var serializedPayload = await _queue.Reader.ReadAsync();
-
-                        if (serializedPayload.Type == PayloadType.Msg)
-                            await SendMessagePayloadAsync(serializedPayload);
-                        else
-                            await SendNonMessagePayloadAsync(serializedPayload);
+                        
                     }
                     catch
                     {

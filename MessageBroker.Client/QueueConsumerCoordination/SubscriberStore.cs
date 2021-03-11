@@ -1,4 +1,6 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Threading.Tasks;
 using MessageBroker.Client.Subscription;
 using MessageBroker.Models;
 
@@ -27,6 +29,14 @@ namespace MessageBroker.Client.QueueConsumerCoordination
         {
             if (_queueDict.TryGetValue(queueMessage.QueueName, out var queueConsumer))
                 queueConsumer.OnMessage(queueMessage);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            foreach (var (_, subscriber) in _queueDict)
+            {
+                await subscriber.DisposeAsync();
+            }
         }
     }
 }

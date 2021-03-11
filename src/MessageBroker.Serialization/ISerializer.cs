@@ -17,6 +17,7 @@ namespace MessageBroker.Serialization
         SerializedPayload Serialize(QueueDelete queueDelete);
         SerializedPayload Serialize(ConfigureSubscription configureSubscription);
         SerializedPayload Serialize(Error error);
+        SerializedPayload Serialize(Ready ready);
 
         PayloadType ParsePayloadType(Memory<byte> b);
 
@@ -31,5 +32,6 @@ namespace MessageBroker.Serialization
         QueueDeclare ToQueueDeclareModel(Memory<byte> data);
         QueueDelete ToQueueDeleteModel(Memory<byte> data);
         ConfigureSubscription ToConfigureSubscription(Memory<byte> data);
+        Ready ToReady(Memory<byte> data);
     }
 }

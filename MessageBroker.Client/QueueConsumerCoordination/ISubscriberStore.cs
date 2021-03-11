@@ -1,9 +1,10 @@
-﻿using MessageBroker.Client.Subscription;
+﻿using System;
+using MessageBroker.Client.Subscription;
 using MessageBroker.Models;
 
 namespace MessageBroker.Client.QueueConsumerCoordination
 {
-    public interface ISubscriberStore
+    public interface ISubscriberStore: IAsyncDisposable
     {
         void Add(Subscriber subscriber);
         void Remove(Subscriber subscriber);

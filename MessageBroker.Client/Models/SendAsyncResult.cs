@@ -1,4 +1,6 @@
-﻿namespace MessageBroker.Client.Models
+﻿using MessageBroker.Models;
+
+namespace MessageBroker.Client.Models
 {
     public class SendAsyncResult
     {
@@ -10,5 +12,20 @@
             IsSuccess = true,
             InternalErrorCode = "Already completed, cannot re-process"
         };
+        
+        public static SendAsyncResult SocketNotConnected => new()
+        {
+            IsSuccess = false,
+            InternalErrorCode = "Client socket in not in connected state"
+        };
+        
+        public static SendAsyncResult Error(string error)
+        {
+            return new()
+            {
+                IsSuccess = false,
+                InternalErrorCode = error
+            };
+        }
     }
 }

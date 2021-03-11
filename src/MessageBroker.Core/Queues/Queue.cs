@@ -6,6 +6,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
+using MessageBroker.Common.Threading;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.SessionPolicy;
@@ -23,6 +24,7 @@ namespace MessageBroker.Core.Queues
         private readonly IRouteMatcher _routeMatcher;
         private readonly ISerializer _serializer;
         private readonly ISessionPolicy _sessionPolicy;
+        private readonly AsyncResetEvent _asyncResetEvent;
         
         private bool _stopped;
 
@@ -36,6 +38,7 @@ namespace MessageBroker.Core.Queues
             _routeMatcher = routeMatcher;
             _serializer = serializer;
             _queue = Channel.CreateUnbounded<Guid>();
+            _asyncResetEvent = new();
         }
 
         public void Dispose()
@@ -44,7 +47,6 @@ namespace MessageBroker.Core.Queues
         }
 
         public string Name { get; private set; }
-
         public string Route { get; private set; }
 
         public void Setup(string name, string route)
@@ -83,12 +85,14 @@ namespace MessageBroker.Core.Queues
         {
             Logger.LogInformation($"Queue -> Session added {sessionId}");
             _sessionPolicy.AddSession(sessionId);
+            CheckCurrentSessionStatus();
         }
 
         public void SessionUnSubscribed(Guid sessionId)
         {
             Logger.LogInformation($"Queue -> Session removed {sessionId}");
             SessionDisconnected(sessionId);
+            CheckCurrentSessionStatus();
         }
 
         private void ReadPayloadsFromMessageStore()
@@ -103,24 +107,20 @@ namespace MessageBroker.Core.Queues
         {
             Task.Factory.StartNew(async () =>
             {
-                while (true)
+                while (!_stopped)
                 {
-                    if (_stopped)
-                        return;
-                    
-                    if (!_sessionPolicy.HasSession())
-                    {
-                        await Task.Delay(1000);
-                        Logger.LogInformation("Queue -> Skipping due to insufficient session with msg count: " + _queue.Reader.Count);
-                        continue;
-                    }
-
-                    if (_queue.Reader.TryRead(out var messageId))
-                    {
-                        ProcessMessage(messageId);
-                    }
+                    await _asyncResetEvent.WaitAsync();
+                    ReadNextMessage();
                 }
             }, TaskCreationOptions.LongRunning);
+        }
+
+        public void ReadNextMessage()
+        {
+            if (_queue.Reader.TryRead(out var messageId))
+            {
+                ProcessMessage(messageId);
+            }
         }
 
         private void ProcessMessage(Guid messageId)
@@ -174,6 +174,14 @@ namespace MessageBroker.Core.Queues
         private void OnMessageNack(Guid messageId)
         {
             _queue.Writer.TryWrite(messageId);
+        }
+
+        private void CheckCurrentSessionStatus()
+        {
+            if (_sessionPolicy.HasSession())
+                _asyncResetEvent.UnBlock();
+            else
+                _asyncResetEvent.Block();
         }
     }
 }

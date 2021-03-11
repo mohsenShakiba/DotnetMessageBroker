@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text;
 using System.Threading;
+using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.QueueConsumerCoordination;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Common.Logging;
@@ -15,6 +16,8 @@ namespace MessageBroker.Client.ReceiveDataProcessing
         private readonly ISubscriberStore _subscriberStore;
         private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
         private readonly ISerializer _serializer;
+
+        public event Action OnReadyReceived;
 
         private int _receivedMessagesCount;
 
@@ -40,6 +43,9 @@ namespace MessageBroker.Client.ReceiveDataProcessing
                 case PayloadType.Msg:
                     OnMessage(data);
                     break;
+                case PayloadType.Ready:
+                    OnReady();
+                    break;
                 default:
                     throw new InvalidOperationException(
                         "Failed to map type to appropriate action while parsing payload");
@@ -63,6 +69,11 @@ namespace MessageBroker.Client.ReceiveDataProcessing
         {
             var nack = _serializer.ToError(payloadData);
             _sendPayloadTaskManager.OnPayloadErrorResult(nack.Id, nack.Message);
+        }
+
+        private void OnReady()
+        {
+            OnReadyReceived?.Invoke();
         }
     }
 }

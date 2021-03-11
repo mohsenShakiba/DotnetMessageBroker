@@ -8,6 +8,7 @@ namespace MessageBroker.Core.Queues
         string Name { get; }
         string Route { get; }
         void Setup(string name, string route);
+        void ReadNextMessage();
         void OnMessage(Message message);
         void SessionSubscribed(Guid sessionId);
         void SessionUnSubscribed(Guid sessionId);

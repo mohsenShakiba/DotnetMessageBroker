@@ -35,7 +35,7 @@ namespace Tests
     public class EndToEndTests
     {
         [Theory]
-        [InlineData(1000, 10)]
+        [InlineData(50000, 10)]
         public async Task EndToEndTest_SingleSubscriberSinglePublisherNoInterrupt_AllMessagesAreReceivedBySubscriber(
             int messageCount, int nackRation)
         {
@@ -62,19 +62,17 @@ namespace Tests
             var publisherClient = publisherServiceProvider.GetRequiredService<MessageBrokerClient>();
             publisherClient.Connect(destination);
 
-            // setup reset event
-            var manualResetEvent = new ManualResetEventSlim(false);
-
-            // setup queue 
-            var queueManager = subscriberClient.GetQueueSubscriber(queueName, queueRoute);
-            var declareResult = await queueManager.DeclareQueue();
-            var subscribeResult = await queueManager.SubscribeQueue();
+            // declare the queue
+            var declareResult = await subscriberClient.CreateQueueAsync(queueName, queueRoute);
 
             if (!declareResult.IsSuccess)
                 throw new Exception($"declare queue failed with error {declareResult.InternalErrorCode}");
 
-            if (!subscribeResult.IsSuccess)
-                throw new Exception($"subscription failed with error {declareResult.InternalErrorCode}");
+            // setup reset event
+            var manualResetEvent = new ManualResetEventSlim(false);
+
+            // setup queue 
+            var queueManager = await subscriberClient.GetQueueSubscriber(queueName, queueRoute);
 
             // setup subscriber
             queueManager.MessageReceived += async msg =>
@@ -130,7 +128,7 @@ namespace Tests
 
 
         [Theory]
-        [InlineData(1000, 10, 10)]
+        [InlineData(1000, 10, 5)]
         public async Task
             EndToEndTest_SingleSubscriberSinglePublisherWithInterrupts_AllMessagesAreReceivedBySubscriber(
                 int messageCount, int nackRation, int failureRatio)
@@ -162,34 +160,46 @@ namespace Tests
             var publisherClient = publisherServiceProvider.GetRequiredService<MessageBrokerClient>();
             publisherClient.Connect(destination);
 
-            // setup reset event
-            var manualResetEvent = new ManualResetEventSlim(false);
-
-            // setup queue 
-            var queueManager = subscriberClient.GetQueueSubscriber(queueName, queueRoute);
-            var declareResult = await queueManager.DeclareQueue();
-            var subscribeResult = await queueManager.SubscribeQueue();
+            // declare the queue
+            var declareResult = await subscriberClient.CreateQueueAsync(queueName, queueRoute);
 
             if (!declareResult.IsSuccess)
                 throw new Exception($"declare queue failed with error {declareResult.InternalErrorCode}");
 
-            if (!subscribeResult.IsSuccess)
-                throw new Exception($"subscription failed with error {declareResult.InternalErrorCode}");
+            // setup reset event
+            var manualResetEvent = new ManualResetEventSlim(false);
+
+            // setup queue 
+            var queueManager = await subscriberClient.GetQueueSubscriber(queueName, queueRoute);
+
+            // setup subscriber on disconnect
+            subscriberClient.OnDisconnected += () =>
+            {
+                Logger.LogInformation($"subscriber disconnected, reconnecting");
+                subscriberClient.Reconnect();
+            };
+
+            // setup publisher on disconnect
+            publisherClient.OnDisconnected += () =>
+            {
+                Logger.LogInformation($"publisher disconnected, reconnecting");
+                publisherClient.Reconnect();
+            };
 
             // setup subscriber
             queueManager.MessageReceived += async msg =>
             {
                 var ratio = random.Next(0, 100);
+                
+                if (ratio < failureRatio)
+                {
+                    subscriberConnectionManager.SimulateInterrupt();
+                    return;
+                }
 
                 if (ratio < nackRation)
                 {
                     await subscriberClient.NackAsync(msg.MessageId);
-                    return;
-                }
-
-                if (ratio < failureRatio)
-                {
-                    subscriberConnectionManager.SimulateInterrupt();
                     return;
                 }
 
@@ -203,7 +213,10 @@ namespace Tests
 
                     if (receivedMessagesCount == messageCount)
                         manualResetEvent.Set();
+                    Logger.LogInformation($"received count: {receivedMessagesCount} with content: {messageStr}");
+ 
                 }
+                
 
                 await subscriberClient.AckAsync(msg.MessageId);
             };
@@ -212,12 +225,18 @@ namespace Tests
 
             while (publishedMessages < messageCount)
             {
+                if (!publisherClient.Connected)
+                {
+                    Thread.Sleep(2000);
+                    Logger.LogInformation($"publisher disconnected, ignoreing");
+                    continue;
+                }
                 var ratio = random.Next(0, 100);
 
                 if (ratio < failureRatio)
                 {
+                    Logger.LogInformation($"interupting");
                     publisherConnectionManager.SimulateInterrupt();
-                    continue;
                 }
 
                 var randomString = RandomGenerator.GenerateString(10);
@@ -231,14 +250,23 @@ namespace Tests
                         messageStore[randomString] = 1;
                 }
 
+                Logger.LogInformation($"before send {publishedMessages}");
                 var publishResult = await publisherClient.PublishAsync(queueRoute, randomData);
 
                 if (!publishResult.IsSuccess)
-                    throw new Exception($"publish message failed with error {publishResult.InternalErrorCode}");
+                {
+                    messageStore.Remove(randomString);
+                    Logger.LogInformation("failed to send data to server");
+                    continue;                    
+                }
                 
+                Logger.LogInformation($"sent {publishedMessages}");
+
                 publishedMessages += 1;
             }
 
+            Logger.LogInformation("finished sending message");
+            
             manualResetEvent.Wait();
             server.Stop();
         }
@@ -283,8 +311,9 @@ namespace Tests
             serviceCollection.AddSingleton<StringPool>();
             serviceCollection.AddSingleton<MessageBrokerClient>();
             serviceCollection.AddSingleton<ISendQueueStore, SendQueueStore>();
-
-            Logger.AddFileLogger(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\logs.txt");
+            
+            // Logger.AddFileLogger(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\logs.txt");
+            Logger.AddConsole();
 
             return serviceCollection.BuildServiceProvider();
         }

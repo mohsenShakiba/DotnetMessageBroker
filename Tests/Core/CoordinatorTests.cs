@@ -1,8 +1,10 @@
 ﻿using System;
+using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Core;
 using MessageBroker.Core.PayloadProcessing;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.Persistence.Queues;
+using MessageBroker.Serialization;
 using MessageBroker.TCP.Client;
 using Moq;
 using Xunit;
@@ -18,8 +20,9 @@ namespace Tests.Core
             var sendQueueStore = new Mock<ISendQueueStore>();
             var queueStore = new Mock<IQueueStore>();
             var messageStore = new Mock<IMessageStore>();
+            var serializer = new Mock<ISerializer>();
 
-            var coordinator = new Coordinator(payloadProcessor.Object, sendQueueStore.Object, queueStore.Object, messageStore.Object);
+            var coordinator = new Coordinator(payloadProcessor.Object, sendQueueStore.Object, queueStore.Object, messageStore.Object, serializer.Object);
             
             coordinator.Setup();
 
@@ -34,8 +37,9 @@ namespace Tests.Core
             var sendQueueStore = new Mock<ISendQueueStore>();
             var queueStore = new Mock<IQueueStore>();
             var messageStore = new Mock<IMessageStore>();
+            var serializer = new Mock<ISerializer>();
 
-            var coordinator = new Coordinator(payloadProcessor.Object, sendQueueStore.Object, queueStore.Object, messageStore.Object);
+            var coordinator = new Coordinator(payloadProcessor.Object, sendQueueStore.Object, queueStore.Object, messageStore.Object, serializer.Object);
             
             coordinator.DataReceived(It.IsAny<Guid>(), It.IsAny<Memory<byte>>());
             
@@ -49,8 +53,9 @@ namespace Tests.Core
             var sendQueueStore = new Mock<ISendQueueStore>();
             var queueStore = new Mock<IQueueStore>();
             var messageStore = new Mock<IMessageStore>();
+            var serializer = new Mock<ISerializer>();
 
-            var coordinator = new Coordinator(payloadProcessor.Object, sendQueueStore.Object, queueStore.Object, messageStore.Object);
+            var coordinator = new Coordinator(payloadProcessor.Object, sendQueueStore.Object, queueStore.Object, messageStore.Object, serializer.Object);
 
             coordinator.ClientConnected(It.IsAny<IClientSession>());
             
@@ -64,8 +69,9 @@ namespace Tests.Core
             var sendQueueStore = new Mock<ISendQueueStore>();
             var queueStore = new Mock<IQueueStore>();
             var messageStore = new Mock<IMessageStore>();
+            var serializer = new Mock<ISerializer>();
 
-            var coordinator = new Coordinator(payloadProcessor.Object, sendQueueStore.Object, queueStore.Object, messageStore.Object);
+            var coordinator = new Coordinator(payloadProcessor.Object, sendQueueStore.Object, queueStore.Object, messageStore.Object, serializer.Object);
 
             coordinator.ClientDisconnected(It.IsAny<IClientSession>());
             

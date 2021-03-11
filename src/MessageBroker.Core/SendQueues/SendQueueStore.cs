@@ -15,18 +15,22 @@ namespace MessageBroker.Core
         }
         
 
-        public void Add(IClientSession clientSession, ISendQueue sendQueue = null)
+        public ISendQueue Add(IClientSession clientSession, ISendQueue sendQueue = null)
         {
             sendQueue ??= new SendQueue(clientSession);
             _sendQueues[clientSession.Id] = sendQueue;
+            return sendQueue;
         }
 
-        public void Remove(IClientSession clientSession)
+        public ISendQueue Remove(IClientSession clientSession)
         {
             if (_sendQueues.TryRemove(clientSession.Id, out var sendQueue))
             {
                 sendQueue.Stop();
+                return sendQueue;
             }
+
+            return null;
         }
 
         public bool TryGet(Guid sessionId, out ISendQueue sendQueue)

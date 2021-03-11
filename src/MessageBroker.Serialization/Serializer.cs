@@ -153,6 +153,16 @@ namespace MessageBroker.Serialization
                 .Build();
         }
 
+        public SerializedPayload Serialize(Ready ready)
+        {
+            var sendPayload = ObjectPool.Shared.Rent<BinarySerializeHelper>();
+            sendPayload.Setup();
+
+            return sendPayload
+                .WriteType(PayloadType.Ready)
+                .Build();
+        }
+
         #endregion
 
         #region Deserialize
@@ -399,11 +409,12 @@ namespace MessageBroker.Serialization
             }
         }
 
+        public Ready ToReady(Memory<byte> _)
+        {
+            return new Ready();
+        }
+
         #endregion
 
-        public void SetPooledStatus(bool isReturned)
-        {
-            IsReturnedToPool = isReturned;
-        }
     }
 }
