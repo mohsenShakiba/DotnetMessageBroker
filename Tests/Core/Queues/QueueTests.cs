@@ -22,13 +22,13 @@ namespace Tests.Core.Queues
     public class QueueTests
     {
         [Fact]
-        public void MakeSureWhenMessageIsAddedToQueueAndSessionExistsTheMessageWillBeSentToSendQueue()
+        public async Task MakeSureWhenMessageIsAddedToQueueAndSessionExistsTheMessageWillBeSentToSendQueue()
         {
             var messageStore = new InMemoryMessageStore();
             var serializer = new Serializer();
             var routeMatcher = new RouteMatcher();
             var sendQueueStore = new SendQueueStore();
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var sessionPolicy = new DefaultSessionPolicy();
 
             var clientSession = new Mock<IClientSession>();
 
@@ -44,7 +44,7 @@ namespace Tests.Core.Queues
 
             queue.Setup("TEST", "TEST");
 
-            sendQueueStore.Add(clientSession.Object);
+            var sendQueue = sendQueueStore.Add(clientSession.Object);
             queue.SessionSubscribed(activeSessionId);
 
             var sampleMessage = new Message
@@ -56,19 +56,23 @@ namespace Tests.Core.Queues
 
             queue.OnMessage(sampleMessage);
             
-            queue.ReadNextMessage();
+            await queue.ReadNextMessage();
 
+            await Task.Delay(100);
+
+            await sendQueue.ReadNextPayloadAsync();
+            
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
         }
 
         [Fact]
-        public void MakeSureWhenMessageIsAddedItIsSentToSendQueueWhenASessionIsAvailable()
+        public async Task MakeSureWhenMessageIsAddedItIsSentToSendQueueWhenASessionIsAvailable()
         {
             var messageStore = new InMemoryMessageStore();
             var serializer = new Serializer();
             var routeMatcher = new RouteMatcher();
             var sendQueueStore = new SendQueueStore();
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var sessionPolicy = new DefaultSessionPolicy();
 
             var clientSession = new Mock<IClientSession>();
 
@@ -93,11 +97,13 @@ namespace Tests.Core.Queues
 
             queue.OnMessage(sampleMessage);
             
-            sendQueueStore.Add(clientSession.Object);
+            var sendQueue = sendQueueStore.Add(clientSession.Object);
             
             queue.SessionSubscribed(activeSessionId);
             
-            queue.ReadNextMessage();
+            await queue.ReadNextMessage();
+
+            await sendQueue.ReadNextPayloadAsync();
             
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
         }
@@ -109,7 +115,7 @@ namespace Tests.Core.Queues
             var serializer = new Serializer();
             var routeMatcher = new RouteMatcher();
             var sendQueueStore = new SendQueueStore();
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var sessionPolicy = new DefaultSessionPolicy();
 
             var queue = new Queue(sessionPolicy,
                 messageStore.Object,
@@ -135,12 +141,12 @@ namespace Tests.Core.Queues
         }
         
         [Fact]
-        public void MakeSureWhenMessageIsNackedBySendQueueItWillBeReQueueTheMessage()
+        public async Task MakeSureWhenMessageIsNackedBySendQueueItWillBeReQueueTheMessage()
         {
             var serializer = new Serializer();
             var routeMatcher = new RouteMatcher();
             var sendQueueStore = new SendQueueStore();
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var sessionPolicy = new DefaultSessionPolicy();
             var messageStore = new InMemoryMessageStore();
 
             var clientSession = new Mock<IClientSession>();
@@ -173,7 +179,7 @@ namespace Tests.Core.Queues
 
             queue.Setup("TEST", "TEST");
 
-            sendQueueStore.Add(clientSession.Object);
+            var sendQueue = sendQueueStore.Add(clientSession.Object);
             queue.SessionSubscribed(activeSessionId);
 
             var sampleMessage = new Message
@@ -185,22 +191,27 @@ namespace Tests.Core.Queues
 
             queue.OnMessage(sampleMessage);
 
-            queue.ReadNextMessage();
+            await queue.ReadNextMessage();
+
+            await sendQueue.ReadNextPayloadAsync();
             
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
             
-            queue.ReadNextMessage();
+            await queue.ReadNextMessage();
+            
+            await sendQueue.ReadNextPayloadAsync();
+
             
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
         }
 
         [Fact]
-        public void MakeSureWhenMessageIsAckedBySendQueueItWillRemoveMessageFromMessageStore()
+        public async Task MakeSureWhenMessageIsAckedBySendQueueItWillRemoveMessageFromMessageStore()
         {
             var serializer = new Serializer();
             var routeMatcher = new RouteMatcher();
             var sendQueueStore = new SendQueueStore();
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var sessionPolicy = new DefaultSessionPolicy();
             
             var messageStore = new Mock<IMessageStore>();
             var clientSession = new Mock<IClientSession>();
@@ -238,10 +249,10 @@ namespace Tests.Core.Queues
 
             queue.OnMessage(sampleMessage);
 
-            queue.ReadNextMessage();
-            
-            sendQueue.
-            
+            await queue.ReadNextMessage();
+
+            await sendQueue.ReadNextPayloadAsync();
+
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
             messageStore.Verify(cs => cs.Delete(It.IsAny<Guid>()));
         }
@@ -252,12 +263,16 @@ namespace Tests.Core.Queues
             var messageStore = new InMemoryMessageStore();
             var serializer = new Serializer();
             var routeMatcher = new RouteMatcher();
-            var sendQueueStore = new SendQueueStore();
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var sessionPolicy = new Mock<ISessionPolicy>();
+            var sendQueueStoreMock = new Mock<ISendQueueStore>();
+            var sendQueueMock = new Mock<ISendQueue>();
+            var sendQueue = sendQueueMock.Object;
 
-            var queue = new Queue(sessionPolicy,
+            sendQueueStoreMock.Setup(sqs => sqs.TryGet(It.IsAny<Guid>(), out sendQueue)).Returns(true);
+
+            var queue = new Queue(sessionPolicy.Object,
                 messageStore,
-                sendQueueStore,
+                sendQueueStoreMock.Object,
                 routeMatcher,
                 serializer);
 
@@ -265,24 +280,22 @@ namespace Tests.Core.Queues
 
             var sessionId = Guid.NewGuid();
             
-            Assert.False(sessionPolicy.HasSession());
-            
             queue.SessionSubscribed(sessionId);
-            
-            Assert.True(sessionPolicy.HasSession());
+
+            sessionPolicy.Verify(s => s.AddSendQueue(It.IsAny<ISendQueue>()));
             
             queue.SessionUnSubscribed(sessionId);
             
-            Assert.False(sessionPolicy.HasSession());
+            sessionPolicy.Verify(s => s.RemoveSendQueue(It.IsAny<Guid>()));
         }
 
         [Fact]
-        public void MakeSurePendingMessageInMessageStoreAreSentWhenQueueIsCreated()
+        public async Task MakeSurePendingMessageInMessageStoreAreSentWhenQueueIsCreated()
         {
             var serializer = new Serializer();
             var routeMatcher = new RouteMatcher();
             var sendQueueStore = new SendQueueStore();
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var sessionPolicy = new DefaultSessionPolicy();
             
             var messageStore = new Mock<IMessageStore>();
             var clientSession = new Mock<IClientSession>();
@@ -311,11 +324,13 @@ namespace Tests.Core.Queues
 
             queue.Setup("TEST", "TEST");
 
-            sendQueueStore.Add(clientSession.Object);
+            var sendQueue = sendQueueStore.Add(clientSession.Object);
             queue.SessionSubscribed(activeSessionId);
 
-            queue.ReadNextMessage();
+            await queue.ReadNextMessage();
 
+            await sendQueue.ReadNextPayloadAsync();
+            
             clientSession.Verify(cs => cs.SendAsync(It.IsAny<Memory<byte>>()));
         }
 
@@ -327,7 +342,7 @@ namespace Tests.Core.Queues
             var messageStore = new InMemoryMessageStore();
             var serializer = new Serializer();
             var sendQueueStore = new SendQueueStore();
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var sessionPolicy = new DefaultSessionPolicy();
 
             var queue = new Queue(sessionPolicy,
                 messageStore,

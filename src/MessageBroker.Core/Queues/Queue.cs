@@ -1,12 +1,9 @@
 ﻿using System;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Common.Logging;
-using MessageBroker.Common.Pooling;
-using MessageBroker.Common.Threading;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.SessionPolicy;
@@ -24,7 +21,6 @@ namespace MessageBroker.Core.Queues
         private readonly IRouteMatcher _routeMatcher;
         private readonly ISerializer _serializer;
         private readonly ISessionPolicy _sessionPolicy;
-        private readonly AsyncResetEvent _asyncResetEvent;
         
         private bool _stopped;
 
@@ -38,7 +34,6 @@ namespace MessageBroker.Core.Queues
             _routeMatcher = routeMatcher;
             _serializer = serializer;
             _queue = Channel.CreateUnbounded<Guid>();
-            _asyncResetEvent = new();
         }
 
         public void Dispose()
@@ -77,22 +72,20 @@ namespace MessageBroker.Core.Queues
 
         public void SessionDisconnected(Guid sessionId)
         {
-            Logger.LogInformation($"Queue -> Session disconnection {sessionId}");
-            _sessionPolicy.RemoveSession(sessionId);
+            _sessionPolicy.RemoveSendQueue(sessionId);
         }
 
         public void SessionSubscribed(Guid sessionId)
         {
-            Logger.LogInformation($"Queue -> Session added {sessionId}");
-            _sessionPolicy.AddSession(sessionId);
-            CheckCurrentSessionStatus();
+            if (_sendQueueStore.TryGet(sessionId, out var sendQueue))
+            {
+                _sessionPolicy.AddSendQueue(sendQueue);
+            }
         }
 
         public void SessionUnSubscribed(Guid sessionId)
         {
-            Logger.LogInformation($"Queue -> Session removed {sessionId}");
             SessionDisconnected(sessionId);
-            CheckCurrentSessionStatus();
         }
 
         private void ReadPayloadsFromMessageStore()
@@ -109,48 +102,66 @@ namespace MessageBroker.Core.Queues
             {
                 while (!_stopped)
                 {
-                    await _asyncResetEvent.WaitAsync();
-                    ReadNextMessage();
+                    await ReadNextMessage();
                 }
+                
+                Logger.LogInformation("exited queue");
             }, TaskCreationOptions.LongRunning);
         }
 
-        public void ReadNextMessage()
+        public async Task ReadNextMessage()
         {
             if (_queue.Reader.TryRead(out var messageId))
             {
-                ProcessMessage(messageId);
+                await ProcessMessage(messageId);
             }
         }
 
-        private void ProcessMessage(Guid messageId)
+        private async Task ProcessMessage(Guid messageId)
         {
             if (_messageStore.TryGetValue(messageId, out var message))
             {
+                Logger.LogInformation($"sending message with content : {Encoding.UTF8.GetString(message.Data.Span)} and id {message.Id}");
                 var sendPayload = _serializer.Serialize(message);
 
-                SendMessage(sendPayload);
+                await FindSendQueueForMessage(sendPayload);
 
                 message.Dispose();
             }
+            else
+            {
+                
+            }
         }
 
-        private void SendMessage(SerializedPayload serializedPayload)
+        private async Task FindSendQueueForMessage(SerializedPayload serializedPayload)
         {
-            var sessionId = _sessionPolicy.GetNextSession();
-
-            if (!sessionId.HasValue)
+            while (true)
             {
-                OnMessageNack(serializedPayload.Id);
-                return;
+                try
+                {
+                    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                
+                    var sendQueue = await _sessionPolicy.GetNextAvailableSendQueueAsync(cts.Token);
+
+                    SendMessage(sendQueue, serializedPayload);
+                    break;
+                }
+                catch
+                {
+                    
+                }
+                
             }
 
-            if (_sendQueueStore.TryGet(sessionId.Value, out var sendQueue))
-            {
-                serializedPayload.ClearStatusListener();
-                serializedPayload.OnStatusChanged += OnMessageStatusChanged;
-                sendQueue.Enqueue(serializedPayload);
-            }
+        }
+
+        private void SendMessage(ISendQueue sendQueue, SerializedPayload serializedPayload)
+        {
+            serializedPayload.ClearStatusListener();
+            serializedPayload.OnStatusChanged += OnMessageStatusChanged;
+            
+            sendQueue.Enqueue(serializedPayload);
         }
 
         private void OnMessageStatusChanged(Guid messageId, SerializedPayloadStatusUpdate payloadStatusUpdate)
@@ -173,15 +184,9 @@ namespace MessageBroker.Core.Queues
 
         private void OnMessageNack(Guid messageId)
         {
+            Logger.LogInformation($"nack received in queue for message id {messageId}, retrying");
             _queue.Writer.TryWrite(messageId);
         }
 
-        private void CheckCurrentSessionStatus()
-        {
-            if (_sessionPolicy.HasSession())
-                _asyncResetEvent.UnBlock();
-            else
-                _asyncResetEvent.Block();
-        }
     }
 }

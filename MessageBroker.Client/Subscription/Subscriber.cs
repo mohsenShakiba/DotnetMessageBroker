@@ -90,7 +90,7 @@ namespace MessageBroker.Client.Subscription
 
                 return await sendPayloadTask;
             }
-            catch (SocketNotConnectionException)
+            catch (SocketNotConnectedException)
             {
                 return SendAsyncResult.SocketNotConnected;
             }

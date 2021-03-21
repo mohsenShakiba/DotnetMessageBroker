@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using MessageBroker.Models;
 
 namespace MessageBroker.Core.Queues
@@ -8,7 +9,7 @@ namespace MessageBroker.Core.Queues
         string Name { get; }
         string Route { get; }
         void Setup(string name, string route);
-        void ReadNextMessage();
+        Task ReadNextMessage();
         void OnMessage(Message message);
         void SessionSubscribed(Guid sessionId);
         void SessionUnSubscribed(Guid sessionId);

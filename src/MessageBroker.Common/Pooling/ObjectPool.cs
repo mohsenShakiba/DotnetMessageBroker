@@ -50,7 +50,7 @@ namespace MessageBroker.Common.Pooling
 
                     if (!i.IsReturnedToPool)
                     {
-                        throw new Exception();
+                        throw new InvalidOperationException("The object seems to be already in use by another owner");
                     }
 
                     i.SetPooledStatus(false);
@@ -64,7 +64,6 @@ namespace MessageBroker.Common.Pooling
 
                 var newInstance = new T();
 
-                // todo: write test to verify any object returns has status equal to false
                 newInstance.SetPooledStatus(false);
 
                 return newInstance;
@@ -76,6 +75,11 @@ namespace MessageBroker.Common.Pooling
             lock (_objectTypeDict)
             {
                 var type = typeof(T);
+
+                if (o.IsReturnedToPool)
+                {
+                    throw new InvalidOperationException("The object has already been returned to pool");
+                }
 
                 o.SetPooledStatus(true);
 

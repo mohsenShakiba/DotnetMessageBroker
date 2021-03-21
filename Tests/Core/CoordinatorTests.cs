@@ -54,10 +54,14 @@ namespace Tests.Core
             var queueStore = new Mock<IQueueStore>();
             var messageStore = new Mock<IMessageStore>();
             var serializer = new Mock<ISerializer>();
+            var clintSession = new Mock<IClientSession>();
+            var sendQueue = new Mock<ISendQueue>();
+
+            sendQueueStore.Setup(sqs => sqs.Add(It.IsAny<IClientSession>(), null)).Returns(sendQueue.Object);
 
             var coordinator = new Coordinator(payloadProcessor.Object, sendQueueStore.Object, queueStore.Object, messageStore.Object, serializer.Object);
 
-            coordinator.ClientConnected(It.IsAny<IClientSession>());
+            coordinator.ClientConnected(clintSession.Object);
             
             sendQueueStore.Verify(s => s.Add(It.IsAny<IClientSession>(), It.IsAny<ISendQueue>()));
         }

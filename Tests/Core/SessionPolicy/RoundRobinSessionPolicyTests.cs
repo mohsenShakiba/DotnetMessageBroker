@@ -1,5 +1,9 @@
 ﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using MessageBroker.Core;
 using MessageBroker.Core.SessionPolicy;
+using Moq;
 using Xunit;
 
 namespace Tests.Core.SessionPolicy
@@ -7,77 +11,64 @@ namespace Tests.Core.SessionPolicy
     public class RoundRobinSessionPolicyTests
     {
         [Fact]
-        public void MakeSureRoundRobinPolicyDoesNotThrowExceptionWhenNoSessionsAreAvailable()
+        public void GetNextAvailableSendQueueAsync_WhenNoSendQueueExists_TaskIsInPending()
         {
-            var sessionPolicy = new RoundRobinSessionPolicy();
-            var result = sessionPolicy.GetNextSession();
-            Assert.Null(result);
+            var sessionPolicy = new DefaultSessionPolicy();
+            var result = sessionPolicy.GetNextAvailableSendQueueAsync(CancellationToken.None);
+            Assert.False(result.IsCompleted);
         }
 
 
         [Fact]
-        public void MakeSureRoundRobinPolicyReturnsHasSessionCorrectly()
+        public void GetNextAvailableSendQueueAsync_WhenSendQueueExistsButNotAvailable_TaskIsNotCompleted()
         {
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var mockSendQueue = new Mock<ISendQueue>();
+            var sessionPolicy = new DefaultSessionPolicy();
+
+            mockSendQueue.Setup(i => i.IsAvailable).Returns(false);
             
-            Assert.False(sessionPolicy.HasSession());
+            sessionPolicy.AddSendQueue(mockSendQueue.Object);
             
-            sessionPolicy.AddSession(Guid.NewGuid());
+            var result = sessionPolicy.GetNextAvailableSendQueueAsync(CancellationToken.None);
             
-            Assert.True(sessionPolicy.HasSession());
+            Assert.False(result.IsCompleted);
         }
         
         [Fact]
-        public void MakeSureRoundRobinPolicySelectsSessionsCorrectly()
+        public void GetNextAvailableSendQueueAsync_WhenAvailable_TaskIsInCompleted()
         {
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var mockSendQueue = new Mock<ISendQueue>();
+            var sessionPolicy = new DefaultSessionPolicy();
 
-            var sessionList = new [] {Guid.NewGuid(), Guid.NewGuid()}; 
+            mockSendQueue.Setup(i => i.IsAvailable).Returns(true);
             
-            sessionPolicy.AddSession(sessionList[0]);
-            sessionPolicy.AddSession(sessionList[1]);
-
-            var session1 = sessionPolicy.GetNextSession();
-            var session2 = sessionPolicy.GetNextSession();
-            var session3 = sessionPolicy.GetNextSession();
+            sessionPolicy.AddSendQueue(mockSendQueue.Object);
             
-            Assert.Equal(sessionList[0], session1);
-            Assert.Equal(sessionList[1], session2);
-            Assert.Equal(sessionList[0], session3);
+            var result = sessionPolicy.GetNextAvailableSendQueueAsync(CancellationToken.None);
+            
+            Assert.True(result.IsCompleted);
+            Assert.Equal(mockSendQueue.Object, result.Result);
         }
 
+        
         [Fact]
-        public void MakeSureIfDuplicateSessionIsAddedThenAnExceptionIsThrown()
+        public void GetNextAvailableSendQueueAsync_WhenDuplicateSendQueueIsAdded_ErrorIsThrown()
         {
-            var sessionPolicy = new RoundRobinSessionPolicy();
+            var sessionPolicy = new DefaultSessionPolicy();
 
-            var duplicateSession = Guid.NewGuid();
+            var duplicateId = Guid.NewGuid();
+
+            var mockSendQueue = new Mock<ISendQueue>();
+
+            mockSendQueue.SetupGet(i => i.Id).Returns(duplicateId);
             
-            sessionPolicy.AddSession(duplicateSession);
+            sessionPolicy.AddSendQueue(mockSendQueue.Object);
 
             Assert.Throws<Exception>(() =>
             {
-                sessionPolicy.AddSession(duplicateSession);
+                sessionPolicy.AddSendQueue(mockSendQueue.Object);
             });
         }
 
-        [Fact]
-        public void MakeSureWhenRemoveIsCalledTheSessionIsReturnCorrectly()
-        {
-            var sessionPolicy = new RoundRobinSessionPolicy();
-
-            var sessionList = new [] {Guid.NewGuid(), Guid.NewGuid()}; 
-            
-            sessionPolicy.AddSession(sessionList[0]);
-            sessionPolicy.AddSession(sessionList[1]);
-            
-            _ = sessionPolicy.GetNextSession();
-
-            sessionPolicy.RemoveSession(sessionList[0]);
-
-            var session = sessionPolicy.GetNextSession();
-            
-            Assert.Equal(sessionList[1], session);
-        }
     }
 }

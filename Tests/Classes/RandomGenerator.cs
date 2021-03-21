@@ -26,6 +26,7 @@ namespace Tests.Classes
         public static SerializedPayload SerializedPayload(PayloadType type = PayloadType.Msg, int dataSize = 10)
         {
             var sp = ObjectPool.Shared.Rent<SerializedPayload>();
+            sp.ClearStatusListener();
             sp.FillFrom(GenerateBytes(dataSize), dataSize, Guid.NewGuid(), type);
             return sp;
         }

@@ -57,7 +57,6 @@ namespace Tests.TCP.Client
                 }
             };
 
-
             var serializedTestMessage = serializer.Serialize(testMessage);
 
             var currentOffset = 0;
@@ -87,6 +86,7 @@ namespace Tests.TCP.Client
             var binaryDataProcessor = new BinaryDataProcessor();
             var clientSession = new ClientSession(binaryDataProcessor);
             var socketEventProcessor = new TestSocketEventProcessor();
+            var testSerializedPayload = RandomGenerator.SerializedPayload();
    
             clientSession.ForwardDataTo(socketEventProcessor);
             clientSession.ForwardEventsTo(socketEventProcessor);
@@ -98,7 +98,7 @@ namespace Tests.TCP.Client
                 resetEvent.Set();
             };
             
-            clientSession.SendAsync(Memory<byte>.Empty);
+            clientSession.SendAsync(testSerializedPayload.Data);
             
             resetEvent.WaitOne();
         }

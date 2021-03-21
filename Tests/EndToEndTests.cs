@@ -35,7 +35,7 @@ namespace Tests
     public class EndToEndTests
     {
         [Theory]
-        [InlineData(50000, 10)]
+        [InlineData(100, 50)]
         public async Task EndToEndTest_SingleSubscriberSinglePublisherNoInterrupt_AllMessagesAreReceivedBySubscriber(
             int messageCount, int nackRation)
         {
@@ -67,6 +67,12 @@ namespace Tests
 
             if (!declareResult.IsSuccess)
                 throw new Exception($"declare queue failed with error {declareResult.InternalErrorCode}");
+            
+            // configure subscriber
+            var configureSubscriberResult = await subscriberClient.ConfigureClientAsync(1000, false);
+            
+            if (!configureSubscriberResult.IsSuccess)
+                throw new Exception($"configure client failed with error {configureSubscriberResult.InternalErrorCode}");
 
             // setup reset event
             var manualResetEvent = new ManualResetEventSlim(false);
@@ -78,16 +84,19 @@ namespace Tests
             queueManager.MessageReceived += async msg =>
             {
                 var ratio = random.Next(0, 100);
+                
+                var messageStr = Encoding.UTF8.GetString(msg.Data.Span);
 
                 if (ratio < nackRation)
                 {
-                    await subscriberClient.NackAsync(msg.MessageId);
+                    Logger.LogInformation($"nacked message {messageStr}");
+                    var res = await subscriberClient.NackAsync(msg.MessageId);
+                    Logger.LogInformation($"nacked message {messageStr} after {res.IsSuccess}");
                     return;
                 }
 
                 lock (messageStoreLock)
                 {
-                    var messageStr = Encoding.UTF8.GetString(msg.Data.Span);
 
                     if (messageStore.ContainsKey(messageStr))
                     {
@@ -98,14 +107,16 @@ namespace Tests
 
                     if (receivedMessagesCount == messageCount)
                         manualResetEvent.Set();
+                    
+                    Logger.LogInformation($"received message {messageStr} {receivedMessagesCount}");
                 }
-
+                
                 await subscriberClient.AckAsync(msg.MessageId);
             };
 
             for (var i = 0; i < messageCount; i++)
             {
-                var randomString = RandomGenerator.GenerateString(10);
+                var randomString = i.ToString();
                 var randomData = Encoding.UTF8.GetBytes(randomString);
 
                 lock (messageStoreLock)
@@ -128,9 +139,8 @@ namespace Tests
 
 
         [Theory]
-        [InlineData(1000, 10, 5)]
-        public async Task
-            EndToEndTest_SingleSubscriberSinglePublisherWithInterrupts_AllMessagesAreReceivedBySubscriber(
+        [InlineData(1000, 20, 10)]
+        public async Task EndToEndTest_SingleSubscriberSinglePublisherWithInterrupts_AllMessagesAreReceivedBySubscriber(
                 int messageCount, int nackRation, int failureRatio)
         {
             // declare variables
@@ -213,7 +223,7 @@ namespace Tests
 
                     if (receivedMessagesCount == messageCount)
                         manualResetEvent.Set();
-                    Logger.LogInformation($"received count: {receivedMessagesCount} with content: {messageStr}");
+                    Logger.LogInformation($"received count: {receivedMessagesCount} with content: {messageStr} and id {msg.MessageId}");
  
                 }
                 
@@ -227,7 +237,6 @@ namespace Tests
             {
                 if (!publisherClient.Connected)
                 {
-                    Thread.Sleep(2000);
                     Logger.LogInformation($"publisher disconnected, ignoreing");
                     continue;
                 }
@@ -239,7 +248,7 @@ namespace Tests
                     publisherConnectionManager.SimulateInterrupt();
                 }
 
-                var randomString = RandomGenerator.GenerateString(10);
+                var randomString = publishedMessages.ToString();
                 var randomData = Encoding.UTF8.GetBytes(randomString);
 
                 lock (messageStoreLock)
@@ -250,7 +259,6 @@ namespace Tests
                         messageStore[randomString] = 1;
                 }
 
-                Logger.LogInformation($"before send {publishedMessages}");
                 var publishResult = await publisherClient.PublishAsync(queueRoute, randomData);
 
                 if (!publishResult.IsSuccess)
@@ -266,6 +274,18 @@ namespace Tests
             }
 
             Logger.LogInformation("finished sending message");
+
+            Task.Factory.StartNew(async () =>
+            {
+                while (true)
+                {
+                    var pendingNumbers = messageStore.Where(kv => kv.Value > 0).Select(kv => kv.Key);
+                    
+                    Logger.LogInformation($"pending numbers are => {string.Join(',', pendingNumbers)}");
+
+                    await Task.Delay(5000);
+                }
+            });
             
             manualResetEvent.Wait();
             server.Stop();
@@ -284,7 +304,7 @@ namespace Tests
             serviceCollection.AddSingleton<ISerializer, Serializer>();
             serviceCollection.AddSingleton<IRouteMatcher, RouteMatcher>();
             serviceCollection.AddSingleton<ISocketServer, TcpSocketServer>();
-            serviceCollection.AddTransient<ISessionPolicy, RoundRobinSessionPolicy>();
+            serviceCollection.AddTransient<ISessionPolicy, DefaultSessionPolicy>();
             serviceCollection.AddSingleton<IQueueStore, InMemoryQueueStore>();
             serviceCollection.AddTransient<IQueue, Queue>();
             serviceCollection.AddSingleton<Coordinator>();
@@ -312,8 +332,8 @@ namespace Tests
             serviceCollection.AddSingleton<MessageBrokerClient>();
             serviceCollection.AddSingleton<ISendQueueStore, SendQueueStore>();
             
-            // Logger.AddFileLogger(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\logs.txt");
-            Logger.AddConsole();
+            Logger.AddFileLogger(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\testo\logs.txt");
+            // Logger.AddConsole();
 
             return serviceCollection.BuildServiceProvider();
         }

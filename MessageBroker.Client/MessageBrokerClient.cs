@@ -123,7 +123,7 @@ namespace MessageBroker.Client
 
                 return await sendPayloadTask;
             }
-            catch (SocketNotConnectionException)
+            catch (SocketNotConnectedException)
             {
                 return SendAsyncResult.SocketNotConnected;
             }

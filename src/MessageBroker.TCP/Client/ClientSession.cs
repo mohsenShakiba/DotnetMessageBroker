@@ -15,6 +15,7 @@ namespace MessageBroker.TCP.Client
         private ITcpSocket _socket;
         private ISocketDataProcessor _socketDataProcessor;
         private ISocketEventProcessor _socketEventProcessor;
+        private byte[] _receiveBuffer;
         private object _lock;
         public bool Debug { get; set; }
 
@@ -23,6 +24,7 @@ namespace MessageBroker.TCP.Client
             _binaryDataProcessor = binaryDataProcessor;
             Id = Guid.NewGuid();
             _lock = new object();
+            _receiveBuffer = ArrayPool<byte>.Shared.Rent(BinaryProtocolConfiguration.ReceiveDataSize);
         }
 
         public Guid Id { get; }
@@ -106,11 +108,9 @@ namespace MessageBroker.TCP.Client
             }, TaskCreationOptions.LongRunning);
         }
 
-        private async Task ReceiveAsync()
+        private async ValueTask ReceiveAsync()
         {
-            var receiveBuffer = ArrayPool<byte>.Shared.Rent(BinaryProtocolConfiguration.ReceiveDataSize);
-
-            var receivedSize = await _socket.ReceiveAsync(receiveBuffer);
+            var receivedSize = await _socket.ReceiveAsync(_receiveBuffer);
 
             if (receivedSize == 0)
             {
@@ -118,9 +118,7 @@ namespace MessageBroker.TCP.Client
                 return;
             }
 
-            _binaryDataProcessor.Write(receiveBuffer.AsMemory(0, receivedSize));
-
-            ArrayPool<byte>.Shared.Return(receiveBuffer);
+            _binaryDataProcessor.Write(_receiveBuffer.AsMemory(0, receivedSize));
         }
 
         private void ProcessReceivedData()
@@ -165,5 +163,6 @@ namespace MessageBroker.TCP.Client
         }
 
         #endregion
+
     }
 }

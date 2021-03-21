@@ -2,7 +2,7 @@
 
 namespace MessageBroker.Client.Exceptions
 {
-    public class SocketNotConnectionException: Exception
+    public class SocketNotConnectedException: Exception
     {
     }
 }

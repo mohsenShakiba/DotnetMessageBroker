@@ -13,6 +13,7 @@ namespace MessageBroker.Client.ConnectionManagement
 {
     public class ConnectionManager : IConnectionManager
     {
+        private readonly Guid Id;
         private readonly IReceiveDataProcessor _receiveDataProcessor;
         private readonly IBinaryDataProcessor _binaryDataProcessor;
 
@@ -20,6 +21,7 @@ namespace MessageBroker.Client.ConnectionManagement
         private ITcpSocket _tcpSocket;
         private IPEndPoint _endPoint;
         private bool _ready;
+        private int _test;
 
         public event Action OnConnected;
         public event Action OnDisconnected;
@@ -33,6 +35,7 @@ namespace MessageBroker.Client.ConnectionManagement
             _receiveDataProcessor = receiveDataProcessor;
             _binaryDataProcessor = binaryDataProcessor;
             SetDefaultTcpSocket();
+            Id = Guid.NewGuid();
         }
 
         private void SetDefaultTcpSocket()
@@ -54,12 +57,14 @@ namespace MessageBroker.Client.ConnectionManagement
             _endPoint = ipEndPoint;
 
             _tcpSocket.Connect(ipEndPoint);
-
-            _clientSession = new ClientSession(_binaryDataProcessor);
+            
+            _clientSession = new ClientSession(new BinaryDataProcessor());
 
             _clientSession.ForwardEventsTo(this);
             _clientSession.ForwardDataTo(_receiveDataProcessor);
             _clientSession.Use(_tcpSocket);
+
+            _test = 0;
 
             ClientConnected(_clientSession);
         }
@@ -89,13 +94,15 @@ namespace MessageBroker.Client.ConnectionManagement
 
             if (!Connected)
             {
-                throw new SocketNotConnectionException();
+                throw new SocketNotConnectedException();
             }
 
+            
             while (!cancellationToken.IsCancellationRequested && !_ready)
             {
-                Logger.LogInformation("waiting for ready signal");
-                await Task.Delay(1000, cancellationToken);
+                Logger.LogInformation($"waiting for ready signal for id {_clientSession.Id} {_ready} {_test} {Id}");
+                
+                await Task.Delay(10, cancellationToken);
             }
 
             if (cancellationToken.IsCancellationRequested)
@@ -106,18 +113,21 @@ namespace MessageBroker.Client.ConnectionManagement
         public void MarkAsReady()
         {
             _ready = true;
+            _test = 1;
+            Logger.LogInformation($"ready received for {_clientSession.Id} {_ready} {_test} {Id}");
         }
 
         public void ClientDisconnected(IClientSession clientSession)
         {
-            Logger.LogInformation("Client disconnected");
-            OnDisconnected?.Invoke();
+            Logger.LogInformation($"Client disconnected {_clientSession.Id} {clientSession.Id} {Id}");
             _ready = false;
+            _test = -1;
+            OnDisconnected?.Invoke();
         }
 
         public void ClientConnected(IClientSession clientSession)
         {
-            Logger.LogInformation("Client connected");
+            Logger.LogInformation($"Client connected {_clientSession.Id}");
             OnConnected?.Invoke();
         }
     }

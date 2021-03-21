@@ -1,12 +1,13 @@
 ﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MessageBroker.Core.SessionPolicy
 {
-    public interface ISessionPolicy
+    public interface ISessionPolicy: IDisposable
     {
-        void AddSession(Guid sessionId);
-        void RemoveSession(Guid sessionId);
-        bool HasSession();
-        Guid? GetNextSession();
+        void AddSendQueue(ISendQueue sendQueue);
+        void RemoveSendQueue(Guid sendQueueId);
+        Task<ISendQueue> GetNextAvailableSendQueueAsync(CancellationToken cancellationToken);
     }
 }

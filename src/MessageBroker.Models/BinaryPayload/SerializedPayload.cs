@@ -10,6 +10,8 @@ namespace MessageBroker.Models.BinaryPayload
     {
         private byte[] _buffer;
         private int _size;
+        private object _lock;
+        private bool _isStatusSet;
         
         public event Action<Guid, SerializedPayloadStatusUpdate> OnStatusChanged;
 
@@ -24,6 +26,7 @@ namespace MessageBroker.Models.BinaryPayload
         public SerializedPayload()
         {
             PoolId = Guid.NewGuid();
+            _lock = new();
         }
 
         public void FillFrom(byte[] data, int size, Guid id, PayloadType type)
@@ -44,12 +47,21 @@ namespace MessageBroker.Models.BinaryPayload
 
         public void ClearStatusListener()
         {
+            _isStatusSet = false;
             OnStatusChanged = null;
         }
         
         public void SetStatus(SerializedPayloadStatusUpdate payloadStatusUpdate)
         {
-            OnStatusChanged?.Invoke(Id, payloadStatusUpdate);
+            lock (_lock)
+            {
+                if (_isStatusSet)
+                {
+                    throw new Exception($"{nameof(SerializedPayload)} status is already set");
+                }
+                _isStatusSet = true;
+                OnStatusChanged?.Invoke(Id, payloadStatusUpdate);
+            }
         }
 
         public void SetPooledStatus(bool isReturned)

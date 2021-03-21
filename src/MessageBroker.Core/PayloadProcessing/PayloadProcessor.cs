@@ -23,8 +23,8 @@ namespace MessageBroker.Core.PayloadProcessing
         {
             var type = _serializer.ParsePayloadType(data);
             
-            Logger.LogInformation($"received type {type}");
-
+            Logger.LogInformation($"payload with type {type}");
+   
             switch (type)
             {
                 case PayloadType.Msg:

@@ -50,9 +50,12 @@ namespace MessageBroker.Core
         {
             Logger.LogInformation($"client session connected, added send queue {clientSession.Id}");
             
-            // todo: better implementation
             var sendQueue = _sendQueueStore.Add(clientSession);
+            
+            sendQueue.ProcessPendingPayloads();
+            
             var serializedPayload = _serializer.Serialize(new Ready());
+            
             sendQueue.Enqueue(serializedPayload);
         }
 

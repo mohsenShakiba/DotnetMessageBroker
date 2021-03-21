@@ -23,7 +23,7 @@ namespace Tests.Core.Persistence.Queues
             
             var serviceCollection = new ServiceCollection();
 
-            serviceCollection.AddSingleton<ISessionPolicy, RoundRobinSessionPolicy>();
+            serviceCollection.AddSingleton<ISessionPolicy, DefaultSessionPolicy>();
             serviceCollection.AddSingleton<IMessageStore, InMemoryMessageStore>();
             serviceCollection.AddSingleton<ISendQueueStore, SendQueueStore>();
             serviceCollection.AddSingleton<IRouteMatcher, RouteMatcher>();
