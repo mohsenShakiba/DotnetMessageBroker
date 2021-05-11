@@ -3,8 +3,8 @@ using System.Linq;
 using System.Text;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
-using MessageBroker.Models.BinaryPayload;
 using MessageBroker.Serialization;
+using MessageBroker.TCP.Binary;
 
 namespace Tests.Classes
 {
@@ -26,8 +26,7 @@ namespace Tests.Classes
         public static SerializedPayload SerializedPayload(PayloadType type = PayloadType.Msg, int dataSize = 10)
         {
             var sp = ObjectPool.Shared.Rent<SerializedPayload>();
-            sp.ClearStatusListener();
-            sp.FillFrom(GenerateBytes(dataSize), dataSize, Guid.NewGuid(), type);
+            sp.FillFrom(GenerateBytes(dataSize), dataSize, Guid.NewGuid());
             return sp;
         }
     }

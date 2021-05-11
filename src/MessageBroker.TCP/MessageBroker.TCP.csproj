@@ -10,4 +10,8 @@
       <ProjectReference Include="..\MessageBroker.Common\MessageBroker.Common.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="ClrHeapAllocationAnalyzer" Version="3.0.0" />
+    </ItemGroup>
+
 </Project>

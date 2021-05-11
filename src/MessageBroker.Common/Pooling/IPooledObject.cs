@@ -2,12 +2,13 @@
 
 namespace MessageBroker.Common.Pooling
 {
+    
+    /// <summary>
+    /// Marker interface for objects used in pooling
+    /// </summary>
     public interface IPooledObject
     {
-        public Guid PoolId { get; }
-        bool IsReturnedToPool { get; }
-
-        void SetPooledStatus(bool isReturned);
+        public Guid PoolId { get; set; }
     }
 
 }

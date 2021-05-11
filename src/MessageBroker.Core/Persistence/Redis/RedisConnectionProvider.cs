@@ -2,7 +2,7 @@
 
 namespace MessageBroker.Core.Persistence.Redis
 {
-    public class RedisConnectionProvider : IRedisConnectionProvider
+    public class RedisConnectionProvider
     {
         private readonly string _urlConnection;
         private ConnectionMultiplexer _connection;

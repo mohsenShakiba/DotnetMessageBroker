@@ -2,14 +2,20 @@
 
 namespace MessageBroker.Core.RouteMatching
 {
+    /// <inheritdoc />
     public class RouteMatcher : IRouteMatcher
     {
-        public bool Match(string messageRoute, string queueRoute)
+        public bool Match(string messageRoute, string topicRoute)
         {
+            if (messageRoute is null || topicRoute is null)
+            {
+                return false;
+            }
+            
             const string wildCard = "*";
 
             var messageRouteSegments = messageRoute.Split('/');
-            var queueRouteSegments = queueRoute.Split('/');
+            var queueRouteSegments = topicRoute.Split('/');
 
             var minSegmentCount = Math.Min(messageRouteSegments.Length, queueRouteSegments.Length);
 

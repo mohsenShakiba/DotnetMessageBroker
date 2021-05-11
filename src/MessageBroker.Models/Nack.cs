@@ -3,7 +3,7 @@
 namespace MessageBroker.Models
 {
     /// <summary>
-    ///     indicating the payload process failed
+    /// Indicates the payload process failed by the client
     /// </summary>
     public struct Nack
     {

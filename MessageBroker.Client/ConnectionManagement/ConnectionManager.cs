@@ -1,134 +1,196 @@
 ﻿using System;
-using System.Net;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
-using MessageBroker.Client.Exceptions;
+using MessageBroker.Client.ConnectionManagement.ConnectionStatusEventArgs;
 using MessageBroker.Client.ReceiveDataProcessing;
-using MessageBroker.Common.Binary;
 using MessageBroker.Common.Logging;
-using MessageBroker.TCP.Client;
-using MessageBroker.TCP.SocketWrapper;
+using MessageBroker.Core.Clients;
+using MessageBroker.TCP;
+using MessageBroker.TCP.EventArgs;
+using MessageBroker.TCP.Binary;
 
 namespace MessageBroker.Client.ConnectionManagement
 {
+    /// <inheritdoc />
     public class ConnectionManager : IConnectionManager
     {
-        private readonly Guid Id;
         private readonly IReceiveDataProcessor _receiveDataProcessor;
-        private readonly IBinaryDataProcessor _binaryDataProcessor;
 
-        private IClientSession _clientSession;
-        private ITcpSocket _tcpSocket;
-        private IPEndPoint _endPoint;
-        private bool _ready;
-        private int _test;
-
-        public event Action OnConnected;
-        public event Action OnDisconnected;
-
-        public IClientSession ClientSession => _clientSession;
-        public bool Connected => _tcpSocket.Connected;
+        private ClientConnectionConfiguration _configuration;
+        private ConcurrentQueue<Guid> _ids = new();
+        private SemaphoreSlim _semaphore;
+        private bool _debug;
 
 
-        public ConnectionManager(IReceiveDataProcessor receiveDataProcessor, IBinaryDataProcessor binaryDataProcessor)
+        public IClient Client { get; private set; }
+        public ITcpSocket Socket { get; private set; }
+        public IReceiveDataProcessor ReceiveDataProcessor => _receiveDataProcessor;
+
+
+        public event EventHandler<ClientConnectionEventArgs> OnConnected;
+        public event EventHandler<ClientDisconnectedEventArgs> OnDisconnected;
+
+
+        public ConnectionManager(IReceiveDataProcessor receiveDataProcessor)
         {
             _receiveDataProcessor = receiveDataProcessor;
-            _binaryDataProcessor = binaryDataProcessor;
-            SetDefaultTcpSocket();
-            Id = Guid.NewGuid();
+            _semaphore = new SemaphoreSlim(1, 1);
         }
 
-        private void SetDefaultTcpSocket()
+        public void Connect(ClientConnectionConfiguration configuration, bool debug)
         {
-            _tcpSocket = new TcpSocket();
+            _debug = debug;
 
-            _receiveDataProcessor.OnReadyReceived += MarkAsReady;
-        }
+            // todo: remove
+            try
+            {
+                // Client?.Dispose();
 
-        public void SetAlternativeTcpSocketForTesting(ITcpSocket tcpSocket)
-        {
-            _tcpSocket = tcpSocket;
-        }
+                _configuration = configuration;
 
-        public void Connect(IPEndPoint ipEndPoint)
-        {
-            _ = ipEndPoint ?? throw new ArgumentNullException(nameof(ipEndPoint));
+   
 
-            _endPoint = ipEndPoint;
+                // once the TcpSocket is connected, create new client from it
 
-            _tcpSocket.Connect(ipEndPoint);
-            
-            _clientSession = new ClientSession(new BinaryDataProcessor());
+                _semaphore.Wait();
+                
+                // connect the tcp client
+                var ipEndpoint = configuration.IpEndPoint ??
+                                 throw new ArgumentNullException(nameof(configuration.IpEndPoint));
+                
+                var newTcpSocket = TcpSocket.NewFromEndPoint(ipEndpoint);
+                
+                var newClient = new Core.Clients.Client(newTcpSocket);
 
-            _clientSession.ForwardEventsTo(this);
-            _clientSession.ForwardDataTo(_receiveDataProcessor);
-            _clientSession.Use(_tcpSocket);
+                newClient.OnDataReceived += ClientDataReceived;
+                newClient.OnDisconnected += ClientDisconnected;
 
-            _test = 0;
+                newClient.Debug = debug;
+                newClient.StartReceiveProcess();
 
-            ClientConnected(_clientSession);
+                Client = newClient;
+                Socket = newTcpSocket;
+                
+                Logger.LogInformation("client socket connected");
+                
+                _semaphore.Release();
+
+
+                OnConnected?.Invoke(this, new ClientConnectionEventArgs());
+
+
+                // no need to call StartSendProcess because we are not using Enqueue method
+                // Client.StartSendProcess();\
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
         }
 
         public void Reconnect()
         {
-            Connect(_endPoint);
+            if (Socket.Connected)
+            {
+                throw new InvalidOperationException("The socket object is in connected state, cannot be reconnected");
+            }
+
+            Connect(_configuration ?? throw new ArgumentNullException($"No configuration exists for reconnection"),
+                _debug);
         }
 
         public void Disconnect()
         {
-            _tcpSocket.Disconnect(true);
-            _clientSession.Close();
+            Socket?.Disconnect();
         }
 
-        public void SimulateInterrupt()
+        public async Task<bool> SendAsync(SerializedPayload serializedPayload, CancellationToken cancellationToken)
         {
-            _tcpSocket.Disconnect(true);
-        }
-
-        public async ValueTask WaitForReadyAsync(CancellationToken cancellationToken)
-        {
-            if (_ready)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                return;
-            }
-
-            if (!Connected)
-            {
-                throw new SocketNotConnectedException();
-            }
-
-            
-            while (!cancellationToken.IsCancellationRequested && !_ready)
-            {
-                Logger.LogInformation($"waiting for ready signal for id {_clientSession.Id} {_ready} {_test} {Id}");
                 
-                await Task.Delay(10, cancellationToken);
+                if (!Socket.Connected)
+                {
+                    Logger.LogInformation("client socket not connected waiting for connection to be established");
+                    await Task.Delay(10);
+                    continue;
+                }
+                
+                _semaphore.Wait();
+
+                try
+                {
+
+                    var result = await Client.SendAsync(serializedPayload.Data, cancellationToken);
+                    
+                    Logger.LogInformation($"Sending payload with id {serializedPayload.PayloadId} and result {result}");
+
+                    // if success then exit loop and return true
+                    if (result)
+                    {
+                        return true;
+                    }
+
+                    // if auto connect is enabled, wait for socket to be re-established
+                    if (_configuration.AutoReconnect)
+                    {
+                        await Task.Delay(5);
+                    }
+                    // otherwise break and return false
+                    else
+                    {
+                        return false;
+                    }
+                }
+                finally
+                {
+                    _semaphore.Release();
+                }
+       
             }
 
-            if (cancellationToken.IsCancellationRequested)
-                throw new TaskCanceledException();
-            
+            // only when cancellation is requested
+            return false;
         }
 
-        public void MarkAsReady()
+        private void ClientDataReceived(object clientSession, ClientSessionDataReceivedEventArgs eventArgs)
         {
-            _ready = true;
-            _test = 1;
-            Logger.LogInformation($"ready received for {_clientSession.Id} {_ready} {_test} {Id}");
+            try
+            {
+                _receiveDataProcessor.DataReceived(clientSession, eventArgs);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
         }
 
-        public void ClientDisconnected(IClientSession clientSession)
+        private void ClientDisconnected(object clientSession, ClientSessionDisconnectedEventArgs eventArgs)
         {
-            Logger.LogInformation($"Client disconnected {_clientSession.Id} {clientSession.Id} {Id}");
-            _ready = false;
-            _test = -1;
-            OnDisconnected?.Invoke();
+            Logger.LogInformation("received event for socket disconnected");
+            _ids.Enqueue(((IClient) clientSession).Id);
+
+            OnDisconnected?.Invoke(this, new ClientDisconnectedEventArgs());
+
+            // check if auto reconnect is enabled
+            if (_configuration.AutoReconnect)
+            {
+                Logger.LogInformation("auto connect in true, trying to reconnect");
+                Reconnect();
+            }
+    
         }
 
-        public void ClientConnected(IClientSession clientSession)
+        /// <summary>
+        /// Will disconnect and dispose the <see cref="IClient"/>
+        /// </summary>
+        public void Dispose()
         {
-            Logger.LogInformation($"Client connected {_clientSession.Id}");
-            OnConnected?.Invoke();
+            Client?.Dispose();
+            Disconnect();
         }
     }
 }

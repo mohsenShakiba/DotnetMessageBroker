@@ -18,7 +18,7 @@ namespace Tests.Common.Binary
             var randomString = RandomGenerator.GenerateString(size);
 
             var binaryDataProcessor = new BinaryDataProcessor();
-
+            
             var binaryData = Encoding.UTF8.GetBytes(randomString);
 
             binaryDataProcessor.Write(BitConverter.GetBytes(size));

@@ -4,25 +4,26 @@ using System.Buffers;
 namespace MessageBroker.Models
 {
     /// <summary>
-    ///     the message contains data that is sent by publisher and received by subscriber
+    /// Represents a data sent from publisher
     /// </summary>
     public struct Message
     {
-        public Guid Id { get; set; }
+        public Guid Id { get; init; }
         public string Route { get; init; }
         public Memory<byte> Data { get; init; }
         public byte[] OriginalMessageData { get; init; }
 
-        public QueueMessage ToQueueMessage(string queueName)
+        public TopicMessage ToTopicMessage(string queueName)
         {
             var newData = ArrayPool<byte>.Shared.Rent(Data.Length);
             Data.CopyTo(newData);
-            return new QueueMessage
+            // todo: use new guid
+            return new TopicMessage
             {
-                Id = Guid.NewGuid(),
+                Id = Id,
                 Data = newData.AsMemory(0, Data.Length),
                 Route = Route,
-                QueueName = queueName,
+                TopicName = queueName,
                 OriginalMessageData = newData
             };
         }

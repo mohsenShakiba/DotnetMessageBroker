@@ -7,83 +7,83 @@ namespace MessageBroker.Common.Pooling
 {
     public class ObjectPool
     {
-        private static ObjectPool _shared;
+        public static readonly ObjectPool Shared = new();
 
-        private readonly Dictionary<Type, Queue<object>> _objectTypeDict;
+        private readonly Dictionary<int, Queue<object>> _objectTypeDict;
+        private readonly Dictionary<Guid, bool> _pooledObjectDict;
         private readonly ConcurrentDictionary<Type, int> _objectTypeStatDict;
 
         public ObjectPool()
         {
-            _objectTypeDict = new Dictionary<Type, Queue<object>>();
-            _objectTypeStatDict = new ConcurrentDictionary<Type, int>();
-        }
-
-        public static ObjectPool Shared
-        {
-            get
-            {
-                if (_shared == null)
-                    _shared = new ObjectPool();
-                return _shared;
-            }
+            _objectTypeDict = new ();
+            _pooledObjectDict = new();
+            _objectTypeStatDict = new ();
         }
 
         public T Rent<T>() where T : IPooledObject, new()
         {
+            var type = typeof(T);
+            var typeKey = type.Name.GetHashCode();
+            
             lock (_objectTypeDict)
             {
-                var type = typeof(T);
 
-                if (!_objectTypeDict.ContainsKey(type))
+                if (!_objectTypeDict.ContainsKey(typeKey))
                 {
-                    _objectTypeDict[type] = new Queue<object>();
+                    _objectTypeDict[typeKey] = new Queue<object>();
 #if DEBUG
                     _objectTypeStatDict[type] = 0;
 #endif
                 }
 
-                var bag = _objectTypeDict[type];
+                var bag = _objectTypeDict[typeKey];
 
                 if (bag.TryDequeue(out var o))
                 {
                     var i = (T) o;
-
-                    if (!i.IsReturnedToPool)
-                    {
-                        throw new InvalidOperationException("The object seems to be already in use by another owner");
-                    }
-
-                    i.SetPooledStatus(false);
+                    // #if DEBUG
+              
+                    _pooledObjectDict[i.PoolId] = false;
 
                     return i;
                 }
 
-#if DEBUG
+                var newInstance = new T {PoolId = Guid.NewGuid()};
+
+// #if DEBUG
+                _pooledObjectDict[newInstance.PoolId] = false;
                 _objectTypeStatDict[type] += 1;
-#endif
-
-                var newInstance = new T();
-
-                newInstance.SetPooledStatus(false);
-
+// #endif
+   
                 return newInstance;
             }
         }
 
         public void Return<T>(T o) where T : IPooledObject
         {
+            var type = typeof(T);
+            var typeKey = type.Name.GetHashCode();
+            
             lock (_objectTypeDict)
             {
-                var type = typeof(T);
+                
+// #if DEBUG
+                var keyExists = _pooledObjectDict.TryGetValue(o.PoolId, out var isReturnedToPool);
 
-                if (o.IsReturnedToPool)
+                if (!keyExists)
                 {
-                    throw new InvalidOperationException("The object has already been returned to pool");
+                    throw new InvalidOperationException($"The object with key: {o.PoolId} doesn't belong to {nameof(ObjectPool)}");
                 }
+                
+                if (isReturnedToPool)
+                {
+                    throw new InvalidOperationException($"The object with key: {o.PoolId} has already been returned to {nameof(ObjectPool)}");
+                }
+// #endif
 
-                o.SetPooledStatus(true);
-
-                _objectTypeDict[type].Enqueue(o);
+                _pooledObjectDict[o.PoolId] = true;
+                
+                _objectTypeDict[typeKey].Enqueue(o);
             }
         }
 

@@ -3,7 +3,7 @@
 namespace MessageBroker.Models
 {
     /// <summary>
-    ///     indicating the payload process was successful
+    /// Indicating the payload process was successful by the client
     /// </summary>
     public struct Ack
     {

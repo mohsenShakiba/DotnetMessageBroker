@@ -1,37 +1,43 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.QueueConsumerCoordination;
+using MessageBroker.Client.Subscriptions;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Common.Logging;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
+using MessageBroker.TCP.EventArgs;
 
 namespace MessageBroker.Client.ReceiveDataProcessing
 {
     public class ReceiveDataProcessor : IReceiveDataProcessor
     {
-        private readonly ISubscriberStore _subscriberStore;
+        private readonly ISubscriptionStore _subscriptionStore;
         private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
-        private readonly ISerializer _serializer;
+        private readonly IDeserializer _deserializer;
+        
+        public event Action<Guid> OnOkReceived;
+        public event Action<Guid, string> OnErrorReceived;
 
-        public event Action OnReadyReceived;
 
         private int _receivedMessagesCount;
 
-        public ReceiveDataProcessor(ISerializer serializer,
-            ISubscriberStore subscriberStore, ISendPayloadTaskManager sendPayloadTaskManager)
+        public ReceiveDataProcessor(IDeserializer deserializer,
+            ISubscriptionStore subscriptionStore, ISendPayloadTaskManager sendPayloadTaskManager)
         {
-            _serializer = serializer;
-            _subscriberStore = subscriberStore;
+            _deserializer = deserializer;
+            _subscriptionStore = subscriptionStore;
             _sendPayloadTaskManager = sendPayloadTaskManager;
         }
 
-        public void DataReceived(Guid sessionId, Memory<byte> data)
+        public void DataReceived(object clientSessionObject, ClientSessionDataReceivedEventArgs dataReceivedEventArgs)
         {
-            var payloadType = _serializer.ParsePayloadType(data);
+            var data = dataReceivedEventArgs.Data;
+            var payloadType = _deserializer.ParsePayloadType(data);
             switch (payloadType)
             {
                 case PayloadType.Ok:
@@ -40,11 +46,8 @@ namespace MessageBroker.Client.ReceiveDataProcessing
                 case PayloadType.Error:
                     OnError(data);
                     break;
-                case PayloadType.Msg:
+                case PayloadType.TopicMessage:
                     OnMessage(data);
-                    break;
-                case PayloadType.Ready:
-                    OnReady();
                     break;
                 default:
                     throw new InvalidOperationException(
@@ -52,28 +55,31 @@ namespace MessageBroker.Client.ReceiveDataProcessing
             }
         }
 
+
+
         private void OnMessage(Memory<byte> payloadData)
         {
             Interlocked.Increment(ref _receivedMessagesCount);
-            var queueMessage = _serializer.ToQueueMessage(payloadData);
-            _subscriberStore.OnMessage(queueMessage);
+            var queueMessage = _deserializer.ToTopicMessage(payloadData);
+            if (_subscriptionStore.TryGet(queueMessage.TopicName, out var subscription))
+            {
+                ((Subscription)subscription).OnMessageReceived(queueMessage);
+            }
         }
 
         private void OnOk(Memory<byte> payloadData)
         {
-            var ack = _serializer.ToAck(payloadData);
+            var ack = _deserializer.ToAck(payloadData);
             _sendPayloadTaskManager.OnPayloadOkResult(ack.Id);
+            OnOkReceived?.Invoke(ack.Id);
         }
 
         private void OnError(Memory<byte> payloadData)
         {
-            var nack = _serializer.ToError(payloadData);
+            var nack = _deserializer.ToError(payloadData);
             _sendPayloadTaskManager.OnPayloadErrorResult(nack.Id, nack.Message);
+            OnErrorReceived?.Invoke(nack.Id, nack.Message);
         }
 
-        private void OnReady()
-        {
-            OnReadyReceived?.Invoke();
-        }
     }
 }

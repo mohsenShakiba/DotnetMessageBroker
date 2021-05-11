@@ -1,7 +1,7 @@
 ﻿namespace MessageBroker.Models
 {
     /// <summary>
-    ///     types of payload
+    /// Types of payloads
     /// </summary>
     public enum PayloadType
     {
@@ -10,11 +10,12 @@
         Error = 3,
         Ack = 4,
         Nack = 5,
-        ConfigureSubscription = 6,
-        QueueCreate = 7,
-        QueueDelete = 8,
-        SubscribeQueue = 9,
-        UnSubscribeQueue = 10,
-        Ready = 11
+        TopicDeclare = 6,
+        TopicDelete = 7,
+        SubscribeTopic = 8,
+        UnsubscribeTopic = 9,
+        Ready = 10,
+        Configure = 11,
+        TopicMessage = 12
     }
 }

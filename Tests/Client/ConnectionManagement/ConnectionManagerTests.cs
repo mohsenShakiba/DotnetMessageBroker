@@ -5,8 +5,6 @@ using System.Threading;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Common.Binary;
-using MessageBroker.TCP.Client;
-using MessageBroker.TCP.SocketWrapper;
 using Moq;
 using Tests.Classes;
 using Xunit;

@@ -1,38 +1,57 @@
 ﻿using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
-using MessageBroker.Common.Utils;
+using Serilog.Events;
 
 namespace MessageBroker.Common.Binary
 {
+    /// <inheritdoc />
     public class BinaryDataProcessor : IBinaryDataProcessor
     {
         private readonly DynamicBuffer _dynamicBuffer;
-        private readonly object _lock;
-        public bool Debug { get; set; }
+        private bool _disposed;
+        private bool _isReading;
+
         public BinaryDataProcessor()
         {
             _dynamicBuffer = new DynamicBuffer();
-            _lock = new object();
         }
 
         public void Write(Memory<byte> chunk)
         {
-            lock (_lock)
-            {
-                _dynamicBuffer.Write(chunk);
-            }
+            _dynamicBuffer.Write(chunk);
+        }
+
+        public void BeginLock()
+        {
+            _isReading = true;
+        }
+
+        public void EndLock()
+        {
+            _isReading = false;
         }
 
         public bool TryRead(out BinaryPayload binaryPayload)
         {
-            lock (_lock)
+            // we need to use lock for this method
+            // because the dispose might be called in the middle of this method
+            // and cause unexpected results
+            lock (_dynamicBuffer)
             {
                 binaryPayload = null;
+                
+                if (_disposed)
+                {
+                    return false;
+                }
+                
                 var canReadHeaderSize = _dynamicBuffer.CanRead(BinaryProtocolConfiguration.PayloadHeaderSize);
 
                 if (!canReadHeaderSize)
@@ -57,10 +76,32 @@ namespace MessageBroker.Common.Binary
                 payload.CopyTo(receiveDataBuffer);
 
                 binaryPayload = ObjectPool.Shared.Rent<BinaryPayload>();
+
+
                 binaryPayload.Setup(receiveDataBuffer, payload.Length);
 
                 return true;
-                
+            }
+            
+        }
+        
+        public void Dispose()
+        {
+            while (_isReading)
+            {
+                Thread.Yield();
+            }
+            
+            if (_disposed)
+            {
+                return;
+            }
+            
+            // so that disposing the buffer would not interfere with TreRead method
+            lock (_dynamicBuffer)
+            {
+                _disposed = true;
+                _dynamicBuffer.Dispose();
             }
         }
     }

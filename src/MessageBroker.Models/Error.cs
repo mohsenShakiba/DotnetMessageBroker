@@ -2,6 +2,9 @@
 
 namespace MessageBroker.Models
 {
+    /// <summary>
+    /// Error containing message for when something goes wrong
+    /// </summary>
     public struct Error
     {
         public Guid Id { get; init; }
