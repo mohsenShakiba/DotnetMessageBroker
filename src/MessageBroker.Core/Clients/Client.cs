@@ -95,7 +95,7 @@ namespace MessageBroker.Core.Clients
 
                     var result = await SendAsync(serializedPayload.Data, CancellationToken.None);
 
-                    Logger.LogInformation($"Send to client payload with id: {serializedPayload.PayloadId} {result}");
+                    Logger.LogInformation($"Send to client payload with id: {serializedPayload.PayloadId} {result} {_disposed}");
 
                     if (!result)
                     {
@@ -111,21 +111,25 @@ namespace MessageBroker.Core.Clients
 
         public AsyncPayloadTicket Enqueue(SerializedPayload serializedPayload)
         {
-            Logger.LogInformation($"called enqueue from client for {serializedPayload.PayloadId}");
-            var queueWasSuccessful = _queue.Writer.TryWrite(serializedPayload);
-
-            if (queueWasSuccessful)
+            lock(this)
             {
-                var ticket = ObjectPool.Shared.Rent<AsyncPayloadTicket>();
+                var queueWasSuccessful = _queue.Writer.TryWrite(serializedPayload);
 
-                ticket.Setup(serializedPayload.PayloadId);
+                if (queueWasSuccessful)
+                {
+                    Logger.LogInformation($"called enqueue from client for {serializedPayload.PayloadId} in {Id}");
 
-                _tickets[ticket.PayloadId] = ticket;
+                    var ticket = ObjectPool.Shared.Rent<AsyncPayloadTicket>();
 
-                return ticket;
+                    ticket.Setup(serializedPayload.PayloadId);
+
+                    _tickets[ticket.PayloadId] = ticket;
+
+                    return ticket;
+                }
+
+                throw new ChannelClosedException();
             }
-
-            throw new ChannelClosedException();
         }
 
         public void EnqueueIgnore(SerializedPayload serializedPayload)
@@ -162,7 +166,7 @@ namespace MessageBroker.Core.Clients
 
         public void Close()
         {
-            Logger.LogInformation($"Dispose was called on client {_disposed}");
+            Logger.LogInformation($"Dispose was called on client {_disposed} from {Id}");
             // we need to lock the close method
             // otherwise multiple concurrent calls to Close will cause the OnDisconnected to be called twice
             lock (this)
@@ -176,7 +180,10 @@ namespace MessageBroker.Core.Clients
                 {
 
                     _disposed = true;
-                
+
+                    // complete the channel 
+                    _queue.Writer.TryComplete();
+
                     _cancellationTokenSource.Cancel();
                 
                     SetStatusForAllPendingTickets();
@@ -363,8 +370,7 @@ namespace MessageBroker.Core.Clients
 
         public void Dispose()
         {
-            // complete the channel 
-            _queue.Writer.TryComplete();
+
 
             _socket.Dispose();
 
@@ -382,7 +388,7 @@ namespace MessageBroker.Core.Clients
 
         private void SetStatusForAllPendingTickets()
         {
-            Logger.LogInformation($"SetStatusForAllPendingTickets was called for {_tickets.Count}");
+            Logger.LogInformation($"SetStatusForAllPendingTickets was called for {_tickets.Count} in {Id}");
             // set status of all the tickets
             foreach (var (_, ticket) in _tickets)
             {

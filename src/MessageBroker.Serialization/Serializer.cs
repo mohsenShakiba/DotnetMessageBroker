@@ -186,21 +186,6 @@ namespace MessageBroker.Serialization
             }
         }
 
-        public SerializedPayload Serialize(Ready ready)
-        {
-            var binaryWriter = ObjectPool.Shared.Rent<BinaryProtocolWriter>();
-            
-            try
-            {
-                return binaryWriter
-                    .WriteType(PayloadType.Ready)
-                    .ToSerializedPayload();
-            }
-            finally
-            {
-                ObjectPool.Shared.Return(binaryWriter);
-            }
-        }
 
         public SerializedPayload Serialize(ConfigureClient configureClient)
         {

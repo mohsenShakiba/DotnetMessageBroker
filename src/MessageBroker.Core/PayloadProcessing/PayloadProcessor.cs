@@ -5,6 +5,7 @@ using MessageBroker.Core.Clients.Store;
 using MessageBroker.Core.Persistence.Topics;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
+using Microsoft.Extensions.Logging;
 using Serilog;
 
 namespace MessageBroker.Core.PayloadProcessing
@@ -16,14 +17,16 @@ namespace MessageBroker.Core.PayloadProcessing
         private readonly ISerializer _serializer;
         private readonly IClientStore _clientStore;
         private readonly ITopicStore _topicStore;
+        private readonly ILogger<PayloadProcessor> _logger;
 
         public PayloadProcessor(IDeserializer deserializer, ISerializer serializer, IClientStore clientStore,
-            ITopicStore topicStore)
+            ITopicStore topicStore, ILogger<PayloadProcessor> logger)
         {
             _deserializer = deserializer;
             _serializer = serializer;
             _clientStore = clientStore;
             _topicStore = topicStore;
+            _logger = logger;
         }
 
         public void OnDataReceived(Guid sessionId, Memory<byte> data)
@@ -31,6 +34,8 @@ namespace MessageBroker.Core.PayloadProcessing
             try
             {
                 var type = _deserializer.ParsePayloadType(data);
+
+                _logger.LogInformation($"Received data with type: {type} from client: {sessionId}");
 
                 switch (type)
                 {
@@ -48,11 +53,11 @@ namespace MessageBroker.Core.PayloadProcessing
                         break;
                     case PayloadType.SubscribeTopic:
                         var subscribeQueue = _deserializer.ToSubscribeTopic(data);
-                        OnSubscribeQueue(sessionId, subscribeQueue);
+                        OnSubscribeTopic(sessionId, subscribeQueue);
                         break;
                     case PayloadType.UnsubscribeTopic:
                         var unsubscribeQueue = _deserializer.ToUnsubscribeTopic(data);
-                        OnUnsubscribeQueue(sessionId, unsubscribeQueue);
+                        OnUnsubscribeTopic(sessionId, unsubscribeQueue);
                         break;
                     case PayloadType.TopicDeclare:
                         var queueDeclare = _deserializer.ToTopicDeclareModel(data);
@@ -66,8 +71,8 @@ namespace MessageBroker.Core.PayloadProcessing
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
-                throw;
+                _logger.LogError($"Failed to deserialize data from client: {sessionId} with error: {e}");
+
             }
            
         }
@@ -78,26 +83,27 @@ namespace MessageBroker.Core.PayloadProcessing
 
             if (!_topicStore.GetAll().Any())
             {
-                Logger.LogInformation($"No topic was found for message with id {message.Id}");
+                _logger.LogInformation($"No topic was found for message with id: {message.Id}");
             }
             
             // dispatch the message to matched queues
-            foreach (var queue in _topicStore.GetAll())
+            foreach (var topic in _topicStore.GetAll())
             {
-                if (queue.MessageRouteMatch(message.Route))
+                if (topic.MessageRouteMatch(message.Route))
                 {
                     try
                     {
-                        queue.OnMessage(message);
+                        topic.OnMessage(message);
                     }
                     catch
                     {
+                        _logger.LogError($"Failed to write message: {message.Id} to topic: {topic.Name}");
                         // message was not written, probably the channel was completed due to being disposed
                     }
                 }
                 else
                 {
-                    Logger.LogInformation($"No topic was found for message with id {message.Id}");
+                    _logger.LogInformation($"No topic was found for message with id: {message.Id}");
                 }
             }
 
@@ -108,21 +114,23 @@ namespace MessageBroker.Core.PayloadProcessing
             message.Dispose();
         }
 
-        private void OnMessageAck(Guid sessionId, Ack ack)
+        private void OnMessageAck(Guid clientId, Ack ack)
         {
-            Logger.LogInformation($"ack message with id {ack.Id}");
-            if (_clientStore.TryGet(sessionId, out var client))
+            _logger.LogInformation($"Ack received for message with id: {ack.Id} from client: {clientId}");
+
+            if (_clientStore.TryGet(clientId, out var client))
                 client.OnPayloadAckReceived(ack.Id);
         }
 
-        private void OnMessageNack(Guid sessionId, Nack nack)
+        private void OnMessageNack(Guid clientId, Nack nack)
         {
-            Logger.LogInformation($"nack message with id {nack.Id}");
-            if (_clientStore.TryGet(sessionId, out var client))
+            _logger.LogInformation($"Nack received for message with id: {nack.Id} from client: {clientId}");
+
+            if (_clientStore.TryGet(clientId, out var client))
                 client.OnPayloadNackReceived(nack.Id);
         }
 
-        private void OnSubscribeQueue(Guid clientId, SubscribeTopic subscribeTopic)
+        private void OnSubscribeTopic(Guid clientId, SubscribeTopic subscribeTopic)
         {
             _clientStore.TryGet(clientId, out var client);
 
@@ -144,7 +152,7 @@ namespace MessageBroker.Core.PayloadProcessing
             }
         }
 
-        private void OnUnsubscribeQueue(Guid clientId, UnsubscribeTopic unsubscribeTopic)
+        private void OnUnsubscribeTopic(Guid clientId, UnsubscribeTopic unsubscribeTopic)
         {
             _clientStore.TryGet(clientId, out var client);
 

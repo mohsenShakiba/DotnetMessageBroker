@@ -17,10 +17,9 @@ namespace MessageBroker.Models
         {
             var newData = ArrayPool<byte>.Shared.Rent(Data.Length);
             Data.CopyTo(newData);
-            // todo: use new guid
             return new TopicMessage
             {
-                Id = Id,
+                Id = Guid.NewGuid(),
                 Data = newData.AsMemory(0, Data.Length),
                 Route = Route,
                 TopicName = queueName,

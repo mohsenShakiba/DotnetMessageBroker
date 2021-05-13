@@ -1,5 +1,6 @@
 ﻿using System;
 using MessageBroker.Core.Stats.TopicStatus;
+using MessageBroker.Core.Topics;
 
 namespace MessageBroker.Core.Broker
 {
@@ -19,6 +20,6 @@ namespace MessageBroker.Core.Broker
         /// </summary>
         public void Stop();
 
-        public ITopicStatRecorder GetStatRecorderForTopic(string topicName);
+        public ITopic GetTopic(string name);
     }
 }

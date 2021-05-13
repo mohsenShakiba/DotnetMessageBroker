@@ -29,5 +29,11 @@ namespace Tests.Classes
             sp.FillFrom(GenerateBytes(dataSize), dataSize, Guid.NewGuid());
             return sp;
         }
+
+        public static double GenerateDouble()
+        {
+            var random = new Random();
+            return random.NextDouble();
+        }
     }
 }

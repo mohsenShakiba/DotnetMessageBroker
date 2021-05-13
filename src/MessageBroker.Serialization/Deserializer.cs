@@ -236,11 +236,6 @@ namespace MessageBroker.Serialization
             }
         }
 
-        public Ready ToReady(Memory<byte> _)
-        {
-            return new Ready();
-        }
-
         public ConfigureClient ToConfigureConcurrency(Memory<byte> data)
         {
             var binaryReader = ObjectPool.Shared.Rent<BinaryProtocolReader>();

@@ -19,7 +19,6 @@ namespace MessageBroker.Serialization
         SerializedPayload Serialize(TopicDeclare topicDeclare);
         SerializedPayload Serialize(TopicDelete topicDelete);
         SerializedPayload Serialize(Error error);
-        SerializedPayload Serialize(Ready ready);
         SerializedPayload Serialize(ConfigureClient configureClient);
     }
 }

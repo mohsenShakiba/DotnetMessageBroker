@@ -7,6 +7,7 @@ using MessageBroker.Core.PayloadProcessing;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.Persistence.Topics;
 using MessageBroker.Core.Stats.TopicStatus;
+using MessageBroker.Core.Topics;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
 using MessageBroker.TCP;
@@ -51,14 +52,14 @@ namespace MessageBroker.Core.Broker
             Dispose();
         }
 
-        public ITopicStatRecorder GetStatRecorderForTopic(string topicName)
+        public ITopic GetTopic(string name)
         {
-            if (_topicStore.TryGetValue(topicName, out var topic))
+            if (_topicStore.TryGetValue(name, out var topic))
             {
-                return topic.StatRecorder;
+                return topic;
             }
-
             throw new KeyNotFoundException("No topic with provided key was found");
+
         }
 
         private void ClientConnected(object _, SocketAcceptedEventArgs eventArgs)
@@ -69,13 +70,16 @@ namespace MessageBroker.Core.Broker
 
                 clientSession.OnDisconnected += ClientDisconnected;
                 clientSession.OnDataReceived += ClientDataReceived;
-            
+
+                // must add the socket to client store before calling StartReceiveProcess 
+                // otherwise we might receive messages before having access to client in client store
+                _clientStore.Add(clientSession);
+
                 clientSession.StartReceiveProcess();
                 clientSession.StartSendProcess();
             
                 Logger.LogInformation($"client session connected, added send queue {clientSession.Id}");
    
-                _clientStore.Add(clientSession);
             }
             catch (ObjectDisposedException)
             {

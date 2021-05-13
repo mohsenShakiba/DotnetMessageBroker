@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using MessageBroker.Common.Logging;
 using MessageBroker.TCP.EventArgs;
+using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.TCP
 {
@@ -10,7 +11,7 @@ namespace MessageBroker.TCP
     public class TcpSocketServer : ISocketServer
     {
         private readonly IPEndPoint _endPoint;
-
+        private readonly ILogger<TcpSocketServer> _logger;
         private bool _isDisposed;
         private bool _isAccepting;
 
@@ -26,9 +27,10 @@ namespace MessageBroker.TCP
         
         public event EventHandler<SocketAcceptedEventArgs> OnSocketAccepted;
         
-        public TcpSocketServer(ConnectionProvider connectionProvider)
+        public TcpSocketServer(ConnectionProvider connectionProvider, ILogger<TcpSocketServer> logger)
         {
             _endPoint = connectionProvider.IpEndPoint;
+            _logger = logger;
         }
 
         public TcpSocketServer(IPEndPoint endPoint)
@@ -52,7 +54,7 @@ namespace MessageBroker.TCP
             _socket.Bind(_endPoint);
             _socket.Listen();
 
-            Logger.LogInformation($"started socket on endpoint {_endPoint}");
+            _logger.LogInformation($"Started socket on endpoint {_endPoint}");
 
             BeginAcceptConnection();
         }
@@ -61,15 +63,13 @@ namespace MessageBroker.TCP
         {
             ThrowIfDisposed();
 
-            Logger.LogInformation("stopping socket server");
+            _logger.LogInformation("Stopping socket server");
             
             _isAccepting = false;
 
             _socketAsyncEventArgs.Completed -= OnAcceptCompleted;
 
             _socket.Close();
-            _socket.Dispose();
-
             _socketAsyncEventArgs.Dispose();
             
             Dispose();
@@ -83,13 +83,11 @@ namespace MessageBroker.TCP
         {
             try
             {
-                ResetAcceptEventArgs();
-                
                 // accept while sync, break when we go async\
                 while (_isAccepting && !_socket.AcceptAsync(_socketAsyncEventArgs))
                 {
                     OnAcceptCompleted(null, _socketAsyncEventArgs);
-                    ResetAcceptEventArgs();
+                    _socketAsyncEventArgs.AcceptSocket = null;
                 }
             }
             catch (Exception e)
@@ -101,8 +99,6 @@ namespace MessageBroker.TCP
 
         private void ResetAcceptEventArgs()
         {
-            _socketAsyncEventArgs.AcceptSocket = null;
-            _socketAsyncEventArgs.UserToken = this;
         }
 
         private void OnAcceptCompleted(object _, SocketAsyncEventArgs socketAsyncEventArgs)
@@ -117,8 +113,7 @@ namespace MessageBroker.TCP
                     break;
             }
 
-            var server = (TcpSocketServer)socketAsyncEventArgs.UserToken;
-            server?.BeginAcceptConnection();
+            BeginAcceptConnection();
         }
 
         private void OnAcceptSuccess(Socket socket)

@@ -71,13 +71,13 @@ namespace MessageBroker.Client
             CancellationToken? cancellationToken = null)
         {
             var serializedPayload = _payloadFactory.NewMessage(data, route);
-            return _sendDataProcessor.SendAsync(serializedPayload, false, cancellationToken ?? CancellationToken.None);
+            return _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken ?? CancellationToken.None);
         }
 
-        public Task<SendAsyncResult> PublishRawAsync(Message message, CancellationToken? cancellationToken = null)
+        public Task<SendAsyncResult> PublishRawAsync(Message message, bool waitForAcknowledge, CancellationToken cancellationToken)
         {
             var serializedPayload = _serializer.Serialize(message);
-            return _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken ?? CancellationToken.None);
+            return _sendDataProcessor.SendAsync(serializedPayload, waitForAcknowledge, cancellationToken);
         }
 
         public Task<SendAsyncResult> DeclareTopicAsync(string queueName, string queueRoute,

@@ -5,6 +5,7 @@ using MessageBroker.Common.Logging;
 using MessageBroker.Core.Persistence.Redis;
 using MessageBroker.Core.Topics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Core.Persistence.Topics
 {
@@ -13,24 +14,25 @@ namespace MessageBroker.Core.Persistence.Topics
     {
         private const string QueueNameKey = "MessageBroker.Queue.Set";
         private readonly RedisConnectionProvider _redisConnectionProvider;
+        private readonly ILogger<RedisTopicStore> _logger;
         private readonly IServiceProvider _serviceProvider;
         private readonly List<ITopic> _queues;
 
-        public RedisTopicStore(RedisConnectionProvider redisConnectionProvider, IServiceProvider serviceProvider)
+        public RedisTopicStore(RedisConnectionProvider redisConnectionProvider, ILogger<RedisTopicStore> logger, IServiceProvider serviceProvider)
         {
             _redisConnectionProvider = redisConnectionProvider;
+            _logger = logger;
             _serviceProvider = serviceProvider;
             _queues = new List<ITopic>();
         }
 
         public void Setup()
         {
-            Logger.LogInformation("QueueStore: setting up");
-
             var connection = _redisConnectionProvider.Get();
             var results = connection.GetDatabase().SetScan(QueueNameKey);
 
             foreach (var result in results)
+            {
                 try
                 {
                     var queue = DeserializeIQueue(result);
@@ -38,10 +40,11 @@ namespace MessageBroker.Core.Persistence.Topics
                 }
                 catch
                 {
-                    Logger.LogError("Failed to deserialize queue");
+                    _logger.LogError("Failed to deserialize topic data");
                 }
+            }
 
-            Logger.LogInformation($"QueueStore: found {results.Count()} queues");
+            _logger.LogInformation($"Found {results.Count()} topics");
         }
 
         public IEnumerable<ITopic> GetAll()

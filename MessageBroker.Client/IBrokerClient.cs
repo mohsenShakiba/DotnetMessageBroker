@@ -18,7 +18,7 @@ namespace MessageBroker.Client
         void Disconnect();
         Task<ISubscription> GetTopicSubscriptionAsync(string name, string route, CancellationToken? cancellationToken = null);
         Task<SendAsyncResult> PublishAsync(string route, byte[] data, CancellationToken? cancellationToken = null);
-        Task<SendAsyncResult> PublishRawAsync(Message message, CancellationToken? cancellationToken = null);
+        Task<SendAsyncResult> PublishRawAsync(Message message, bool waitForAcknowledge, CancellationToken cancellationToken);
         Task<SendAsyncResult> DeclareTopicAsync(string queueName, string queueRoute,
             CancellationToken? cancellationToken = null);
 

@@ -21,229 +21,89 @@ namespace Tests
     {
 
         [Theory]
-        [InlineData(20000)]
-        public async Task Test(int count)
-        {
-            var topicName = RandomGenerator.GenerateString(10);
-            var wait = new ManualResetEvent(false);
-            var serverIpEndpoint = new IPEndPoint(IPAddress.Loopback, 8000);
-
-            var clientConnectionConfiguration = new ClientConnectionConfiguration
-            {
-                AutoReconnect = true,
-                IpEndPoint = serverIpEndpoint
-            };
-            
-            var brokerBuilder = new BrokerBuilder();
-
-            using var broker = brokerBuilder
-                .UseMemoryStore()
-                .UseEndPoint(serverIpEndpoint)
-                .AddConsoleLog()
-                .Build();
-            
-            
-            broker.Start();
-
-            await using var clientFactory = new BrokerClientFactory();
-
-            var client = clientFactory.GetClient();
-            
-            client.Connect(clientConnectionConfiguration);
-            
-            var result = await client.DeclareTopicAsync(topicName, topicName);
-            
-            Assert.True(result.IsSuccess);
-            
-            var subscription = await client.GetTopicSubscriptionAsync(topicName, topicName);
-            
-            var numberOfReceivedMessages = 0;
-
-            subscription.MessageReceived += message =>
-            {
-                if (Encoding.UTF8.GetString(message.Data.Span) != numberOfReceivedMessages.ToString())
-                {
-                    Console.WriteLine($"missed number {numberOfReceivedMessages}");
-                }
-                Interlocked.Increment(ref numberOfReceivedMessages);
-                
-                Logger.LogInformation($"received message {Encoding.UTF8.GetString(message.Data.Span)} with id {message.MessageId}");
-                message.Ack();
-
-                if (numberOfReceivedMessages == count)
-                {
-                    wait.Set();
-                }
-            };
-
-            var sw = new Stopwatch();
-            sw.Start();
-            for (var i = 0; i < count; i++)
-            {
-                var randomString = i.ToString();
-                var randomData = Encoding.UTF8.GetBytes(randomString);
-                var response = await client.PublishAsync(topicName, randomData);
-
-                if (!response.IsSuccess)
-                    throw new Exception("Failed to send data to server");
-            }
-            
-            sw.Stop();
-            
-            Console.WriteLine($"took {sw.ElapsedMilliseconds}");
-
-
-            await Task.Delay(1000);
-            
-            var lastCheck = 0;
-            
-            while (true)
-            {
-                if (count == numberOfReceivedMessages)
-                {
-                    break;
-                }
-
-                if (lastCheck != numberOfReceivedMessages)
-                {
-                    lastCheck = numberOfReceivedMessages;
-                    await Task.Delay(100);
-                }
-                else
-                {
-                    break;
-                }
-
-            }
-            
-            Assert.Equal(count, numberOfReceivedMessages);
-
-        }
-        
-        // [Theory]
-        // [InlineData(10000, 0)]
-        // public async Task EndToEndTest_SingleSubscriberSinglePublisherNoInterrupt_AllMessagesAreReceivedBySubscriber(
-        //     int messageCount, int nackRation)
-        // {
-        //     // declare variables
-        //     var messageStore = new Dictionary<string, int>();
-        //     var random = new Random();
-        //     var messageStoreLock = new object();
-        //     var queueName = RandomGenerator.GenerateString(10);
-        //     var queueRoute = RandomGenerator.GenerateString(10);
-        //     var destination = new IPEndPoint(IPAddress.Loopback, 8000);
-        //     var serverServiceProvider = GetServerServiceProvider();
-        //     var subscriberServiceProvider = GetClientServiceProvider();
-        //     var publisherServiceProvider = GetClientServiceProvider();
-        //
-        //     // setup server
-        //     var server = serverServiceProvider.GetRequiredService<ISocketServer>();
-        //     server.Start(destination);
-        //
-        //     // setup send client
-        //     var subscriberClient = subscriberServiceProvider.GetRequiredService<MessageBrokerClient>();
-        //     subscriberClient.Connect(destination);
-        //
-        //     // setup receive client
-        //     var publisherClient = publisherServiceProvider.GetRequiredService<MessageBrokerClient>();
-        //     publisherClient.Connect(destination);
-        //
-        //     // declare the queue
-        //     var declareResult = await subscriberClient.CreateQueueAsync(queueName, queueRoute);
-        //
-        //     if (!declareResult.IsSuccess)
-        //         throw new Exception($"declare queue failed with error {declareResult.InternalErrorCode}");
-        //     
-        //     // setup reset event
-        //     var manualResetEvent = new ManualResetEventSlim(false);
-        //
-        //     // setup queue 
-        //     var queueManager = await subscriberClient.GetQueueSubscriber(queueName, queueRoute, 100);
-        //
-        //     // setup subscriber
-        //     queueManager.MessageReceived += async msg =>
-        //     {
-        //         var ratio = random.Next(0, 100);
-        //         
-        //         var messageStr = Encoding.UTF8.GetString(msg.Data.Span);
-        //
-        //         if (ratio < nackRation)
-        //         {
-        //             Logger.LogInformation($"nacked message {messageStr}");
-        //             var res = await subscriberClient.NackAsync(msg.MessageId);
-        //             Logger.LogInformation($"nacked message {messageStr} after {res.IsSuccess}");
-        //             return;
-        //         }
-        //
-        //         lock (messageStoreLock)
-        //         {
-        //
-        //             if (messageStore.ContainsKey(messageStr))
-        //             {
-        //                 messageStore[messageStr] -= 1;
-        //             }
-        //
-        //             var receivedMessagesCount = messageStore.Values.Count(v => v == 0);
-        //
-        //             if (receivedMessagesCount == messageCount)
-        //                 manualResetEvent.Set();
-        //             
-        //             Logger.LogInformation($"received message {messageStr} {receivedMessagesCount}");
-        //         }
-        //         
-        //         await subscriberClient.AckAsync(msg.MessageId);
-        //     };
-        //     
-        //     for (var i = 0; i < messageCount; i++)
-        //     {
-        //
-        //         
-        //         var randomString = i.ToString();
-        //         var randomData = Encoding.UTF8.GetBytes(randomString);
-        //
-        //         lock (messageStoreLock)
-        //         {
-        //             if (messageStore.ContainsKey(randomString))
-        //                 messageStore[randomString] += 1;
-        //             else
-        //                 messageStore[randomString] = 1;
-        //         }
-        //
-        //         var publishResult = await publisherClient.PublishAsync(queueRoute, randomData);
-        //
-        //         if (!publishResult.IsSuccess)
-        //             throw new Exception($"publish message failed with error {publishResult.InternalErrorCode}");
-        //         
-        //     }
-        //
-        //     manualResetEvent.Wait();
-        //     server.Stop();
-        // }
-
-
-        [Theory]
-        [InlineData(100, 30, 15)]
-        public async Task EndToEndTest_SingleSubscriberSinglePublisherWithInterrupts_AllMessagesAreReceivedBySubscriber(int messageCount, int nackRation, int failureRatio)
+        [InlineData(100, 0.5f)]
+        public async Task Receive_AllMessagesAreReceived_SubscriberIsDisconnectedMultipleTimes(int numberOfMessagesToBeReceived, float chanceOfClientFailure)
         {
             // declare variables
-            var queueName = RandomGenerator.GenerateString(10);
-            var messageStore = new MessageStore(queueName, messageCount);
-            var random = new Random();
-            var serverIpEndpoint = new IPEndPoint(IPAddress.Loopback, 8001);
+            var topicName = RandomGenerator.GenerateString(10);
+            var messageStore = new MessageStore(topicName, numberOfMessagesToBeReceived);
             var clientConnectionConfiguration = new ClientConnectionConfiguration
             {
                 AutoReconnect = true,
-                IpEndPoint = serverIpEndpoint
+                IpEndPoint = new IPEndPoint(IPAddress.Loopback, 8002)
             };
-            
+
             // setup server
             var brokerBuilder = new BrokerBuilder();
 
             using var broker = brokerBuilder
                 .UseMemoryStore()
-                .UseEndPoint(serverIpEndpoint)
-                // .AddConsoleLog()
-                .AddFile(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\Logs\test.txt")
+                .UseEndPoint(clientConnectionConfiguration.IpEndPoint)
+                 // .AddConsoleLog()
+                 .AddFile(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\Logs\test.txt")
+                .Build();
+
+            broker.Start();
+
+            await using var clientFactory = new BrokerClientFactory();
+
+            // setup subscriber
+            var subscriberClient = clientFactory.GetClient();
+            subscriberClient.Connect(clientConnectionConfiguration, true);
+
+            // declare topic
+            var declareResult = await subscriberClient.DeclareTopicAsync(topicName, topicName);
+            Assert.True(declareResult.IsSuccess);
+
+            // setup a topic with test data
+            PopulateTopicWithMessage(topicName, numberOfMessagesToBeReceived, messageStore, broker);
+
+            // get new subscription 
+            var subscription = await subscriberClient.GetTopicSubscriptionAsync(topicName, topicName);
+
+            // setup subscriber
+            subscription.MessageReceived += msg =>
+            {
+                if (RandomGenerator.GenerateDouble() < chanceOfClientFailure)
+                {
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        subscriberClient.ConnectionManager.Socket.SimulateInterrupt();
+                    });
+                    return;
+                }
+
+                // note: the id of msg has changed 
+                var messageData = new Guid(msg.Data.Span);
+
+                messageStore.OnMessageReceived(messageData);
+
+                msg.Ack();
+            };
+
+            messageStore.WaitForAllMessageToBeReceived();
+        }
+
+
+        [Theory]
+        [InlineData(100, 0.5f)]
+        public async Task Receive_AllMessagesAreReceived_SomeMessagesAreNacked(int numberOfMessagesToBeReceived, float changeForMessageToBeNacked)
+        {
+            // declare variables
+            var topicName = RandomGenerator.GenerateString(10);
+            var messageStore = new MessageStore(topicName, numberOfMessagesToBeReceived);
+            var clientConnectionConfiguration = new ClientConnectionConfiguration
+            {
+                AutoReconnect = true,
+                IpEndPoint = new IPEndPoint(IPAddress.Loopback, 8002)
+            };
+            
+            // setup server
+            var brokerBuilder = new BrokerBuilder();
+        
+            using var broker = brokerBuilder
+                .UseMemoryStore()
+                .UseEndPoint(clientConnectionConfiguration.IpEndPoint)
                 .Build();
             
             broker.Start();
@@ -254,61 +114,76 @@ namespace Tests
             var subscriberClient = clientFactory.GetClient();
             subscriberClient.Connect(clientConnectionConfiguration, true);
         
+            // declare topic
+            var declareResult = await subscriberClient.DeclareTopicAsync(topicName, topicName);
+            Assert.True(declareResult.IsSuccess);
+        
+            // setup a topic with test data
+            PopulateTopicWithMessage(topicName, numberOfMessagesToBeReceived, messageStore, broker);
+            
+            // get new subscription 
+            var subscription = await subscriberClient.GetTopicSubscriptionAsync(topicName, topicName);
+            
+            // setup subscriber
+            subscription.MessageReceived += msg =>
+            {
+                if (RandomGenerator.GenerateDouble() < changeForMessageToBeNacked)
+                {
+                    msg.Nack();
+                    return;
+                }
+        
+                // note: the id of msg has changed 
+                var messageData = new Guid(msg.Data.Span);
+        
+                messageStore.OnMessageReceived(messageData);
+            
+                msg.Ack();
+            };
+        
+            messageStore.WaitForAllMessageToBeReceived();
+        }
+
+        [Theory]
+        [InlineData(100, 0.5f)]
+        public async Task Send_AllMessagesAreSent_PublisherIsDisconnectedMultipleTimes(int numberOfMessagesToSend, float chanceOfClientFailure)
+        {
+            // in this test we will try to send n messages to server while keep disconnecting the client 
+            // to make sure that messages will be received by the server and the acknowledge will be received 
+            // by the client 
+            
+            // declare variables
+            var topicName = RandomGenerator.GenerateString(10);
+            var messageStore = new MessageStore(topicName, numberOfMessagesToSend);
+            var clientConnectionConfiguration = new ClientConnectionConfiguration
+            {
+                AutoReconnect = true,
+                IpEndPoint = new IPEndPoint(IPAddress.Loopback, 8001)
+            };
+            
+            // setup server
+            var brokerBuilder = new BrokerBuilder();
+
+            using var broker = brokerBuilder
+                .UseMemoryStore()
+                .UseEndPoint(clientConnectionConfiguration.IpEndPoint)
+                .Build();
+            
+            broker.Start();
+        
+            await using var clientFactory = new BrokerClientFactory();
+            
             // setup publisher
             var publisherClient = clientFactory.GetClient();
             publisherClient.Connect(clientConnectionConfiguration);
         
             // declare topic
-            var declareResult = await subscriberClient.DeclareTopicAsync(queueName, queueName);
+            var declareResult = await publisherClient.DeclareTopicAsync(topicName, topicName);
             Assert.True(declareResult.IsSuccess);
-        
-            // setup queue 
-            var subscription = await subscriberClient.GetTopicSubscriptionAsync(queueName, queueName);
-            
-            // // setup subscriber
-            // subscription.MessageReceived += msg =>
-            // {
-            //     try
-            //     {
-            //         Logger.LogInformation($"received message in client with id: {msg.MessageId} {messageStore.ReceivedCount}");
-            //         var ratio = random.Next(0, 100);
-            //     
-            //         if (ratio < failureRatio)
-            //         {
-            //             // intentionally interrupt the socket
-            //             subscriberClient.ConnectionManager.Socket.SimulateInterrupt();
-            //             return;
-            //         }
-            //
-            //         if (ratio < nackRation)
-            //         {
-            //             msg.Nack();
-            //             return;
-            //         }
-            //
-            //         var messageData = new Guid(msg.Data.Span);
-            //
-            //         messageStore.OnMessageReceived(messageData);
-            //     
-            //     
-            //         msg.Ack();
-            //     }
-            //     catch (Exception e)
-            //     {
-            //         Console.WriteLine(e);
-            //         throw;
-            //     }
-            //     
-            // };
 
-            publisherClient.ConnectionManager.ReceiveDataProcessor.OnOkReceived += (guid) =>
+            while (messageStore.SentCount < numberOfMessagesToSend)
             {
-                messageStore.OnOkReceived(guid);
-            };
-
-            while (messageStore.CurrentCount < messageCount)
-            {
-                if (random.Next(0, 100) < failureRatio)
+                if (RandomGenerator.GenerateDouble() < chanceOfClientFailure)
                 {
                     ThreadPool.QueueUserWorkItem(_ =>
                     {
@@ -316,34 +191,33 @@ namespace Tests
                     });
                 }
 
-                var msg = messageStore.GetUniqueMessage();
+                var msg = messageStore.NewMessage();
 
-                var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(1));
                 
-                var publishResult = await publisherClient.PublishRawAsync(msg, cancellationTokenSource.Token);
+                var publishResult = await publisherClient.PublishRawAsync(msg, true, cancellationTokenSource.Token);
                 
-                Logger.LogInformation($"client sent message with id {msg.Id} and count {messageStore.CurrentCount}");
-        
-                if (!publishResult.IsSuccess)
+                if (publishResult.IsSuccess)
                 {
-                    // throw new Exception($"Sending failed, reason: {publishResult.InternalErrorCode}");
-                }
-                else
-                {
-                    messageStore.Commit(msg.Id, msg);
+                    messageStore.OnMessageSent(msg.Id);
                 }
 
             }
 
-            await Task.Delay(1000);
-
-            messageStore.WaitForSendDataToFinish();
-            
-
-            // messageStore.WaitForDataToFinish();
-            // Assert.Equal(messageCount, messageStore.ReceivedCount);   
+            messageStore.WaitForAllMessageToBeSent();
         }
 
+
+        private void PopulateTopicWithMessage(string topicName, int numberOfMessages, MessageStore messageStore, IBroker broker)
+        {
+            var topic = broker.GetTopic(topicName);
+
+            for(var i = 0; i < numberOfMessages; i++)
+            {
+                var message = messageStore.NewMessage();
+                topic.OnMessage(message);
+            }
+        }
        
     }
 }

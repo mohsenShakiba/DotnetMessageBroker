@@ -4,21 +4,19 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Common.DynamicThrottling;
-using MessageBroker.Common.Logging;
 using MessageBroker.Core.Clients;
 using MessageBroker.Core.DispatchPolicy;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.RouteMatching;
-using MessageBroker.Core.Stats.TopicStatus;
 using MessageBroker.Models;
-using MessageBroker.Models.Async;
 using MessageBroker.Serialization;
 using MessageBroker.TCP.Binary;
+using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Core.Topics
 {
     /// <inheritdoc />
-    public class Topic : ITopic, IAsyncPayloadTicketHandler
+    public class Topic : ITopic
     {
         /// <summary>
         /// Store for <see cref="Message"/>
@@ -33,31 +31,31 @@ namespace MessageBroker.Core.Topics
 
         private readonly IRouteMatcher _routeMatcher;
         private readonly ISerializer _serializer;
+        private readonly ILogger<Topic> _logger;
         private readonly IDispatcher _dispatcher;
         private readonly DynamicWaitThrottling _throttling;
 
         public string Name { get; private set; }
         public string Route { get; private set; }
-        public ITopicStatRecorder StatRecorder { get; }
 
         private bool _disposed;
 
         public Topic(IDispatcher dispatcher, IMessageStore messageStore, IRouteMatcher routeMatcher,
-            ISerializer serializer)
+            ISerializer serializer, ILogger<Topic> logger)
         {
             _dispatcher = dispatcher;
             _messageStore = messageStore;
             _routeMatcher = routeMatcher;
             _serializer = serializer;
+            _logger = logger;
             _queueChannel = Channel.CreateUnbounded<Guid>();
             _throttling = new();
-            StatRecorder = new TopicStatRecorder();
         }
 
 
         public void Dispose()
         {
-            Volatile.Write(ref _disposed, true);
+            _disposed = true;
 
             // if called twice
             _ = _queueChannel.Writer.TryComplete();
@@ -76,10 +74,9 @@ namespace MessageBroker.Core.Topics
 
         public void OnMessage(Message message)
         {
-            Logger.LogInformation(
-                $"Topic {Name} received message with id: {message.Id} and count {StatRecorder.ReceivedMessageCount}");
-
             ThrowIfDisposed();
+
+            _logger.LogInformation($"Topic {Name} received message with id: {message.Id}");
 
             // create TopicMessage from message
             var queueMessage = message.ToTopicMessage(Name);
@@ -89,13 +86,11 @@ namespace MessageBroker.Core.Topics
 
             // add the message to queue chan
             _queueChannel.Writer.TryWrite(queueMessage.Id);
-
-            StatRecorder.OnMessageReceived();
         }
 
         public bool MessageRouteMatch(string messageRoute)
         {
-            if (Volatile.Read(ref _disposed))
+            if (_disposed)
             {
                 return false;
             }
@@ -105,6 +100,7 @@ namespace MessageBroker.Core.Topics
 
         public void ClientSubscribed(IClient client)
         {
+            _logger.LogInformation($"Added new subscription to topic: {Name} with id: {client.Id}");
             ThrowIfDisposed();
             _dispatcher.Add(client);
         }
@@ -112,10 +108,10 @@ namespace MessageBroker.Core.Topics
         public void ClientUnsubscribed(IClient client)
         {
             ThrowIfDisposed();
-            var clientIsSubscribed = _dispatcher.Remove(client);
-            if (clientIsSubscribed)
+            var success = _dispatcher.Remove(client);
+            if (success)
             {
-                Logger.LogInformation($"Client removed from topic {Name} with {_queueChannel.Reader.Count}");
+                _logger.LogInformation($"Removed subscription from topic: {Name} with id: {client.Id}");
             }
         }
 
@@ -134,6 +130,15 @@ namespace MessageBroker.Core.Topics
             ThrowIfDisposed();
 
             var messages = _messageStore.GetAll();
+
+            if (messages.Any())
+            {
+                _logger.LogWarning($"Found {messages.Count()} messages while initializing the topic: {Name}");
+            }
+            else
+            {
+                _logger.LogWarning($"No messages was found while initializing the topic: {Name}");
+            }
 
             foreach (var message in messages)
                 _queueChannel.Writer.TryWrite(message);
@@ -168,9 +173,9 @@ namespace MessageBroker.Core.Topics
             {
                 var client = _dispatcher.NextAvailable();
 
+                // if no subscription is found then just wait
                 if (client is null)
                 {
-                    Logger.LogInformation($"delaying message with id: {serializedPayload.PayloadId}");
                     await _throttling.WaitAndIncrease();
                     continue;
                 }
@@ -181,10 +186,9 @@ namespace MessageBroker.Core.Topics
                 // get ticket for payload
                 try
                 {
-                    Logger.LogInformation($"Enqueue message with id {serializedPayload.PayloadId}");
+                    _logger.LogInformation($"Adding message with id: {serializedPayload.PayloadId} to subscription with id: {client.Id} in topic: {Name}");
                     var ticket = client.Enqueue(serializedPayload);
-                    // listen to status of payload
-                    ticket.Handler = this;
+                    ticket.OnStatusChanged += OnStatusChanged;
                     break;
                 }
                 catch (ChannelClosedException)
@@ -212,7 +216,7 @@ namespace MessageBroker.Core.Topics
         /// <param name="messageId">identifier of the message</param>
         private void OnMessageAck(Guid messageId)
         {
-            Logger.LogInformation($"received ack for ticket with id {messageId}");
+            _logger.LogInformation($"Received ack for message with id: {messageId} in topic: {Name}");
             _messageStore.Delete(messageId);
         }
 
@@ -222,7 +226,7 @@ namespace MessageBroker.Core.Topics
         /// <param name="messageId"></param>
         private void OnMessageNack(Guid messageId)
         {
-            Logger.LogInformation($"received nack for ticket with id {messageId}");
+            _logger.LogInformation($"Received Nack for message with id: {messageId} in topic: {Name}");
             _queueChannel.Writer.TryWrite(messageId);
         }
 

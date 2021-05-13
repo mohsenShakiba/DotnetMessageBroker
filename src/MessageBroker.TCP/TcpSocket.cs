@@ -7,10 +7,9 @@ using System.Threading.Tasks;
 namespace MessageBroker.TCP
 {
     /// <inheritdoc cref="ITcpSocket" />
-    public class TcpSocket : ITcpSocket
+    public sealed class TcpSocket : ITcpSocket
     {
         private readonly Socket _socket;
-        private readonly SemaphoreSlim _semaphore;
 
         private bool _disposed;
         
@@ -19,7 +18,6 @@ namespace MessageBroker.TCP
         public TcpSocket(Socket socket)
         {
             _socket = socket;
-            _semaphore = new SemaphoreSlim(1, 1);
         }
 
         public static TcpSocket NewFromEndPoint(IPEndPoint ipEndPoint)
