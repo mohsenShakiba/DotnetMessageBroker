@@ -22,7 +22,15 @@ namespace MessageBroker.Common.Binary
         /// <param name="chunk">Chunk of payload data</param>
         void Write(Memory<byte> chunk);
 
+        /// <summary>
+        /// While this lock is active, calling Dispose will prevent the buffer to be disposed
+        /// </summary>
         void BeginLock();
+
+        /// <summary>
+        /// Release the lock, now the buffer can be disposed
+        /// </summary>
+        /// <remarks>If Dispose was previously called, then buffer will be disposed once EndLock is called</remarks>
         void EndLock();
         
         /// <summary>

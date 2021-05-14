@@ -41,10 +41,10 @@ namespace MessageBroker.Core.DispatchPolicy
 
         public bool Remove(IClient client)
         {
+            _wrLock.EnterWriteLock();
+
             try
             {
-                _wrLock.EnterWriteLock();
-
                 return _clients.Remove(client.Id, out _);
             }
             finally
@@ -57,6 +57,7 @@ namespace MessageBroker.Core.DispatchPolicy
         public IClient NextAvailable()
         {
             _wrLock.EnterReadLock();
+
             try
             {
                 foreach (var (_, client) in _clients)

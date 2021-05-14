@@ -41,20 +41,19 @@ namespace MessageBroker.Common.Pooling
                 if (bag.TryDequeue(out var o))
                 {
                     var i = (T) o;
-                    // #if DEBUG
-              
+#if DEBUG
                     _pooledObjectDict[i.PoolId] = false;
-
+#endif
                     return i;
                 }
 
                 var newInstance = new T {PoolId = Guid.NewGuid()};
 
-// #if DEBUG
+#if DEBUG
                 _pooledObjectDict[newInstance.PoolId] = false;
                 _objectTypeStatDict[type] += 1;
-// #endif
-   
+#endif
+
                 return newInstance;
             }
         }
@@ -66,8 +65,8 @@ namespace MessageBroker.Common.Pooling
             
             lock (_objectTypeDict)
             {
-                
-// #if DEBUG
+
+#if DEBUG
                 var keyExists = _pooledObjectDict.TryGetValue(o.PoolId, out var isReturnedToPool);
 
                 if (!keyExists)
@@ -79,10 +78,12 @@ namespace MessageBroker.Common.Pooling
                 {
                     throw new InvalidOperationException($"The object with key: {o.PoolId} has already been returned to {nameof(ObjectPool)}");
                 }
-// #endif
-
-                _pooledObjectDict[o.PoolId] = true;
                 
+                _pooledObjectDict[o.PoolId] = true;
+
+#endif
+
+
                 _objectTypeDict[typeKey].Enqueue(o);
             }
         }

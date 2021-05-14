@@ -70,7 +70,7 @@ namespace MessageBroker.Core.Clients
         /// the client won't be flooded with too many messages
         /// </remarks>
         AsyncPayloadTicket Enqueue(SerializedPayload serializedPayload);
-        void EnqueueIgnore(SerializedPayload serializedPayload);
+        void EnqueueFireAndForget(SerializedPayload serializedPayload);
 
         /// <summary>
         /// Called by the <see cref="IPayloadProcessor"/> when ack is received by the client

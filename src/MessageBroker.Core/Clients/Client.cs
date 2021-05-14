@@ -15,6 +15,7 @@ using MessageBroker.Serialization;
 using MessageBroker.TCP;
 using MessageBroker.TCP.Binary;
 using MessageBroker.TCP.EventArgs;
+using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Core.Clients
 {
@@ -22,12 +23,12 @@ namespace MessageBroker.Core.Clients
     public class Client : IClient
     {
         /// <summary>
-        /// The IBinaryDataProcessor used for storing batch data received from connection, processing them and retrieving them
+        /// The <see cref="IBinaryDataProcessor"/> used for storing batch data received from connection, processing them and retrieving them
         /// </summary>
         private readonly IBinaryDataProcessor _binaryDataProcessor;
 
         /// <summary>
-        /// The underlying ITcpSocket used for sending an receiving data
+        /// The underlying <see cref="ITcpSocket"/> used for sending an receiving data
         /// </summary>
         private readonly ITcpSocket _socket;
 
@@ -36,6 +37,7 @@ namespace MessageBroker.Core.Clients
         /// </summary>
         private readonly byte[] _receiveBuffer;
 
+        private readonly ILogger<Client> _logger;
         private readonly ConcurrentDictionary<Guid, AsyncPayloadTicket> _tickets;
         private readonly Channel<SerializedPayload> _queue;
         private readonly CancellationTokenSource _cancellationTokenSource;
@@ -50,22 +52,32 @@ namespace MessageBroker.Core.Clients
 
         private bool _disposed;
         private int _count;
-        private static int _msgReceivedCount;
 
-        public Client(ITcpSocket tcpSocket, IBinaryDataProcessor binaryDataProcessor = null)
+        public Client(ITcpSocket tcpSocket, ILogger<Client> logger, IBinaryDataProcessor binaryDataProcessor = null)
         {
             if (!tcpSocket.Connected)
                 throw new InvalidOperationException("The provided tcp socket was not in connected state");
 
             // set a random id
             Id = Guid.NewGuid();
-            _cancellationTokenSource = new CancellationTokenSource();
 
             _socket = tcpSocket;
+            _logger = logger;
+
+            // set binary data processor and set default if null
             _binaryDataProcessor = binaryDataProcessor ?? new BinaryDataProcessor();
+
+            // rent buffer using for receiving data
             _receiveBuffer = ArrayPool<byte>.Shared.Rent(BinaryProtocolConfiguration.ReceiveDataSize);
-            _tickets = new();
+
+            // set cancellation token
+            _cancellationTokenSource = new CancellationTokenSource();
+
+            // create channel for send queue
             _queue = Channel.CreateUnbounded<SerializedPayload>();
+
+            // dictionary for storing tickets
+            _tickets = new();
         }
 
         public void StartReceiveProcess()
@@ -95,7 +107,7 @@ namespace MessageBroker.Core.Clients
 
                     var result = await SendAsync(serializedPayload.Data, CancellationToken.None);
 
-                    Logger.LogInformation($"Send to client payload with id: {serializedPayload.PayloadId} {result} {_disposed}");
+                    _logger.LogTrace($"Sending message: {serializedPayload.PayloadId} to client: {Id}");
 
                     if (!result)
                     {
@@ -107,114 +119,6 @@ namespace MessageBroker.Core.Clients
             });
         }
 
-        #region Close
-
-        public AsyncPayloadTicket Enqueue(SerializedPayload serializedPayload)
-        {
-            lock(this)
-            {
-                var queueWasSuccessful = _queue.Writer.TryWrite(serializedPayload);
-
-                if (queueWasSuccessful)
-                {
-                    Logger.LogInformation($"called enqueue from client for {serializedPayload.PayloadId} in {Id}");
-
-                    var ticket = ObjectPool.Shared.Rent<AsyncPayloadTicket>();
-
-                    ticket.Setup(serializedPayload.PayloadId);
-
-                    _tickets[ticket.PayloadId] = ticket;
-
-                    return ticket;
-                }
-
-                throw new ChannelClosedException();
-            }
-        }
-
-        public void EnqueueIgnore(SerializedPayload serializedPayload)
-        {
-            _queue.Writer.TryWrite(serializedPayload);
-        }
-
-        public void OnPayloadAckReceived(Guid payloadId)
-        {
-            DisposeMessagePayloadAndSetStatus(payloadId, true);
-        }
-
-        public void OnPayloadNackReceived(Guid payloadId)
-        {
-            DisposeMessagePayloadAndSetStatus(payloadId, false);
-        }
-
-        private void DisposeMessagePayloadAndSetStatus(Guid payloadId, bool ack)
-        {
-            try
-            {
-                if (_tickets.Remove(payloadId, out var ticket))
-                {
-                    Logger.LogInformation($"status received for payload with id {payloadId}");
-                    ticket.SetStatus(ack);
-                    ObjectPool.Shared.Return(ticket);
-                }
-            }
-            catch
-            {
-                // do nothing
-            }
-        }
-
-        public void Close()
-        {
-            Logger.LogInformation($"Dispose was called on client {_disposed} from {Id}");
-            // we need to lock the close method
-            // otherwise multiple concurrent calls to Close will cause the OnDisconnected to be called twice
-            lock (this)
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-                
-                try
-                {
-
-                    _disposed = true;
-
-                    // complete the channel 
-                    _queue.Writer.TryComplete();
-
-                    _cancellationTokenSource.Cancel();
-                
-                    SetStatusForAllPendingTickets();
-
-                    if (_socket.Connected)
-                    {
-                        _socket.Disconnect();
-                    }
-
-                    var disconnectedEventArgs = new ClientSessionDisconnectedEventArgs {Id = Id};
-
-                    Logger.LogInformation($"Notifying the callee for disconnect {OnDisconnected == null}");
-
-                    ThreadPool.QueueUserWorkItem(_ =>
-                    {
-                        OnDisconnected?.Invoke(this, disconnectedEventArgs);
-                    });
-
-                    Dispose();
-                }
-                catch (Exception e)
-                {
-                    Logger.LogError($"exception wile trying to dispose {e}");
-                }
-             
-
-            }
-        }
-
-        #endregion
-
         #region Receive
 
         /// <summary>
@@ -222,17 +126,10 @@ namespace MessageBroker.Core.Clients
         /// </summary>
         private async ValueTask ReceiveAsync()
         {
-            if (_count > 0)
-            {
-                throw new Exception();
-            }
-
-            Interlocked.Increment(ref _count);
 
             try
             {
-                var buff = new byte[1024];
-                var receivedSize = await _socket.ReceiveAsync(buff, _cancellationTokenSource.Token);
+                var receivedSize = await _socket.ReceiveAsync(_receiveBuffer, _cancellationTokenSource.Token);
 
                 if (receivedSize == 0)
                 {
@@ -242,55 +139,6 @@ namespace MessageBroker.Core.Clients
 
                 var data = buff.AsMemory(0, receivedSize).ToArray();
                 _binaryDataProcessor.Write(data);
-
-                // if (BitConverter.ToInt32(data) == 0)
-                // {
-                //     Console.WriteLine("all zero");
-                //     return;
-                // }
-                //
-                //
-                // // validate the data to make sure received data is correct
-                // var offset = 0;
-                // var msgCount = 0;
-                // var deserializer = new Deserializer();
-                // while (true)
-                // {
-                //     if (data.Length <= offset)
-                //     {
-                //         break;
-                //     }
-                //
-                //     var size = BitConverter.ToInt32(data.AsSpan(offset, 4));
-                //
-                //     var slice = data.AsMemory(offset + 4, size);
-                //
-                //     var type = deserializer.ParsePayloadType(slice);
-                //
-                //     if (type == PayloadType.Msg)
-                //     {
-                //         try
-                //         {
-                //             msgCount += 1;
-                //             var msgConverted = deserializer.ToMessage(slice);
-                //         }
-                //         catch (Exception e)
-                //         {
-                //             Console.WriteLine(e);
-                //             throw;
-                //         }
-                //     }
-                //
-                //     if (type == PayloadType.TopicMessage)
-                //     {
-                //         var msgConverted = deserializer.ToTopicMessage(slice);
-                //
-                //     }
-                //
-                //     offset += (size + 4);
-                // }
-                //
-                // _msgReceivedCount += msgCount;
 
                 ProcessReceivedData();
             }
@@ -353,6 +201,44 @@ namespace MessageBroker.Core.Clients
 
         #region Send
 
+        public AsyncPayloadTicket Enqueue(SerializedPayload serializedPayload)
+        {
+            lock (this)
+            {
+                var queueWasSuccessful = _queue.Writer.TryWrite(serializedPayload);
+
+                if (queueWasSuccessful)
+                {
+                    _logger.LogTrace($"Enqueue message: {serializedPayload.PayloadId} in client: {Id}");
+
+                    var ticket = ObjectPool.Shared.Rent<AsyncPayloadTicket>();
+
+                    ticket.Setup(serializedPayload.PayloadId);
+
+                    _tickets[ticket.PayloadId] = ticket;
+
+                    return ticket;
+                }
+
+                throw new ChannelClosedException();
+            }
+        }
+
+        public void EnqueueFireAndForget(SerializedPayload serializedPayload)
+        {
+            _queue.Writer.TryWrite(serializedPayload);
+        }
+
+        public void OnPayloadAckReceived(Guid payloadId)
+        {
+            DisposeMessagePayloadAndSetStatus(payloadId, true);
+        }
+
+        public void OnPayloadNackReceived(Guid payloadId)
+        {
+            DisposeMessagePayloadAndSetStatus(payloadId, false);
+        }
+
         public async Task<bool> SendAsync(Memory<byte> payload, CancellationToken cancellationToken)
         {
             var sendSize = await _socket.SendAsync(payload, cancellationToken);
@@ -368,6 +254,53 @@ namespace MessageBroker.Core.Clients
 
         #endregion
 
+        public void Close()
+        {
+            // we need to lock the close method
+            // otherwise multiple concurrent calls to Close will cause the OnDisconnected to be called twice
+            lock (this)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                try
+                {
+
+                    _logger.LogInformation($"Dispose was called on client: {Id}");
+
+                    _disposed = true;
+
+                    // complete the channel 
+                    _queue.Writer.TryComplete();
+
+                    _cancellationTokenSource.Cancel();
+
+                    SetStatusForAllPendingTickets();
+
+                    if (_socket.Connected)
+                    {
+                        _socket.Disconnect();
+                    }
+
+                    // we need to invoice OnDisconnected on a separate thread
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        var disconnectedEventArgs = new ClientSessionDisconnectedEventArgs { Id = Id };
+                        OnDisconnected?.Invoke(this, disconnectedEventArgs);
+                    });
+
+                    Dispose();
+                }
+                catch
+                {
+                    // no-op
+                }
+
+            }
+        }
+
         public void Dispose()
         {
 
@@ -376,6 +309,27 @@ namespace MessageBroker.Core.Clients
 
             // todo:
             // ArrayPool<byte>.Shared.Return(_receiveBuffer, true);
+        }
+
+        private void DisposeMessagePayloadAndSetStatus(Guid payloadId, bool ack)
+        {
+            try
+            {
+                if (_tickets.Remove(payloadId, out var ticket))
+                {
+                    var type = ack ? "Ack" : "nack";
+
+                    _logger.LogTrace($"{type} received for message: {payloadId}");
+
+                    ticket.SetStatus(ack);
+
+                    ObjectPool.Shared.Return(ticket);
+                }
+            }
+            catch
+            {
+                // do nothing
+            }
         }
 
         private void OnReceivedDataDisposed()

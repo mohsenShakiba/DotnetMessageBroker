@@ -80,16 +80,16 @@ namespace MessageBroker.Client
             return _sendDataProcessor.SendAsync(serializedPayload, waitForAcknowledge, cancellationToken);
         }
 
-        public Task<SendAsyncResult> DeclareTopicAsync(string queueName, string queueRoute,
+        public Task<SendAsyncResult> DeclareTopicAsync(string name, string route,
             CancellationToken? cancellationToken = null)
         {
-            var serializedPayload = _payloadFactory.NewDeclareTopic(queueName, queueRoute);
+            var serializedPayload = _payloadFactory.NewDeclareTopic(name, route);
             return _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken ?? CancellationToken.None);
         }
 
-        public Task<SendAsyncResult> DeleteTopicAsync(string queueName, CancellationToken? cancellationToken = null)
+        public Task<SendAsyncResult> DeleteTopicAsync(string name, CancellationToken? cancellationToken = null)
         {
-            var serializedPayload = _payloadFactory.NewDeleteTopic(queueName);
+            var serializedPayload = _payloadFactory.NewDeleteTopic(name);
             return _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken ?? CancellationToken.None);
         }
 
@@ -101,6 +101,7 @@ namespace MessageBroker.Client
             _isDisposed = true;
 
             await _subscriptionStore.DisposeAsync();
+
             _sendPayloadTaskManager.Dispose();
         }
     }

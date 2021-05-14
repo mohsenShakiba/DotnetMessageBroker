@@ -29,62 +29,59 @@ namespace MessageBroker.Core.PayloadProcessing
             _logger = logger;
         }
 
-        public void OnDataReceived(Guid sessionId, Memory<byte> data)
+        public void OnDataReceived(Guid clientId, Memory<byte> data)
         {
             try
             {
                 var type = _deserializer.ParsePayloadType(data);
 
-                _logger.LogInformation($"Received data with type: {type} from client: {sessionId}");
+                _logger.LogInformation($"Received data with type: {type} from client: {clientId}");
 
                 switch (type)
                 {
                     case PayloadType.Msg:
                         var message = _deserializer.ToMessage(data);
-                        OnMessage(sessionId, message);
+                        OnMessage(clientId, message);
                         break;
                     case PayloadType.Ack:
                         var ack = _deserializer.ToAck(data);
-                        OnMessageAck(sessionId, ack);
+                        OnMessageAck(clientId, ack);
                         break;
                     case PayloadType.Nack:
                         var nack = _deserializer.ToNack(data);
-                        OnMessageNack(sessionId, nack);
+                        OnMessageNack(clientId, nack);
                         break;
                     case PayloadType.SubscribeTopic:
                         var subscribeQueue = _deserializer.ToSubscribeTopic(data);
-                        OnSubscribeTopic(sessionId, subscribeQueue);
+                        OnSubscribeTopic(clientId, subscribeQueue);
                         break;
                     case PayloadType.UnsubscribeTopic:
                         var unsubscribeQueue = _deserializer.ToUnsubscribeTopic(data);
-                        OnUnsubscribeTopic(sessionId, unsubscribeQueue);
+                        OnUnsubscribeTopic(clientId, unsubscribeQueue);
                         break;
                     case PayloadType.TopicDeclare:
                         var queueDeclare = _deserializer.ToTopicDeclareModel(data);
-                        OnDeclareQueue(sessionId, queueDeclare);
+                        OnDeclareQueue(clientId, queueDeclare);
                         break;
                     case PayloadType.TopicDelete:
                         var queueDelete = _deserializer.ToTopicDeleteModel(data);
-                        OnDeleteQueue(sessionId, queueDelete);
+                        OnDeleteQueue(clientId, queueDelete);
                         break;
                 }
             }
             catch (Exception e)
             {
-                _logger.LogError($"Failed to deserialize data from client: {sessionId} with error: {e}");
+                _logger.LogError($"Failed to deserialize data from client: {clientId} with error: {e}");
 
             }
            
         }
 
 
-        private void OnMessage(Guid sessionId, Message message)
+        private void OnMessage(Guid clientId, Message message)
         {
 
-            if (!_topicStore.GetAll().Any())
-            {
-                _logger.LogInformation($"No topic was found for message with id: {message.Id}");
-            }
+            var matchedAnyTopic = false;
             
             // dispatch the message to matched queues
             foreach (var topic in _topicStore.GetAll())
@@ -94,21 +91,25 @@ namespace MessageBroker.Core.PayloadProcessing
                     try
                     {
                         topic.OnMessage(message);
+                        matchedAnyTopic = true;
                     }
+                    // message was not written, probably the channel was completed due to being disposed
                     catch
                     {
                         _logger.LogError($"Failed to write message: {message.Id} to topic: {topic.Name}");
-                        // message was not written, probably the channel was completed due to being disposed
                     }
-                }
-                else
-                {
-                    _logger.LogInformation($"No topic was found for message with id: {message.Id}");
                 }
             }
 
-            // send received ack to publisher
-            SendReceivedPayloadOk(sessionId, message.Id);
+            if (matchedAnyTopic)
+            {
+                // send received ack to publisher
+                SendReceivedPayloadOk(clientId, message.Id);
+            }
+            else
+            {
+                SendReceivePayloadError(clientId, message.Id, "No topic was found");
+            }
 
             // must return the original message data to buffer pool
             message.Dispose();
@@ -175,7 +176,7 @@ namespace MessageBroker.Core.PayloadProcessing
         }
 
 
-        private void OnDeclareQueue(Guid sessionId, TopicDeclare topicDeclare)
+        private void OnDeclareQueue(Guid clientId, TopicDeclare topicDeclare)
         {
             Logger.LogInformation($"declaring queue with name {topicDeclare.Name}");
 
@@ -184,9 +185,9 @@ namespace MessageBroker.Core.PayloadProcessing
             {
                 // if queue route match
                 if (queue.Route == topicDeclare.Route)
-                    SendReceivedPayloadOk(sessionId, topicDeclare.Id);
+                    SendReceivedPayloadOk(clientId, topicDeclare.Id);
                 else
-                    SendReceivePayloadError(sessionId, topicDeclare.Id, "Queue name already exists");
+                    SendReceivePayloadError(clientId, topicDeclare.Id, "Queue name already exists");
 
                 return;
             }
@@ -194,34 +195,34 @@ namespace MessageBroker.Core.PayloadProcessing
             // create new queue
             _topicStore.Add(topicDeclare.Name, topicDeclare.Route);
 
-            SendReceivedPayloadOk(sessionId, topicDeclare.Id);
+            SendReceivedPayloadOk(clientId, topicDeclare.Id);
         }
 
-        private void OnDeleteQueue(Guid sessionId, TopicDelete topicDelete)
+        private void OnDeleteQueue(Guid clientId, TopicDelete topicDelete)
         {
             Logger.LogInformation($"deleting queue with name {topicDelete.Name}");
 
             _topicStore.Delete(topicDelete.Name);
 
-            SendReceivedPayloadOk(sessionId, topicDelete.Id);
+            SendReceivedPayloadOk(clientId, topicDelete.Id);
         }
 
-        private void SendReceivedPayloadOk(Guid sessionId, Guid payloadId)
+        private void SendReceivedPayloadOk(Guid clientId, Guid payloadId)
         {
-            if (_clientStore.TryGet(sessionId, out var sendQueue))
+            if (_clientStore.TryGet(clientId, out var sendQueue))
             {
                 var ok = new Ok
                 {
                     Id = payloadId
                 };
                 var sendPayload = _serializer.Serialize(ok);
-                sendQueue.EnqueueIgnore(sendPayload);
+                sendQueue.EnqueueFireAndForget(sendPayload);
             }
         }
 
-        private void SendReceivePayloadError(Guid sessionId, Guid payloadId, string message)
+        private void SendReceivePayloadError(Guid clientId, Guid payloadId, string message)
         {
-            if (_clientStore.TryGet(sessionId, out var sendQueue))
+            if (_clientStore.TryGet(clientId, out var sendQueue))
             {
                 var error = new Error
                 {
@@ -229,7 +230,7 @@ namespace MessageBroker.Core.PayloadProcessing
                     Message = message
                 };
                 var sendPayload = _serializer.Serialize(error);
-                sendQueue.EnqueueIgnore(sendPayload);
+                sendQueue.EnqueueFireAndForget(sendPayload);
             }
         }
     }

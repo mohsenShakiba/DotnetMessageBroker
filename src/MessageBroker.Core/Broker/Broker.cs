@@ -6,36 +6,37 @@ using MessageBroker.Core.Clients.Store;
 using MessageBroker.Core.PayloadProcessing;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.Persistence.Topics;
-using MessageBroker.Core.Stats.TopicStatus;
 using MessageBroker.Core.Topics;
-using MessageBroker.Models;
 using MessageBroker.Serialization;
 using MessageBroker.TCP;
 using MessageBroker.TCP.EventArgs;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Core.Broker
 {
-    /// <summary>
-    /// Instance of message broker
-    /// </summary>
+
+    /// <inheritdoc/>
     public class Broker: IBroker
     {
         private readonly IPayloadProcessor _payloadProcessor;
         private readonly IClientStore _clientStore;
         private readonly IMessageStore _messageStore;
-        private readonly ISerializer _serializer;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly ILogger<Broker> _logger;
         private readonly ITopicStore _topicStore;
         private readonly ISocketServer _socketServer;
 
         public Broker(ISocketServer socketServer, IPayloadProcessor payloadProcessor, IClientStore clientStore, ITopicStore topicStore,
-            IMessageStore messageStore, ISerializer serializer)
+            IMessageStore messageStore, IServiceProvider serviceProvider, ILogger<Broker> logger)
         {
             _socketServer = socketServer;
             _payloadProcessor = payloadProcessor;
             _clientStore = clientStore;
             _topicStore = topicStore;
             _messageStore = messageStore;
-            _serializer = serializer;
+            _serviceProvider = serviceProvider;
+            _logger = logger;
         }
 
         public void Start()
@@ -52,21 +53,14 @@ namespace MessageBroker.Core.Broker
             Dispose();
         }
 
-        public ITopic GetTopic(string name)
-        {
-            if (_topicStore.TryGetValue(name, out var topic))
-            {
-                return topic;
-            }
-            throw new KeyNotFoundException("No topic with provided key was found");
-
-        }
 
         private void ClientConnected(object _, SocketAcceptedEventArgs eventArgs)
         {
             try
             {
-                var clientSession = new Client(eventArgs.Socket);
+                var logger = _serviceProvider.GetRequiredService<ILogger<Client>>();
+
+                var clientSession = new Client(eventArgs.Socket, logger);
 
                 clientSession.OnDisconnected += ClientDisconnected;
                 clientSession.OnDataReceived += ClientDataReceived;
@@ -78,7 +72,7 @@ namespace MessageBroker.Core.Broker
                 clientSession.StartReceiveProcess();
                 clientSession.StartSendProcess();
             
-                Logger.LogInformation($"client session connected, added send queue {clientSession.Id}");
+                _logger.LogInformation($"Client: {clientSession.Id} connected");
    
             }
             catch (ObjectDisposedException)
@@ -95,22 +89,21 @@ namespace MessageBroker.Core.Broker
             }
             catch (Exception e)
             {
-                Logger.LogError($"An error occured while trying to dispatch messages, error: {e}");
+                _logger.LogError($"An error occured while trying to dispatch messages, error: {e}");
             }
         }
 
         private void ClientDisconnected(object clientSession, ClientSessionDisconnectedEventArgs eventArgs)
         {
-            Logger.LogInformation("client session disconnected, removing send queue");
 
             if (clientSession is IClient client)
             {
                 
+                _logger.LogInformation($"Client: {client.Id} removed");
+
                 foreach (var queue in _topicStore.GetAll())
                     queue.ClientUnsubscribed(client);
-                
-                client.OnDisconnected -= ClientDisconnected;
-                client.OnDataReceived -= ClientDataReceived;
+
                 _clientStore.Remove(client);
             }
         }
