@@ -12,4 +12,9 @@
       <PackageReference Include="System.Collections.Concurrent" Version="4.3.0" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\src\MessageBroker.Common\MessageBroker.Common.csproj" />
+      <ProjectReference Include="..\src\MessageBroker.Serialization\MessageBroker.Serialization.csproj" />
+    </ItemGroup>
+
 </Project>
