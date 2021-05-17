@@ -1,16 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Client;
 using MessageBroker.Client.ConnectionManagement;
-using MessageBroker.Common.Logging;
-using MessageBroker.Core.Broker;
-using MessageBroker.TCP;
+using MessageBroker.Core;
+using MessageBroker.Core.Persistence.Topics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Tests.Classes;
 using Xunit;
@@ -26,7 +22,10 @@ namespace Tests
         {
             // declare variables
             var topicName = RandomGenerator.GenerateString(10);
-            var messageStore = new MessageStore(topicName, numberOfMessagesToBeReceived);
+
+            var loggerFactory = new LoggerFactory();
+            var messageStore = new MessageStore(loggerFactory.CreateLogger<MessageStore>());
+            messageStore.Setup(topicName, numberOfMessagesToBeReceived);
             var clientConnectionConfiguration = new ClientConnectionConfiguration
             {
                 AutoReconnect = true,
@@ -40,7 +39,6 @@ namespace Tests
                 .UseMemoryStore()
                 .UseEndPoint(clientConnectionConfiguration.IpEndPoint)
                  // .AddConsoleLog()
-                 .AddFile(@"C:\Users\m.shakiba.PSZ021-PC\Desktop\Logs\test.txt")
                 .Build();
 
             broker.Start();
@@ -49,7 +47,7 @@ namespace Tests
 
             // setup subscriber
             var subscriberClient = clientFactory.GetClient();
-            subscriberClient.Connect(clientConnectionConfiguration, true);
+            subscriberClient.Connect(clientConnectionConfiguration);
 
             // declare topic
             var declareResult = await subscriberClient.DeclareTopicAsync(topicName, topicName);
@@ -91,7 +89,9 @@ namespace Tests
         {
             // declare variables
             var topicName = RandomGenerator.GenerateString(10);
-            var messageStore = new MessageStore(topicName, numberOfMessagesToBeReceived);
+            var loggerFactory = new LoggerFactory();
+            var messageStore = new MessageStore(loggerFactory.CreateLogger<MessageStore>());
+            messageStore.Setup(topicName, numberOfMessagesToBeReceived);
             var clientConnectionConfiguration = new ClientConnectionConfiguration
             {
                 AutoReconnect = true,
@@ -112,7 +112,7 @@ namespace Tests
             
             // setup subscriber
             var subscriberClient = clientFactory.GetClient();
-            subscriberClient.Connect(clientConnectionConfiguration, true);
+            subscriberClient.Connect(clientConnectionConfiguration);
         
             // declare topic
             var declareResult = await subscriberClient.DeclareTopicAsync(topicName, topicName);
@@ -154,7 +154,9 @@ namespace Tests
             
             // declare variables
             var topicName = RandomGenerator.GenerateString(10);
-            var messageStore = new MessageStore(topicName, numberOfMessagesToSend);
+            var loggerFactory = new LoggerFactory();
+            var messageStore = new MessageStore(loggerFactory.CreateLogger<MessageStore>());
+            messageStore.Setup(topicName, numberOfMessagesToSend);
             var clientConnectionConfiguration = new ClientConnectionConfiguration
             {
                 AutoReconnect = true,
@@ -210,9 +212,11 @@ namespace Tests
 
         private void PopulateTopicWithMessage(string topicName, int numberOfMessages, MessageStore messageStore, IBroker broker)
         {
-            var topic = broker.GetTopic(topicName);
+            var topicStore = broker.ServiceProvider.GetRequiredService<ITopicStore>();
 
-            for(var i = 0; i < numberOfMessages; i++)
+            topicStore.TryGetValue(topicName, out var topic);
+
+            for (var i = 0; i < numberOfMessages; i++)
             {
                 var message = messageStore.NewMessage();
                 topic.OnMessage(message);

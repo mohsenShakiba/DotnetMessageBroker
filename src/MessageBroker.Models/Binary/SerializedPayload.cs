@@ -3,7 +3,7 @@ using System.Buffers;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
 
-namespace MessageBroker.TCP.Binary
+namespace MessageBroker.Models.Binary
 {
     
     /// <summary>

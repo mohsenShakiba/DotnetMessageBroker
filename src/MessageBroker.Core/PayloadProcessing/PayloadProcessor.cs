@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using MessageBroker.Common.Logging;
 using MessageBroker.Core.Clients.Store;
 using MessageBroker.Core.Persistence.Topics;
 using MessageBroker.Models;
@@ -60,11 +59,11 @@ namespace MessageBroker.Core.PayloadProcessing
                         OnUnsubscribeTopic(clientId, unsubscribeQueue);
                         break;
                     case PayloadType.TopicDeclare:
-                        var queueDeclare = _deserializer.ToTopicDeclareModel(data);
+                        var queueDeclare = _deserializer.ToTopicDeclare(data);
                         OnDeclareQueue(clientId, queueDeclare);
                         break;
                     case PayloadType.TopicDelete:
-                        var queueDelete = _deserializer.ToTopicDeleteModel(data);
+                        var queueDelete = _deserializer.ToTopicDelete(data);
                         OnDeleteQueue(clientId, queueDelete);
                         break;
                 }
@@ -178,7 +177,7 @@ namespace MessageBroker.Core.PayloadProcessing
 
         private void OnDeclareQueue(Guid clientId, TopicDeclare topicDeclare)
         {
-            Logger.LogInformation($"declaring queue with name {topicDeclare.Name}");
+            _logger.LogInformation($"declaring topic: {topicDeclare.Name}");
 
             // if queue exists
             if (_topicStore.TryGetValue(topicDeclare.Name, out var queue))
@@ -200,7 +199,7 @@ namespace MessageBroker.Core.PayloadProcessing
 
         private void OnDeleteQueue(Guid clientId, TopicDelete topicDelete)
         {
-            Logger.LogInformation($"deleting queue with name {topicDelete.Name}");
+            _logger.LogInformation($"Deleting topic: {topicDelete.Name}");
 
             _topicStore.Delete(topicDelete.Name);
 

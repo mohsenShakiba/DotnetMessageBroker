@@ -7,8 +7,8 @@ namespace MessageBroker.TCP
     /// TcpServer that listens on IpEndPoint and accepts the incoming connections
     /// once a connection is accepted the <see cref="OnSocketAccepted"/> event is called
     /// </summary>
-    /// <seealso cref="TcpSocketServer"/>
-    public interface ISocketServer: IDisposable
+    /// <seealso cref="TcpListener"/>
+    public interface IListener: IDisposable
     {
         /// <summary>
         /// Event for when a socket connection has been accepted

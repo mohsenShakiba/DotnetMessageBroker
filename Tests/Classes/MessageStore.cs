@@ -3,35 +3,40 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using MessageBroker.Common.Logging;
 using MessageBroker.Models;
-using MessageBroker.TCP.Binary;
+using Microsoft.Extensions.Logging;
 
 namespace Tests.Classes
 {
     public class MessageStore
     {
         
-        private readonly int _numberOfMessages;
-        private readonly string _defaultRoute;
+        private int _numberOfMessages;
+        private string _defaultRoute;
         
         private readonly ConcurrentDictionary<Guid, Message> _allMessages;
         
         private readonly ConcurrentDictionary<Guid, bool> _sentMessages;
         private readonly ConcurrentDictionary<Guid, bool> _receivedMessages;
+        private readonly ILogger<MessageStore> _logger;
 
         public int ReceivedCount => _receivedMessages.Count;
         public int SentCount => _sentMessages.Count;
-        
 
-        public MessageStore(string defaultRoute, int numberOfMessages)
+
+        public MessageStore(ILogger<MessageStore> logger)
         {
-            _defaultRoute = defaultRoute;
-            _numberOfMessages = numberOfMessages;
-            
+            _logger = logger;
+
             _allMessages = new();
             _receivedMessages = new();
             _sentMessages = new();
+        }
+
+        public void Setup(string defaultRoute, int numberOfMessages)
+        {
+            _defaultRoute = defaultRoute;
+            _numberOfMessages = numberOfMessages;
         }
         
         public Message NewMessage(string route = null)
@@ -96,7 +101,7 @@ namespace Tests.Classes
                     {
                         if (!_receivedMessages.ContainsKey(key))
                         {
-                            Logger.LogWarning($"Message {key} was not received by the subscription");
+                            _logger.LogWarning($"Message {key} was not received by the subscription");
                         }
                     }
 
@@ -128,7 +133,7 @@ namespace Tests.Classes
                     {
                         if (!_sentMessages.ContainsKey(key))
                         {
-                            Logger.LogWarning($"Message {key} was not received by the subscription");
+                            _logger.LogWarning($"Message {key} was not received by the subscription");
                         }
                     }
                     

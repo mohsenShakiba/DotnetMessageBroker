@@ -1,6 +1,6 @@
 ﻿using System;
 using MessageBroker.Models;
-using MessageBroker.TCP.Binary;
+using MessageBroker.Models.Binary;
 
 namespace MessageBroker.Serialization
 {

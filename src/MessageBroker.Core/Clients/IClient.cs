@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using MessageBroker.Core.PayloadProcessing;
 using MessageBroker.Core.Topics;
 using MessageBroker.Models.Async;
+using MessageBroker.Models.Binary;
 using MessageBroker.TCP;
-using MessageBroker.TCP.Binary;
 using MessageBroker.TCP.EventArgs;
 
 namespace MessageBroker.Core.Clients
@@ -24,7 +24,10 @@ namespace MessageBroker.Core.Clients
         /// </summary>
         Guid Id { get; }
         
-        bool Debug { get; set; }
+        /// <summary>
+        /// Returns true if <see cref="Close"/> or <see cref="Dispose"/> is called
+        /// </summary>
+        bool IsClosed { get; }
         
         /// <summary>
         /// Used by the <see cref="ITopic"/> to check if client is available
@@ -42,7 +45,7 @@ namespace MessageBroker.Core.Clients
         event EventHandler<ClientSessionDataReceivedEventArgs> OnDataReceived;
 
         /// <summary>
-        /// Will start a dedicated thread for receiving data from <see cref="ITcpSocket"/>
+        /// Will start a dedicated thread for receiving data from <see cref="ISocket"/>
         /// </summary>
         void StartReceiveProcess();
 
@@ -50,6 +53,13 @@ namespace MessageBroker.Core.Clients
         /// Will start a dedicated thread for sending data that is added by <see cref="Enqueue"/> 
         /// </summary>
         void StartSendProcess();
+
+        /// <summary>
+        /// Will read the next message from queue and send it to <see cref="ISocket"/>
+        /// </summary>
+        /// <returns>Task for when sending is complete</returns>
+        /// <remarks>Use for testing only</remarks>
+        Task SendNextMessageInQueue();
 
         /// <summary>
         /// Will send payload data to client immediately
@@ -70,6 +80,11 @@ namespace MessageBroker.Core.Clients
         /// the client won't be flooded with too many messages
         /// </remarks>
         AsyncPayloadTicket Enqueue(SerializedPayload serializedPayload);
+
+        /// <summary>
+        /// Same as <see cref="Enqueue"/> but will not create a <see cref="AsyncPayloadTicket"/>
+        /// </summary>
+        /// <param name="serializedPayload"></param>
         void EnqueueFireAndForget(SerializedPayload serializedPayload);
 
         /// <summary>

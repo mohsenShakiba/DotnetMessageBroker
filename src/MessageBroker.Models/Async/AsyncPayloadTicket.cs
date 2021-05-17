@@ -1,6 +1,6 @@
 ﻿using System;
 using MessageBroker.Common.Pooling;
-using MessageBroker.TCP.Binary;
+using MessageBroker.Models.Binary;
 
 namespace MessageBroker.Models.Async
 {
@@ -25,21 +25,6 @@ namespace MessageBroker.Models.Async
         /// </summary>
         public event Action<Guid, bool> OnStatusChanged;
 
-        private IAsyncPayloadTicketHandler _handler;
-        private bool _handlerSet;
-
-        public IAsyncPayloadTicketHandler Handler
-        {
-            get
-            {
-                return _handler;
-            }
-            set
-            {
-                _handlerSet = true;
-                _handler = value;
-            }
-        }
 
         public bool IsEmpty => OnStatusChanged == null;
    
@@ -86,17 +71,11 @@ namespace MessageBroker.Models.Async
                 }
                 
                 _isStatusSet = true;
-                
-                // OnStatusChanged?.Invoke(PayloadId, success);
-                Handler.OnStatusChanged(PayloadId, success);
+
+                OnStatusChanged?.Invoke(PayloadId, success);
             }
         }
         
-    }
-
-    public interface IAsyncPayloadTicketHandler
-    {
-        void OnStatusChanged(Guid payloadId, bool ack);
     }
 
 }

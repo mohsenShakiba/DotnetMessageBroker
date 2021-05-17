@@ -8,7 +8,7 @@ namespace MessageBroker.TCP
     /// A wrapper interface so that mocking socket behaviour would be easier
     /// the default implementation will accept aa actual TCP socket
     /// </summary>
-    public interface ITcpSocket: IDisposable
+    public interface ISocket: IDisposable
     {
         /// <summary>
         /// Returns the current connection status of underlying socket

@@ -1,8 +1,6 @@
 ﻿using System;
-using MessageBroker.Client.Subscriptions;
-using MessageBroker.Models;
 
-namespace MessageBroker.Client.QueueConsumerCoordination
+namespace MessageBroker.Client.Subscriptions.Store
 {
     /// <summary>
     /// Store for <see cref="ISubscription"/>

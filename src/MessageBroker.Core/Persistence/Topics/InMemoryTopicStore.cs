@@ -54,6 +54,7 @@ namespace MessageBroker.Core.Persistence.Topics
         {
             var queue = _serviceProvider.GetRequiredService<ITopic>();
             queue.Setup(name, route);
+            queue.StartProcessingMessages();
             return queue;
         }
     }

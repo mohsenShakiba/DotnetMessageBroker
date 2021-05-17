@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using MessageBroker.Common.Logging;
 using MessageBroker.Core.Persistence.Redis;
 using MessageBroker.Core.Topics;
 using Microsoft.Extensions.DependencyInjection;
@@ -99,6 +98,7 @@ namespace MessageBroker.Core.Persistence.Topics
         {
             var queue = _serviceProvider.GetService<ITopic>();
             queue.Setup(name, route);
+            queue.StartProcessingMessages();
             return queue;
         }
     }

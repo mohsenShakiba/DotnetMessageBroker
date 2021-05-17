@@ -2,10 +2,10 @@
 using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Payloads;
-using MessageBroker.Client.QueueConsumerCoordination;
 using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Client.SendDataProcessing;
 using MessageBroker.Client.Subscriptions;
+using MessageBroker.Client.Subscriptions.Store;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
@@ -19,6 +19,7 @@ namespace MessageBroker.Client
     {
         
         private IServiceProvider _serviceProvider;
+        
 
         public IBrokerClient GetClient()
         {
@@ -34,6 +35,8 @@ namespace MessageBroker.Client
             if (_serviceProvider is null)
             {
                 var serviceCollection = new ServiceCollection();
+
+                serviceCollection.AddLogging();
                 
                 serviceCollection.AddSingleton<ISerializer, Serializer>();
                 serviceCollection.AddSingleton<IDeserializer, Deserializer>();

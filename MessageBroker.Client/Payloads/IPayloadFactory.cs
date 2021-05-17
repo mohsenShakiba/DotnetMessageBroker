@@ -1,5 +1,5 @@
 ﻿using System;
-using MessageBroker.TCP.Binary;
+using MessageBroker.Models.Binary;
 
 namespace MessageBroker.Client.Payloads
 {

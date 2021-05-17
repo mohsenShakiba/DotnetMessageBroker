@@ -5,14 +5,14 @@ using System.Linq;
 using System.Threading;
 using MessageBroker.Core.Clients;
 
-namespace MessageBroker.Core.DispatchPolicy
+namespace MessageBroker.Core.Dispatching
 {
     /// <inheritdoc />
     public class DefaultDispatcher : IDispatcher
     {
+
         private readonly ConcurrentDictionary<Guid, IClient> _clients;
         private readonly ReaderWriterLockSlim _wrLock;
-
 
         public DefaultDispatcher()
         {
@@ -41,10 +41,9 @@ namespace MessageBroker.Core.DispatchPolicy
 
         public bool Remove(IClient client)
         {
-            _wrLock.EnterWriteLock();
-
             try
             {
+                _wrLock.EnterWriteLock();
                 return _clients.Remove(client.Id, out _);
             }
             finally
@@ -56,10 +55,10 @@ namespace MessageBroker.Core.DispatchPolicy
 
         public IClient NextAvailable()
         {
-            _wrLock.EnterReadLock();
-
             try
             {
+                _wrLock.EnterReadLock();
+
                 foreach (var (_, client) in _clients)
                 {
                     if (!client.ReachedMaxConcurrency)

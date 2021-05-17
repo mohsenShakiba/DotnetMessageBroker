@@ -9,7 +9,6 @@ using MessageBroker.Client.SendDataProcessing;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
-using MessageBroker.TCP.Binary;
 
 namespace MessageBroker.Client.Subscriptions
 {

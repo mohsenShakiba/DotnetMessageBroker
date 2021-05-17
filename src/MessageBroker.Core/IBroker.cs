@@ -1,8 +1,6 @@
 ﻿using System;
-using MessageBroker.Core.Stats.TopicStatus;
-using MessageBroker.Core.Topics;
 
-namespace MessageBroker.Core.Broker
+namespace MessageBroker.Core
 {
     /// <summary>
     /// Abstraction for Broker
@@ -11,15 +9,19 @@ namespace MessageBroker.Core.Broker
     public interface IBroker: IDisposable
     {
         /// <summary>
+        /// ServiceProvider associated with this broker, used for testing 
+        /// </summary>
+        IServiceProvider ServiceProvider { get; }
+
+        /// <summary>
         /// Start the broker
         /// </summary>
-        public void Start();
+        void Start();
         
         /// <summary>
         /// Stop and dispose the broker
         /// </summary>
-        public void Stop();
+        void Stop();
 
-        public ITopic GetTopic(string name);
     }
 }

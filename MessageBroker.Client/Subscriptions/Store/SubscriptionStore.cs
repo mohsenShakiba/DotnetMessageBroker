@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Threading;
+﻿using System.Collections.Concurrent;
 using System.Threading.Tasks;
-using MessageBroker.Client.Subscriptions;
-using MessageBroker.Models;
 
-namespace MessageBroker.Client.QueueConsumerCoordination
+namespace MessageBroker.Client.Subscriptions.Store
 {
     /// <inheritdoc />
     public class SubscriptionStore : ISubscriptionStore

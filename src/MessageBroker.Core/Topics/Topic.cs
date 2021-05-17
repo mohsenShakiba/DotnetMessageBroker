@@ -5,12 +5,12 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Common.DynamicThrottling;
 using MessageBroker.Core.Clients;
-using MessageBroker.Core.DispatchPolicy;
+using MessageBroker.Core.Dispatching;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Models;
+using MessageBroker.Models.Binary;
 using MessageBroker.Serialization;
-using MessageBroker.TCP.Binary;
 using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Core.Topics
@@ -69,7 +69,17 @@ namespace MessageBroker.Core.Topics
             Route = route;
 
             ReadPayloadsFromMessageStore();
-            ReadNextMessagesContinuously();
+        }
+        
+        public void StartProcessingMessages()
+        {
+            Task.Factory.StartNew(async () =>
+            {
+                while (!_disposed)
+                {
+                    await ReadNextMessage();
+                }
+            }, TaskCreationOptions.LongRunning);
         }
 
         public void OnMessage(Message message)
@@ -144,16 +154,7 @@ namespace MessageBroker.Core.Topics
                 _queueChannel.Writer.TryWrite(message);
         }
 
-        private void ReadNextMessagesContinuously()
-        {
-            Task.Factory.StartNew(async () =>
-            {
-                while (!_disposed)
-                {
-                    await ReadNextMessage();
-                }
-            }, TaskCreationOptions.LongRunning);
-        }
+        
 
         private async Task ProcessMessage(Guid messageId)
         {

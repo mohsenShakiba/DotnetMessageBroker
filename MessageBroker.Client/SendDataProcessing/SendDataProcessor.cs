@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.TaskManager;
-using MessageBroker.TCP.Binary;
+using MessageBroker.Models.Binary;
 
 namespace MessageBroker.Client.SendDataProcessing
 {

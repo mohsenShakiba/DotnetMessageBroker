@@ -1,5 +1,5 @@
-﻿using MessageBroker.Serialization;
-using MessageBroker.TCP.Binary;
+﻿using MessageBroker.Models.Binary;
+using MessageBroker.Serialization;
 using Xunit;
 
 namespace Tests.Common.ObjectPool

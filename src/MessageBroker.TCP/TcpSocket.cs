@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 namespace MessageBroker.TCP
 {
-    /// <inheritdoc cref="ITcpSocket" />
-    public sealed class TcpSocket : ITcpSocket
+    /// <inheritdoc cref="ISocket" />
+    public sealed class TcpSocket : ISocket
     {
         private readonly Socket _socket;
 

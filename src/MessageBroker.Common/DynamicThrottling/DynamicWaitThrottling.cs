@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace MessageBroker.Common.DynamicThrottling
 {
@@ -27,16 +28,16 @@ namespace MessageBroker.Common.DynamicThrottling
             MaxDelay = maxDelay;
         }
 
-        public Task Wait()
+        public Task WaitAsync(CancellationToken? cancellationToken = null)
         {
-            return Task.Delay(CurrentDelay);
+            return Task.Delay(CurrentDelay, cancellationToken ?? CancellationToken.None);
         }
 
-        public Task WaitAndIncrease()
+        public Task WaitAndIncrease(CancellationToken? cancellationToken = null)
         {
             try
             {
-                return Wait();
+                return WaitAsync(cancellationToken);
             }
             finally
             {

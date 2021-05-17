@@ -18,9 +18,8 @@ namespace MessageBroker.Serialization
         Ok ToOk(Memory<byte> data);
         SubscribeTopic ToSubscribeTopic(Memory<byte> data);
         UnsubscribeTopic ToUnsubscribeTopic(Memory<byte> data);
-        TopicDeclare ToTopicDeclareModel(Memory<byte> data);
-        TopicDelete ToTopicDeleteModel(Memory<byte> data);
-        Ready ToReady(Memory<byte> data);
-        ConfigureClient ToConfigureConcurrency(Memory<byte> data);
+        TopicDeclare ToTopicDeclare(Memory<byte> data);
+        TopicDelete ToTopicDelete(Memory<byte> data);
+        ConfigureClient ToConfigureClient(Memory<byte> data);
     }
 }

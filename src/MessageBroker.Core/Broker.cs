@@ -1,19 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
-using MessageBroker.Common.Logging;
 using MessageBroker.Core.Clients;
 using MessageBroker.Core.Clients.Store;
 using MessageBroker.Core.PayloadProcessing;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.Persistence.Topics;
-using MessageBroker.Core.Topics;
-using MessageBroker.Serialization;
 using MessageBroker.TCP;
 using MessageBroker.TCP.EventArgs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
-namespace MessageBroker.Core.Broker
+namespace MessageBroker.Core
 {
 
     /// <inheritdoc/>
@@ -25,12 +22,15 @@ namespace MessageBroker.Core.Broker
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<Broker> _logger;
         private readonly ITopicStore _topicStore;
-        private readonly ISocketServer _socketServer;
+        private readonly IListener _listener;
+        private bool _disposed;
 
-        public Broker(ISocketServer socketServer, IPayloadProcessor payloadProcessor, IClientStore clientStore, ITopicStore topicStore,
+        public IServiceProvider ServiceProvider => _serviceProvider;
+
+        public Broker(IListener listener, IPayloadProcessor payloadProcessor, IClientStore clientStore, ITopicStore topicStore,
             IMessageStore messageStore, IServiceProvider serviceProvider, ILogger<Broker> logger)
         {
-            _socketServer = socketServer;
+            _listener = listener;
             _payloadProcessor = payloadProcessor;
             _clientStore = clientStore;
             _topicStore = topicStore;
@@ -41,9 +41,9 @@ namespace MessageBroker.Core.Broker
 
         public void Start()
         {
-            _socketServer.OnSocketAccepted += ClientConnected;
+            _listener.OnSocketAccepted += ClientConnected;
             
-            _socketServer.Start();
+            _listener.Start();
             _topicStore.Setup();
             _messageStore.Setup();
         }
@@ -58,7 +58,7 @@ namespace MessageBroker.Core.Broker
         {
             try
             {
-                var logger = _serviceProvider.GetRequiredService<ILogger<Client>>();
+                var logger = _serviceProvider.GetService<ILogger<Client>>() ?? NullLogger<Client>.Instance;
 
                 var clientSession = new Client(eventArgs.Socket, logger);
 
@@ -81,18 +81,6 @@ namespace MessageBroker.Core.Broker
             }
         }
         
-        private void ClientDataReceived(object clientSession, ClientSessionDataReceivedEventArgs eventArgs)
-        {
-            try
-            {
-                _payloadProcessor.OnDataReceived(eventArgs.Id, eventArgs.Data);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError($"An error occured while trying to dispatch messages, error: {e}");
-            }
-        }
-
         private void ClientDisconnected(object clientSession, ClientSessionDisconnectedEventArgs eventArgs)
         {
 
@@ -108,12 +96,27 @@ namespace MessageBroker.Core.Broker
             }
         }
         
+        private void ClientDataReceived(object clientSession, ClientSessionDataReceivedEventArgs eventArgs)
+        {
+            try
+            {
+                _payloadProcessor.OnDataReceived(eventArgs.Id, eventArgs.Data);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError($"An error occured while trying to dispatch messages, error: {e}");
+            }
+        }
+        
         public void Dispose()
         {
-            _socketServer.OnSocketAccepted -= ClientConnected;
-
-            _socketServer.Stop();
-
+            if (!_disposed)
+            {
+                _listener.OnSocketAccepted -= ClientConnected;
+                _listener.Stop();
+                _disposed = true;
+            }
+   
         }
     }
 }

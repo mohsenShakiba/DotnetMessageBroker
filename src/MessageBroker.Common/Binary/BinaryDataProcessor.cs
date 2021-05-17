@@ -5,7 +5,6 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
 using Serilog.Events;
 
@@ -87,6 +86,7 @@ namespace MessageBroker.Common.Binary
         
         public void Dispose()
         {
+            // wait until lock is released
             while (_isReading)
             {
                 Thread.Yield();

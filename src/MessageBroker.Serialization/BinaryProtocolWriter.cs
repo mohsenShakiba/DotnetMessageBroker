@@ -4,7 +4,7 @@ using System.Text;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
-using MessageBroker.TCP.Binary;
+using MessageBroker.Models.Binary;
 
 namespace MessageBroker.Serialization
 {

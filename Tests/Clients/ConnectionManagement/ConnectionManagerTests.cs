@@ -1,15 +1,4 @@
-﻿using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
-using MessageBroker.Client.ConnectionManagement;
-using MessageBroker.Client.ReceiveDataProcessing;
-using MessageBroker.Common.Binary;
-using Moq;
-using Tests.Classes;
-using Xunit;
-
-namespace Tests.Client.ConnectionManagement
+﻿namespace Tests.Clients.ConnectionManagement
 {
     public class ConnectionManagerTests
     {

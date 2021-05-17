@@ -1,7 +1,7 @@
 ﻿using System;
 using MessageBroker.Models;
+using MessageBroker.Models.Binary;
 using MessageBroker.Serialization;
-using MessageBroker.TCP.Binary;
 
 namespace MessageBroker.Client.Payloads
 {

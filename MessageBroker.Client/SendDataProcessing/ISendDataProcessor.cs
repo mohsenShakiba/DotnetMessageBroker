@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using MessageBroker.Client.Models;
 using MessageBroker.Models;
-using MessageBroker.TCP.Binary;
+using MessageBroker.Models.Binary;
 
 namespace MessageBroker.Client.SendDataProcessing
 {

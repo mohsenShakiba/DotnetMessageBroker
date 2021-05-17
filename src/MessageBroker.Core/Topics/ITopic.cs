@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
 using MessageBroker.Core.Clients;
-using MessageBroker.Core.Stats.TopicStatus;
 using MessageBroker.Models;
 
 namespace MessageBroker.Core.Topics
@@ -25,14 +24,17 @@ namespace MessageBroker.Core.Topics
         /// </summary>
         string Route { get; }
         
-        ITopicStatRecorder StatRecorder { get; }
-        
         /// <summary>
         /// Setup will set name and route of topic
         /// </summary>
         /// <param name="name">Name of topic</param>
         /// <param name="route">Route of topic</param>
         void Setup(string name, string route);
+
+        /// <summary>
+        /// Will continuously check queue for new messages to process
+        /// </summary>
+        void StartProcessingMessages();
         
         /// <summary>
         /// Read the next available message from topic's queue and process it

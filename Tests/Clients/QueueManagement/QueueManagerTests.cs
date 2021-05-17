@@ -1,17 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
-using MessageBroker.Client.ConnectionManagement;
-using MessageBroker.Client.Models;
-using MessageBroker.Client.QueueConsumerCoordination;
-using MessageBroker.Client.TaskManager;
-using MessageBroker.Common.Pooling;
-using MessageBroker.Models;
-using MessageBroker.Serialization;
-using Moq;
-using Tests.Classes;
-using Xunit;
-
-namespace Tests.Client.QueueManagement
+﻿namespace Tests.Clients.QueueManagement
 {
     // public class QueueManagerTests
     // {

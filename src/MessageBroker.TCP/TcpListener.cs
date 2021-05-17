@@ -1,24 +1,23 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
-using MessageBroker.Common.Logging;
 using MessageBroker.TCP.EventArgs;
 using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.TCP
 {
     /// <inheritdoc />
-    public class TcpSocketServer : ISocketServer
+    public sealed class TcpListener : IListener
     {
         private readonly IPEndPoint _endPoint;
-        private readonly ILogger<TcpSocketServer> _logger;
+        private readonly ILogger<TcpListener> _logger;
         private bool _isDisposed;
         private bool _isAccepting;
 
         /// <summary>
         /// Socket object used for listening to IPEndPoint
         /// </summary>
-        private Socket _socket;
+        private System.Net.Sockets.Socket _socket;
         
         /// <summary>
         /// SocketAsyncEventArgs used for accepting connections
@@ -27,15 +26,16 @@ namespace MessageBroker.TCP
         
         public event EventHandler<SocketAcceptedEventArgs> OnSocketAccepted;
         
-        public TcpSocketServer(ConnectionProvider connectionProvider, ILogger<TcpSocketServer> logger)
+        public TcpListener(ConnectionProvider connectionProvider, ILogger<TcpListener> logger)
         {
             _endPoint = connectionProvider.IpEndPoint;
             _logger = logger;
         }
 
-        public TcpSocketServer(IPEndPoint endPoint)
+        public TcpListener(IPEndPoint endPoint, ILogger<TcpListener> logger)
         {
             _endPoint = endPoint;
+            _logger = logger;
         }
 
         public void Start()
@@ -50,7 +50,7 @@ namespace MessageBroker.TCP
             _socketAsyncEventArgs = new SocketAsyncEventArgs();
             _socketAsyncEventArgs.Completed += OnAcceptCompleted;
 
-            _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            _socket = new System.Net.Sockets.Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             _socket.Bind(_endPoint);
             _socket.Listen();
 
@@ -83,7 +83,9 @@ namespace MessageBroker.TCP
         {
             try
             {
-                // accept while sync, break when we go async\
+                _socketAsyncEventArgs.AcceptSocket = null;
+
+                // accept while sync, break when we go async
                 while (_isAccepting && !_socket.AcceptAsync(_socketAsyncEventArgs))
                 {
                     OnAcceptCompleted(null, _socketAsyncEventArgs);
@@ -92,13 +94,8 @@ namespace MessageBroker.TCP
             }
             catch (Exception e)
             {
-                Logger.LogError($"Server encountered an exception while trying to accept connection, exception: {e}");
-                Stop();
+                _logger.LogError($"Server encountered an exception while trying to accept connection, exception: {e}");
             }
-        }
-
-        private void ResetAcceptEventArgs()
-        {
         }
 
         private void OnAcceptCompleted(object _, SocketAsyncEventArgs socketAsyncEventArgs)
@@ -116,9 +113,9 @@ namespace MessageBroker.TCP
             BeginAcceptConnection();
         }
 
-        private void OnAcceptSuccess(Socket socket)
+        private void OnAcceptSuccess(System.Net.Sockets.Socket socket)
         {
-            Logger.LogInformation($"accepted new socket connection from {socket.RemoteEndPoint}");
+            _logger.LogInformation($"Accepted new socket connection from {socket.RemoteEndPoint}");
 
             var tcpSocket = new TcpSocket(socket);
 
@@ -129,7 +126,7 @@ namespace MessageBroker.TCP
 
         private void OnAcceptError(SocketError err)
         {
-            Logger.LogError($"failed to accept socket connection, error: {err}");
+            _logger.LogError($"Failed to accept socket connection, error: {err}");
         }
 
         private void ThrowIfDisposed()

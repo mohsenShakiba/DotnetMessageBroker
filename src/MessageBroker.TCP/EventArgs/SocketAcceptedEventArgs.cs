@@ -5,6 +5,6 @@
     /// </summary>
     public class SocketAcceptedEventArgs: System.EventArgs
     {
-        public ITcpSocket Socket { get; init; }
+        public ISocket Socket { get; init; }
     }
 }

@@ -7,13 +7,12 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using MessageBroker.Common.Binary;
-using MessageBroker.Common.Logging;
 using MessageBroker.Common.Pooling;
 using MessageBroker.Models;
 using MessageBroker.Models.Async;
+using MessageBroker.Models.Binary;
 using MessageBroker.Serialization;
 using MessageBroker.TCP;
-using MessageBroker.TCP.Binary;
 using MessageBroker.TCP.EventArgs;
 using Microsoft.Extensions.Logging;
 
@@ -28,9 +27,9 @@ namespace MessageBroker.Core.Clients
         private readonly IBinaryDataProcessor _binaryDataProcessor;
 
         /// <summary>
-        /// The underlying <see cref="ITcpSocket"/> used for sending an receiving data
+        /// The underlying <see cref="ISocket"/> used for sending an receiving data
         /// </summary>
-        private readonly ITcpSocket _socket;
+        private readonly ISocket _socket;
 
         /// <summary>
         /// A buffer used to store temporary received data
@@ -43,25 +42,24 @@ namespace MessageBroker.Core.Clients
         private readonly CancellationTokenSource _cancellationTokenSource;
 
         public Guid Id { get; }
-        public bool Debug { get; set; }
         public bool ReachedMaxConcurrency => false;
+        public bool IsClosed => _disposed;
 
         public event EventHandler<ClientSessionDisconnectedEventArgs> OnDisconnected;
 
         public event EventHandler<ClientSessionDataReceivedEventArgs> OnDataReceived;
 
         private bool _disposed;
-        private int _count;
 
-        public Client(ITcpSocket tcpSocket, ILogger<Client> logger, IBinaryDataProcessor binaryDataProcessor = null)
+        public Client(ISocket socket, ILogger<Client> logger, IBinaryDataProcessor binaryDataProcessor = null)
         {
-            if (!tcpSocket.Connected)
+            if (!socket.Connected)
                 throw new InvalidOperationException("The provided tcp socket was not in connected state");
 
             // set a random id
             Id = Guid.NewGuid();
 
-            _socket = tcpSocket;
+            _socket = socket;
             _logger = logger;
 
             // set binary data processor and set default if null
@@ -80,6 +78,8 @@ namespace MessageBroker.Core.Clients
             _tickets = new();
         }
 
+        #region Receive
+
         public void StartReceiveProcess()
         {
             ThrowIfDisposed();
@@ -95,31 +95,6 @@ namespace MessageBroker.Core.Clients
             }, TaskCreationOptions.LongRunning);
         }
 
-        public void StartSendProcess()
-        {
-            ThrowIfDisposed();
-
-            Task.Factory.StartNew(async () =>
-            {
-                while (!_disposed)
-                {
-                    var serializedPayload = await _queue.Reader.ReadAsync();
-
-                    var result = await SendAsync(serializedPayload.Data, CancellationToken.None);
-
-                    _logger.LogTrace($"Sending message: {serializedPayload.PayloadId} to client: {Id}");
-
-                    if (!result)
-                    {
-                        DisposeMessagePayloadAndSetStatus(serializedPayload.PayloadId, false);
-                    }
-
-                    ObjectPool.Shared.Return(serializedPayload);
-                }
-            });
-        }
-
-        #region Receive
 
         /// <summary>
         /// Will receive data from socket and write to BinaryDataProcessor
@@ -127,29 +102,17 @@ namespace MessageBroker.Core.Clients
         private async ValueTask ReceiveAsync()
         {
 
-            try
-            {
-                var receivedSize = await _socket.ReceiveAsync(_receiveBuffer, _cancellationTokenSource.Token);
+            var receivedSize = await _socket.ReceiveAsync(_receiveBuffer, _cancellationTokenSource.Token);
 
-                if (receivedSize == 0)
-                {
-                    Close();
-                    return;
-                }
-
-                var data = buff.AsMemory(0, receivedSize).ToArray();
-                _binaryDataProcessor.Write(data);
-
-                ProcessReceivedData();
-            }
-            catch
+            if (receivedSize == 0)
             {
-                Logger.LogInformation("exception");
+                Close();
+                return;
             }
-            finally
-            {
-                Interlocked.Decrement(ref _count);
-            }
+
+            _binaryDataProcessor.Write(_receiveBuffer.AsMemory(0, receivedSize));
+
+            ProcessReceivedData();
         }
 
         /// <summary>
@@ -160,23 +123,13 @@ namespace MessageBroker.Core.Clients
         {
             try
             {
+                // we are calling BeginLock so that if Dispose is called on BinaryDataProcessor it waits until EndLock is called
                 _binaryDataProcessor.BeginLock();
                 
                 while (_binaryDataProcessor.TryRead(out var binaryPayload))
                 {
                     try
-                    {
-                        var deserialized = new Deserializer();
-
-                        var type = deserialized.ParsePayloadType(binaryPayload.DataWithoutSize);
-
-                        if (type == PayloadType.Msg)
-                        {
-                            var msg = deserialized.ToMessage(binaryPayload.DataWithoutSize);
-                            
-                            Logger.LogInformation($"binary, received data with id {msg.Id}");
-                        }
-                        
+                    {                        
                         var dataReceivedEventArgs = new ClientSessionDataReceivedEventArgs()
                         {
                             Data = binaryPayload.DataWithoutSize,
@@ -200,6 +153,35 @@ namespace MessageBroker.Core.Clients
         #endregion
 
         #region Send
+
+        public void StartSendProcess()
+        {
+            ThrowIfDisposed();
+
+            Task.Factory.StartNew(async () =>
+            {
+                while (!_disposed)
+                {
+                    await SendNextMessageInQueue();
+                }
+            });
+        }
+
+        public async Task SendNextMessageInQueue()
+        {
+            var serializedPayload = await _queue.Reader.ReadAsync();
+
+            var result = await SendAsync(serializedPayload.Data, CancellationToken.None);
+
+            _logger.LogTrace($"Sending message: {serializedPayload.PayloadId} to client: {Id}");
+
+            if (!result)
+            {
+                DisposeMessagePayloadAndSetStatus(serializedPayload.PayloadId, false);
+            }
+
+            ObjectPool.Shared.Return(serializedPayload);
+        }
 
         public AsyncPayloadTicket Enqueue(SerializedPayload serializedPayload)
         {
@@ -270,15 +252,19 @@ namespace MessageBroker.Core.Clients
 
                     _logger.LogInformation($"Dispose was called on client: {Id}");
 
+                    // mark as disposed
                     _disposed = true;
 
                     // complete the channel 
                     _queue.Writer.TryComplete();
 
+                    // cancelling the receive cancellation token
                     _cancellationTokenSource.Cancel();
 
+                    // setting status for all the tickets
                     SetStatusForAllPendingTickets();
 
+                    // disconnect the socket
                     if (_socket.Connected)
                     {
                         _socket.Disconnect();
@@ -289,9 +275,10 @@ namespace MessageBroker.Core.Clients
                     {
                         var disconnectedEventArgs = new ClientSessionDisconnectedEventArgs { Id = Id };
                         OnDisconnected?.Invoke(this, disconnectedEventArgs);
+                        OnDisconnected = null;
                     });
 
-                    Dispose();
+
                 }
                 catch
                 {
@@ -303,12 +290,7 @@ namespace MessageBroker.Core.Clients
 
         public void Dispose()
         {
-
-
-            _socket.Dispose();
-
-            // todo:
-            // ArrayPool<byte>.Shared.Return(_receiveBuffer, true);
+            Close();
         }
 
         private void DisposeMessagePayloadAndSetStatus(Guid payloadId, bool ack)
@@ -336,27 +318,25 @@ namespace MessageBroker.Core.Clients
         {
             _binaryDataProcessor.Dispose();
 
-            // OnDataReceived = null;
+            ArrayPool<byte>.Shared.Return(_receiveBuffer);
+
+            OnDataReceived = null;
+
+            // this line is moved to close method after invoking OnDisconnected
             // OnDisconnected = null;
         }
 
         private void SetStatusForAllPendingTickets()
         {
-            Logger.LogInformation($"SetStatusForAllPendingTickets was called for {_tickets.Count} in {Id}");
             // set status of all the tickets
             foreach (var (_, ticket) in _tickets)
             {
                 try
                 {
-                    Logger.LogInformation($"ticket for id {ticket.PayloadId} returned");
-                    try
-                    {
-                        ticket.SetStatus(false);
-                        ObjectPool.Shared.Return(ticket);
-                    }
-                    catch (Exception e)
-                    {
-                    }
+                    _logger.LogTrace($"Ticket for message: {ticket.PayloadId} was disposed");
+
+                    ticket.SetStatus(false);
+                    ObjectPool.Shared.Return(ticket);
                 }
                 catch
                 {

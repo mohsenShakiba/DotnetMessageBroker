@@ -9,7 +9,7 @@ namespace MessageBroker.Serialization
     /// <summary>
     /// A utility class to that provides helper methods to deserialize binary to payload
     /// </summary>
-    public class BinaryProtocolReader : IDisposable, IPooledObject
+    public class BinaryProtocolReader : IPooledObject
     {
         
         public Guid PoolId { get; set; }
@@ -122,11 +122,6 @@ namespace MessageBroker.Serialization
                 throw new ArgumentOutOfRangeException(
                     $"Cannot read bytes, current is {_currentOffset}, available is {_receivedData.Length - _currentOffset}");
             }
-        }
-
-        public void Dispose()
-        {
-            // do nothing
         }
 
     }

@@ -1,8 +1,8 @@
-﻿using System.Net;
-using MessageBroker.Common.Logging;
+﻿using System;
+using System.Net;
 using MessageBroker.Core.Clients;
 using MessageBroker.Core.Clients.Store;
-using MessageBroker.Core.DispatchPolicy;
+using MessageBroker.Core.Dispatching;
 using MessageBroker.Core.PayloadProcessing;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.Persistence.Redis;
@@ -14,7 +14,7 @@ using MessageBroker.TCP;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace MessageBroker.Core.Broker
+namespace MessageBroker.Core
 {
     
     /// <summary>
@@ -59,26 +59,21 @@ namespace MessageBroker.Core.Broker
         public BrokerBuilder UserRedisStore(string connectionString)
         {
             var redisConnectionProvider = new RedisConnectionProvider(connectionString);
+
             _serviceCollection.AddSingleton(redisConnectionProvider);
-            
             _serviceCollection.AddSingleton<IMessageStore, RedisMessageStore>();
             _serviceCollection.AddSingleton<ITopicStore, InMemoryTopicStore>();
+
             return this;
         }
 
         /// <summary>
-        /// Add provider for logging
+        /// Configure logger 
         /// </summary>
-        /// <param name="loggerProvider">Logger provider for logging</param>
-        public BrokerBuilder AddLoggerProvider(ILoggerProvider loggerProvider)
+        /// <param name="loggerBuilder">Action for configuring logging</param>
+        public BrokerBuilder ConfigureLogger(Action<ILoggingBuilder> loggerBuilder)
         {
-            Logger.AddProvider(loggerProvider);
-            return this;
-        }
-
-        public BrokerBuilder AddFile(string path)
-        {
-            Logger.AddFile(path);
+            _serviceCollection.AddLogging(loggerBuilder);
             return this;
         }
 
@@ -87,7 +82,11 @@ namespace MessageBroker.Core.Broker
         /// </summary>
         public BrokerBuilder AddConsoleLog()
         {
-            Logger.AddConsole();
+            ConfigureLogger(builder =>
+            {
+                builder.AddConsole();
+            });
+
             return this;
         }
 
@@ -104,13 +103,15 @@ namespace MessageBroker.Core.Broker
 
         private void AddRequiredServices()
         {
+
+            _serviceCollection.AddLogging();
             _serviceCollection.AddSingleton<IPayloadProcessor, PayloadProcessor>();
             _serviceCollection.AddSingleton<IClientStore, ClientStore>();
             _serviceCollection.AddSingleton<IMessageStore, InMemoryMessageStore>();
             _serviceCollection.AddSingleton<ISerializer, Serializer>();
             _serviceCollection.AddSingleton<IDeserializer, Deserializer>();
             _serviceCollection.AddSingleton<IRouteMatcher, RouteMatcher>();
-            _serviceCollection.AddSingleton<ISocketServer, TcpSocketServer>();
+            _serviceCollection.AddSingleton<IListener, TcpListener>();
             _serviceCollection.AddSingleton<IBroker, Broker>();
 
             _serviceCollection.AddTransient<IClient, Client>();

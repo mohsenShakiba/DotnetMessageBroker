@@ -4,10 +4,10 @@ using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.Payloads;
-using MessageBroker.Client.QueueConsumerCoordination;
 using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Client.SendDataProcessing;
 using MessageBroker.Client.Subscriptions;
+using MessageBroker.Client.Subscriptions.Store;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Models;
 using MessageBroker.Serialization;
@@ -40,9 +40,9 @@ namespace MessageBroker.Client
             _sendPayloadTaskManager = sendPayloadTaskManager;
         }
 
-        public void Connect(ClientConnectionConfiguration configuration, bool debug)
+        public void Connect(ClientConnectionConfiguration configuration)
         {
-            _connectionManager.Connect(configuration, debug);
+            _connectionManager.Connect(configuration);
         }
 
         public void Reconnect()
@@ -55,8 +55,7 @@ namespace MessageBroker.Client
             _connectionManager.Disconnect();
         }
 
-        public async Task<ISubscription> GetTopicSubscriptionAsync(string name, string route,
-            CancellationToken? cancellationToken = null)
+        public async Task<ISubscription> GetTopicSubscriptionAsync(string name, string route, CancellationToken? cancellationToken = null)
         {
             var subscription = new Subscription(_payloadFactory, _connectionManager, _sendDataProcessor);
 
@@ -67,8 +66,7 @@ namespace MessageBroker.Client
             return subscription;
         }
 
-        public Task<SendAsyncResult> PublishAsync(string route, byte[] data,
-            CancellationToken? cancellationToken = null)
+        public Task<SendAsyncResult> PublishAsync(string route, byte[] data, CancellationToken? cancellationToken = null)
         {
             var serializedPayload = _payloadFactory.NewMessage(data, route);
             return _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken ?? CancellationToken.None);

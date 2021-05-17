@@ -5,13 +5,13 @@ using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement.ConnectionStatusEventArgs;
 using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Core.Clients;
+using MessageBroker.Models.Binary;
 using MessageBroker.TCP;
-using MessageBroker.TCP.Binary;
 
 namespace MessageBroker.Client.ConnectionManagement
 {
     /// <summary>
-    /// Utility class for managing <see cref="ITcpSocket"/> and <see cref="IClient"/>
+    /// Utility class for managing <see cref="ISocket"/> and <see cref="IClient"/>
     /// to provider methods for sending data and connecting, disconnecting and reconnecting to/from server
     /// with auto reconnect feature
     /// </summary>
@@ -23,12 +23,10 @@ namespace MessageBroker.Client.ConnectionManagement
         IClient Client { get; }
         
         /// <summary>
-        /// The underlying <see cref="ITcpSocket"/>
+        /// The underlying <see cref="ISocket"/>
         /// </summary>
-        ITcpSocket Socket { get; }
+        ISocket Socket { get; }
         
-        IReceiveDataProcessor ReceiveDataProcessor { get; }
-
         /// <summary>
         /// Called when connection is established to broker server 
         /// </summary>
@@ -44,7 +42,7 @@ namespace MessageBroker.Client.ConnectionManagement
         /// </summary>
         /// <exception cref="ArgumentNullException">IpEndPoint is null</exception>
         /// <param name="configuration">The configuration for connection</param>
-        void Connect(ClientConnectionConfiguration configuration, bool debug);
+        void Connect(ClientConnectionConfiguration configuration);
         
         /// <summary>
         /// Will try to reconnect to server if the connection is broker
@@ -54,7 +52,7 @@ namespace MessageBroker.Client.ConnectionManagement
         void Reconnect();
         
         /// <summary>
-        /// Will disconnect the underlying <see cref="ITcpSocket"/>
+        /// Will disconnect the underlying <see cref="ISocket"/>
         /// </summary>
         void Disconnect();
 

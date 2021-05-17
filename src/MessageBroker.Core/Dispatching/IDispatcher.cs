@@ -1,7 +1,7 @@
 ﻿using MessageBroker.Core.Clients;
 using MessageBroker.Core.Topics;
 
-namespace MessageBroker.Core.DispatchPolicy
+namespace MessageBroker.Core.Dispatching
 {
     /// <summary>
     /// Used by <see cref="ITopic"/> to select <see cref="IClient"/> from list of topic subscribers 

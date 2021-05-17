@@ -190,7 +190,7 @@ namespace MessageBroker.Serialization
             }
         }
 
-        public TopicDeclare ToTopicDeclareModel(Memory<byte> data)
+        public TopicDeclare ToTopicDeclare(Memory<byte> data)
         {
             var binaryReader = ObjectPool.Shared.Rent<BinaryProtocolReader>();
             binaryReader.Setup(data);
@@ -214,7 +214,7 @@ namespace MessageBroker.Serialization
             }
         }
 
-        public TopicDelete ToTopicDeleteModel(Memory<byte> data)
+        public TopicDelete ToTopicDelete(Memory<byte> data)
         {
             var binaryReader = ObjectPool.Shared.Rent<BinaryProtocolReader>();
             binaryReader.Setup(data);
@@ -236,7 +236,7 @@ namespace MessageBroker.Serialization
             }
         }
 
-        public ConfigureClient ToConfigureConcurrency(Memory<byte> data)
+        public ConfigureClient ToConfigureClient(Memory<byte> data)
         {
             var binaryReader = ObjectPool.Shared.Rent<BinaryProtocolReader>();
             binaryReader.Setup(data);
