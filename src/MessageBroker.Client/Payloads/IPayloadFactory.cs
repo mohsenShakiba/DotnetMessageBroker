@@ -1,10 +1,10 @@
 ﻿using System;
-using MessageBroker.Models.Binary;
+using MessageBroker.Common.Binary;
 
 namespace MessageBroker.Client.Payloads
 {
     /// <summary>
-    /// Factory pattern for create <see cref="SerializedPayload"/> from payloads
+    /// Factory pattern for create <see cref="SerializedPayload" /> from payloads
     /// </summary>
     public interface IPayloadFactory
     {

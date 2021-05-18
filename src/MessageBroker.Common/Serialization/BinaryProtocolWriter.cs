@@ -2,48 +2,51 @@
 using System.Buffers;
 using System.Text;
 using MessageBroker.Common.Binary;
+using MessageBroker.Common.Models;
 using MessageBroker.Common.Pooling;
-using MessageBroker.Models;
-using MessageBroker.Models.Binary;
 
-namespace MessageBroker.Serialization
+namespace MessageBroker.Common.Serialization
 {
     /// <summary>
-    /// A utility class that provides method for writing base types to payload 
+    /// A utility class that provides method for writing base types to payload
     /// </summary>
-    public class BinaryProtocolWriter: IDisposable, IPooledObject
+    public class BinaryProtocolWriter : IDisposable, IPooledObject
     {
-        
-        public Guid PoolId { get; set; }
-        
         /// <summary>
         /// Buffer used for writing data to
         /// </summary>
         private byte[] _buffer;
-        
+
         /// <summary>
         /// The offset of buffer that data is written to
         /// </summary>
         private int _currentBufferOffset;
-        
+
+        /// <summary>
+        /// id of payload
+        /// </summary>
+        private Guid _id;
+
         /// <summary>
         /// Type of payload
         /// </summary>
         private PayloadType _type;
-        
-        /// <summary>
-        /// id of payload 
-        /// </summary>
-        private Guid _id;
 
 
         public BinaryProtocolWriter()
         {
             if (_buffer is null)
                 _buffer = ArrayPool<byte>.Shared.Rent(64);
-            
+
             Refresh();
         }
+
+        public void Dispose()
+        {
+            ArrayPool<byte>.Shared.Return(_buffer, true);
+        }
+
+        public Guid PoolId { get; set; }
 
         /// <summary>
         /// Writes the type of payload
@@ -64,17 +67,17 @@ namespace MessageBroker.Serialization
         public BinaryProtocolWriter WriteId(Guid id)
         {
             _id = id;
-            
+
             const int requiredSizeForGuid = 16;
-            
+
             MakeSureBufferSizeHasRoomForSize(requiredSizeForGuid);
-            
+
             id.TryWriteBytes(_buffer.AsSpan(_currentBufferOffset));
-            
+
             _currentBufferOffset += requiredSizeForGuid;
-            
+
             WriteNewLine();
-            
+
             return this;
         }
 
@@ -86,15 +89,15 @@ namespace MessageBroker.Serialization
         public BinaryProtocolWriter WriteInt(int i)
         {
             const int requiredSizeForInt = 4;
-            
+
             MakeSureBufferSizeHasRoomForSize(requiredSizeForInt);
-            
+
             BitConverter.TryWriteBytes(_buffer.AsSpan(_currentBufferOffset), i);
-            
+
             _currentBufferOffset += requiredSizeForInt;
-            
+
             WriteNewLine();
-            
+
             return this;
         }
 
@@ -106,15 +109,15 @@ namespace MessageBroker.Serialization
         public BinaryProtocolWriter WriteStr(string s)
         {
             // note: we only check for ascii because strings used for queues can only be ascii
-            
+
             MakeSureBufferSizeHasRoomForSize(s.Length);
-            
+
             Encoding.UTF8.GetBytes(s, _buffer.AsSpan(_currentBufferOffset));
-            
+
             _currentBufferOffset += s.Length;
 
             WriteNewLine();
-            
+
             return this;
         }
 
@@ -126,21 +129,21 @@ namespace MessageBroker.Serialization
         public BinaryProtocolWriter WriteMemory(Memory<byte> m)
         {
             MakeSureBufferSizeHasRoomForSize(m.Length + BinaryProtocolConfiguration.SizeForInt);
-            
+
             BitConverter.TryWriteBytes(_buffer.AsSpan(_currentBufferOffset), m.Length);
-            
+
             m.CopyTo(_buffer.AsMemory(_currentBufferOffset + BinaryProtocolConfiguration.SizeForInt));
 
             _currentBufferOffset += m.Length + BinaryProtocolConfiguration.SizeForInt;
-            
+
             WriteNewLine();
-            
+
             return this;
         }
 
         /// <summary>
         /// Returns a pooled SerializedPayload with containing the written data
-        /// then refreshes the writer 
+        /// then refreshes the writer
         /// </summary>
         /// <returns></returns>
         public SerializedPayload ToSerializedPayload()
@@ -148,11 +151,11 @@ namespace MessageBroker.Serialization
             try
             {
                 WriteSizeOfPayloadToBufferHeader();
-                
+
                 var serializedPayload = ObjectPool.Shared.Rent<SerializedPayload>();
-                
+
                 serializedPayload.FillFrom(_buffer, _currentBufferOffset, _id);
-            
+
                 return serializedPayload;
             }
             finally
@@ -190,11 +193,6 @@ namespace MessageBroker.Serialization
                 ArrayPool<byte>.Shared.Return(_buffer, true);
                 _buffer = newBuffer;
             }
-        }
-
-        public void Dispose()
-        {
-            ArrayPool<byte>.Shared.Return(_buffer, true);
         }
     }
 }

@@ -1,15 +1,12 @@
-﻿using System;
-using MessageBroker.Common.Binary;
+﻿using MessageBroker.Common.Binary;
+using MessageBroker.Common.Models;
 using MessageBroker.Common.Pooling;
-using MessageBroker.Models;
-using MessageBroker.Models.Binary;
 
-namespace MessageBroker.Serialization
+namespace MessageBroker.Common.Serialization
 {
     /// <inheritdoc />
     public class Serializer : ISerializer
     {
-
         public SerializedPayload Serialize(Message msg)
         {
             var binaryWriter = ObjectPool.Shared.Rent<BinaryProtocolWriter>();
@@ -190,7 +187,7 @@ namespace MessageBroker.Serialization
         public SerializedPayload Serialize(ConfigureClient configureClient)
         {
             var binaryWriter = ObjectPool.Shared.Rent<BinaryProtocolWriter>();
-            
+
             try
             {
                 return binaryWriter

@@ -3,14 +3,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using MessageBroker.Common.Binary;
 using MessageBroker.Common.DynamicThrottling;
+using MessageBroker.Common.Models;
+using MessageBroker.Common.Serialization;
 using MessageBroker.Core.Clients;
 using MessageBroker.Core.Dispatching;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.RouteMatching;
-using MessageBroker.Models;
-using MessageBroker.Models.Binary;
-using MessageBroker.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Core.Topics
@@ -18,8 +18,11 @@ namespace MessageBroker.Core.Topics
     /// <inheritdoc />
     public class Topic : ITopic
     {
+        private readonly IDispatcher _dispatcher;
+        private readonly ILogger<Topic> _logger;
+
         /// <summary>
-        /// Store for <see cref="Message"/>
+        /// Store for <see cref="Message" />
         /// reading and writing messages to this store
         /// </summary>
         private readonly IMessageStore _messageStore;
@@ -31,12 +34,7 @@ namespace MessageBroker.Core.Topics
 
         private readonly IRouteMatcher _routeMatcher;
         private readonly ISerializer _serializer;
-        private readonly ILogger<Topic> _logger;
-        private readonly IDispatcher _dispatcher;
         private readonly DynamicWaitThrottling _throttling;
-
-        public string Name { get; private set; }
-        public string Route { get; private set; }
 
         private bool _disposed;
 
@@ -49,8 +47,11 @@ namespace MessageBroker.Core.Topics
             _serializer = serializer;
             _logger = logger;
             _queueChannel = Channel.CreateUnbounded<Guid>();
-            _throttling = new();
+            _throttling = new DynamicWaitThrottling();
         }
+
+        public string Name { get; private set; }
+        public string Route { get; private set; }
 
 
         public void Dispose()
@@ -70,15 +71,12 @@ namespace MessageBroker.Core.Topics
 
             ReadPayloadsFromMessageStore();
         }
-        
+
         public void StartProcessingMessages()
         {
             Task.Factory.StartNew(async () =>
             {
-                while (!_disposed)
-                {
-                    await ReadNextMessage();
-                }
+                while (!_disposed) await ReadNextMessage();
             }, TaskCreationOptions.LongRunning);
         }
 
@@ -100,10 +98,7 @@ namespace MessageBroker.Core.Topics
 
         public bool MessageRouteMatch(string messageRoute)
         {
-            if (_disposed)
-            {
-                return false;
-            }
+            if (_disposed) return false;
 
             return _routeMatcher.Match(messageRoute, Route);
         }
@@ -119,20 +114,14 @@ namespace MessageBroker.Core.Topics
         {
             ThrowIfDisposed();
             var success = _dispatcher.Remove(client);
-            if (success)
-            {
-                _logger.LogInformation($"Removed subscription from topic: {Name} with id: {client.Id}");
-            }
+            if (success) _logger.LogInformation($"Removed subscription from topic: {Name} with id: {client.Id}");
         }
 
         public async Task ReadNextMessage()
         {
             ThrowIfDisposed();
 
-            if (_queueChannel.Reader.TryRead(out var messageId))
-            {
-                await ProcessMessage(messageId);
-            }
+            if (_queueChannel.Reader.TryRead(out var messageId)) await ProcessMessage(messageId);
         }
 
         private void ReadPayloadsFromMessageStore()
@@ -142,19 +131,14 @@ namespace MessageBroker.Core.Topics
             var messages = _messageStore.GetAll();
 
             if (messages.Any())
-            {
                 _logger.LogWarning($"Found {messages.Count()} messages while initializing the topic: {Name}");
-            }
             else
-            {
                 _logger.LogWarning($"No messages was found while initializing the topic: {Name}");
-            }
 
             foreach (var message in messages)
                 _queueChannel.Writer.TryWrite(message);
         }
 
-        
 
         private async Task ProcessMessage(Guid messageId)
         {
@@ -187,7 +171,8 @@ namespace MessageBroker.Core.Topics
                 // get ticket for payload
                 try
                 {
-                    _logger.LogInformation($"Adding message with id: {serializedPayload.PayloadId} to subscription with id: {client.Id} in topic: {Name}");
+                    _logger.LogInformation(
+                        $"Adding message with id: {serializedPayload.PayloadId} to subscription with id: {client.Id} in topic: {Name}");
                     var ticket = client.Enqueue(serializedPayload);
                     ticket.OnStatusChanged += OnStatusChanged;
                     break;
@@ -202,13 +187,9 @@ namespace MessageBroker.Core.Topics
         public void OnStatusChanged(Guid messageId, bool ack)
         {
             if (ack)
-            {
                 OnMessageAck(messageId);
-            }
             else
-            {
                 OnMessageNack(messageId);
-            }
         }
 
         /// <summary>
@@ -234,7 +215,7 @@ namespace MessageBroker.Core.Topics
         private void ThrowIfDisposed()
         {
             if (Volatile.Read(ref _disposed))
-                throw new ObjectDisposedException($"Topic has been disposed");
+                throw new ObjectDisposedException("Topic has been disposed");
         }
     }
 }

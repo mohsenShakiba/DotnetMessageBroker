@@ -7,12 +7,12 @@ using MessageBroker.Client.Models;
 namespace MessageBroker.Client.TaskManager
 {
     /// <inheritdoc />
-    public class SendPayloadTaskManager : ISendPayloadTaskManager
+    public class TaskManager : ITaskManager
     {
         private readonly ConcurrentDictionary<Guid, SendPayloadTaskCompletionSource> _tasks;
         private bool _disposed;
 
-        public SendPayloadTaskManager()
+        public TaskManager()
         {
             _tasks = new ConcurrentDictionary<Guid, SendPayloadTaskCompletionSource>();
             RunTaskCancelledCheckProcess();
@@ -34,7 +34,7 @@ namespace MessageBroker.Client.TaskManager
             return tcs.Task;
         }
 
- 
+
         public void OnPayloadOkResult(Guid payloadId)
         {
             if (_tasks.TryGetValue(payloadId, out var taskCompletionSource))
@@ -59,6 +59,11 @@ namespace MessageBroker.Client.TaskManager
                 taskCompletionSource.OnSendError();
         }
 
+        public void Dispose()
+        {
+            _disposed = true;
+        }
+
         private void RunTaskCancelledCheckProcess()
         {
             Task.Factory.StartNew(async () =>
@@ -74,17 +79,8 @@ namespace MessageBroker.Client.TaskManager
         private void DisposeCancelledTasks()
         {
             foreach (var (_, source) in _tasks)
-            {
                 if (source.CancellationToken.IsCancellationRequested)
-                {
                     source.OnError("Task was cancelled");
-                }
-            }
-        }
-
-        public void Dispose()
-        {
-            _disposed = true;
         }
     }
 }

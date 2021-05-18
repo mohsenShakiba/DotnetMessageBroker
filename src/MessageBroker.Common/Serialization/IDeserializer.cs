@@ -1,7 +1,7 @@
 ﻿using System;
-using MessageBroker.Models;
+using MessageBroker.Common.Models;
 
-namespace MessageBroker.Serialization
+namespace MessageBroker.Common.Serialization
 {
     /// <summary>
     /// Deserializes a binary payload to structured Payloads

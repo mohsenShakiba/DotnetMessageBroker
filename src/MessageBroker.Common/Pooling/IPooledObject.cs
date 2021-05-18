@@ -2,7 +2,6 @@
 
 namespace MessageBroker.Common.Pooling
 {
-    
     /// <summary>
     /// Marker interface for objects used in pooling
     /// </summary>
@@ -10,5 +9,4 @@ namespace MessageBroker.Common.Pooling
     {
         public Guid PoolId { get; set; }
     }
-
 }

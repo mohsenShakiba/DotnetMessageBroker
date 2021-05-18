@@ -2,8 +2,7 @@
 
 namespace MessageBroker.Client.ConnectionManagement.ConnectionStatusEventArgs
 {
-    public class ClientDisconnectedEventArgs: EventArgs
+    public class ClientDisconnectedEventArgs : EventArgs
     {
-        
     }
 }

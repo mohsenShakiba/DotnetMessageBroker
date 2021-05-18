@@ -1,13 +1,13 @@
 ﻿using System;
 
-namespace MessageBroker.Models
+namespace MessageBroker.Common.Models
 {
     /// <summary>
     /// Model for deleting a queue
     /// </summary>
     public struct TopicDelete
     {
-        public Guid Id { get; init; }
-        public string Name { get; init; }
+        public Guid Id { get; set; }
+        public string Name { get; set; }
     }
 }

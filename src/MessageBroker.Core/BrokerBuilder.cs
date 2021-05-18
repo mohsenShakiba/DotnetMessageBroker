@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Net;
+using MessageBroker.Common.Serialization;
+using MessageBroker.Common.Tcp;
 using MessageBroker.Core.Clients;
 using MessageBroker.Core.Clients.Store;
 using MessageBroker.Core.Dispatching;
@@ -9,27 +11,23 @@ using MessageBroker.Core.Persistence.Redis;
 using MessageBroker.Core.Persistence.Topics;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Topics;
-using MessageBroker.Serialization;
-using MessageBroker.TCP;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Core
 {
-    
     /// <summary>
     /// Builder for creating an IBroker
     /// </summary>
     public class BrokerBuilder
     {
+        private readonly IServiceCollection _serviceCollection;
 
-        private IServiceCollection _serviceCollection;
-        
         public BrokerBuilder()
         {
             _serviceCollection = new ServiceCollection();
         }
-        
+
         /// <summary>
         /// Specify the endpoint which socket server will listen on
         /// </summary>
@@ -68,7 +66,7 @@ namespace MessageBroker.Core
         }
 
         /// <summary>
-        /// Configure logger 
+        /// Configure logger
         /// </summary>
         /// <param name="loggerBuilder">Action for configuring logging</param>
         public BrokerBuilder ConfigureLogger(Action<ILoggingBuilder> loggerBuilder)
@@ -82,10 +80,7 @@ namespace MessageBroker.Core
         /// </summary>
         public BrokerBuilder AddConsoleLog()
         {
-            ConfigureLogger(builder =>
-            {
-                builder.AddConsole();
-            });
+            ConfigureLogger(builder => { builder.AddConsole(); });
 
             return this;
         }
@@ -103,8 +98,8 @@ namespace MessageBroker.Core
 
         private void AddRequiredServices()
         {
-
             _serviceCollection.AddLogging();
+            
             _serviceCollection.AddSingleton<IPayloadProcessor, PayloadProcessor>();
             _serviceCollection.AddSingleton<IClientStore, ClientStore>();
             _serviceCollection.AddSingleton<IMessageStore, InMemoryMessageStore>();

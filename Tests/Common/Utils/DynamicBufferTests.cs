@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using MessageBroker.Client;
 using MessageBroker.Common.Binary;
 using Tests.Classes;
 using Xunit;

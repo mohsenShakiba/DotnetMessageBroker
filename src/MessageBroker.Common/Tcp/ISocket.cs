@@ -2,19 +2,19 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MessageBroker.TCP
+namespace MessageBroker.Common.Tcp
 {
     /// <summary>
     /// A wrapper interface so that mocking socket behaviour would be easier
     /// the default implementation will accept aa actual TCP socket
     /// </summary>
-    public interface ISocket: IDisposable
+    public interface ISocket : IDisposable
     {
         /// <summary>
         /// Returns the current connection status of underlying socket
         /// </summary>
         bool Connected { get; }
-        
+
         /// <summary>
         /// Will close the socket connection and dispose the TcpSocket object
         /// </summary>
@@ -35,7 +35,7 @@ namespace MessageBroker.TCP
         /// <exception cref="ObjectDisposedException">The object has been disposed</exception>
         /// <returns>Number of bytes sent</returns>
         ValueTask<int> SendAsync(Memory<byte> data, CancellationToken cancellationToken);
-        
+
         /// <summary>
         /// Will receive data and return the number of received bytes
         /// </summary>

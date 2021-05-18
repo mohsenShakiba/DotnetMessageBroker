@@ -5,17 +5,22 @@ namespace MessageBroker.Common.Binary
 {
     /// <summary>
     /// Provides a dynamically-sized buffer that efficiently provides reading and writing of binary data
-    /// used by <see cref="BinaryDataProcessor"/> to process incoming payloads 
+    /// used by <see cref="BinaryDataProcessor" /> to process incoming payloads
     /// </summary>
     public class DynamicBuffer : IDisposable
     {
         private byte[] _buffer;
         private int _end;
         private int _start;
-        
+
         public DynamicBuffer()
         {
             _buffer = ArrayPool<byte>.Shared.Rent(1024);
+        }
+
+        public void Dispose()
+        {
+            ArrayPool<byte>.Shared.Return(_buffer, true);
         }
 
         public void Write(Memory<byte> m)
@@ -26,11 +31,8 @@ namespace MessageBroker.Common.Binary
 
                 var remainingSize = _buffer.Length - _end;
 
-                if (remainingSize < m.Length)
-                {
-                    AllocateNewBufferWithExtraSize(m.Length);
-                }
-      
+                if (remainingSize < m.Length) AllocateNewBufferWithExtraSize(m.Length);
+
                 m.CopyTo(_buffer.AsMemory(_end));
                 _end += m.Length;
             }
@@ -94,11 +96,5 @@ namespace MessageBroker.Common.Binary
             _end = _end - _start;
             _start = 0;
         }
-
-        public void Dispose()
-        {
-            ArrayPool<byte>.Shared.Return(_buffer, true);
-        }
-
     }
 }

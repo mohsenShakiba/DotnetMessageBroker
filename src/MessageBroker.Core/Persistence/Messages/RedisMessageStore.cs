@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using MessageBroker.Common.Models;
+using MessageBroker.Common.Serialization;
 using MessageBroker.Core.Persistence.Redis;
-using MessageBroker.Models;
-using MessageBroker.Serialization;
 
 namespace MessageBroker.Core.Persistence.Messages
 {
@@ -10,12 +10,13 @@ namespace MessageBroker.Core.Persistence.Messages
     public class RedisMessageStore : IMessageStore
     {
         private const string MessageRedisKey = "MessageBroker.Messages.Set";
+        private readonly IDeserializer _deserializer;
         private readonly InMemoryMessageStore _inMemoryMessageStore;
         private readonly RedisConnectionProvider _redisConnectionProvider;
-        private readonly IDeserializer _deserializer;
         private readonly ISerializer _serializer;
 
-        public RedisMessageStore(RedisConnectionProvider redisConnectionProvider, IDeserializer deserializer, ISerializer serializer)
+        public RedisMessageStore(RedisConnectionProvider redisConnectionProvider, IDeserializer deserializer,
+            ISerializer serializer)
         {
             _redisConnectionProvider = redisConnectionProvider;
             _inMemoryMessageStore = new InMemoryMessageStore();

@@ -7,7 +7,7 @@ namespace MessageBroker.Client.ConnectionManagement
     /// </summary>
     public class ClientConnectionConfiguration
     {
-        public IPEndPoint IpEndPoint { get; init; }
-        public bool AutoReconnect { get; init; }
+        public EndPoint EndPoint { get; set; }
+        public bool AutoReconnect { get; set; }
     }
 }

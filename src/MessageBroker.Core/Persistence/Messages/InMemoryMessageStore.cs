@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using MessageBroker.Models;
+using MessageBroker.Common.Models;
 
 namespace MessageBroker.Core.Persistence.Messages
 {
@@ -43,10 +43,8 @@ namespace MessageBroker.Core.Persistence.Messages
 
         public void Delete(Guid id)
         {
-            if (_store.TryRemove(id, out var topicMessage))
-            {
-                topicMessage.Dispose();
-            };
+            if (_store.TryRemove(id, out var topicMessage)) topicMessage.Dispose();
+            ;
         }
 
         public IEnumerable<Guid> GetAll()

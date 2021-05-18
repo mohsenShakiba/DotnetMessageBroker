@@ -6,6 +6,6 @@ namespace MessageBroker.Core.Clients.Store
     {
         void Add(IClient client);
         void Remove(IClient client);
-        bool TryGet(Guid sessionId, out IClient queue);
+        bool TryGet(Guid clientId, out IClient queue);
     }
 }

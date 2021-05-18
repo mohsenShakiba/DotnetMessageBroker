@@ -1,11 +1,10 @@
-﻿using System;
-using MessageBroker.Models;
-using MessageBroker.Models.Binary;
+﻿using MessageBroker.Common.Binary;
+using MessageBroker.Common.Models;
 
-namespace MessageBroker.Serialization
+namespace MessageBroker.Common.Serialization
 {
     /// <summary>
-    /// Serializes a payload to <see cref="SerializedPayload"/>
+    /// Serializes a payload to <see cref="SerializedPayload" />
     /// </summary>
     public interface ISerializer
     {

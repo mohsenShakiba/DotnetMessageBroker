@@ -3,16 +3,15 @@ using System.Collections.Concurrent;
 
 namespace MessageBroker.Core.Clients.Store
 {
-    public class ClientStore: IClientStore
+    public class ClientStore : IClientStore
     {
-        
         private readonly ConcurrentDictionary<Guid, IClient> _sendQueues;
 
         public ClientStore()
         {
             _sendQueues = new ConcurrentDictionary<Guid, IClient>();
         }
-        
+
 
         public void Add(IClient client)
         {
@@ -24,9 +23,9 @@ namespace MessageBroker.Core.Clients.Store
             _sendQueues.TryRemove(client.Id, out var _);
         }
 
-        public bool TryGet(Guid sessionId, out IClient queue)
+        public bool TryGet(Guid clientId, out IClient queue)
         {
-            return _sendQueues.TryGetValue(sessionId, out queue);
+            return _sendQueues.TryGetValue(clientId, out queue);
         }
     }
 }

@@ -1,31 +1,29 @@
 ﻿using System;
 using System.Net;
 using System.Net.Sockets;
-using MessageBroker.TCP.EventArgs;
+using MessageBroker.Common.Tcp.EventArgs;
 using Microsoft.Extensions.Logging;
 
-namespace MessageBroker.TCP
+namespace MessageBroker.Common.Tcp
 {
     /// <inheritdoc />
     public sealed class TcpListener : IListener
     {
         private readonly IPEndPoint _endPoint;
         private readonly ILogger<TcpListener> _logger;
-        private bool _isDisposed;
         private bool _isAccepting;
+        private bool _isDisposed;
 
         /// <summary>
         /// Socket object used for listening to IPEndPoint
         /// </summary>
-        private System.Net.Sockets.Socket _socket;
-        
+        private Socket _socket;
+
         /// <summary>
         /// SocketAsyncEventArgs used for accepting connections
         /// </summary>
         private SocketAsyncEventArgs _socketAsyncEventArgs;
-        
-        public event EventHandler<SocketAcceptedEventArgs> OnSocketAccepted;
-        
+
         public TcpListener(ConnectionProvider connectionProvider, ILogger<TcpListener> logger)
         {
             _endPoint = connectionProvider.IpEndPoint;
@@ -38,21 +36,23 @@ namespace MessageBroker.TCP
             _logger = logger;
         }
 
+        public event EventHandler<SocketAcceptedEventArgs> OnSocketAccepted;
+
         public void Start()
         {
             ThrowIfDisposed();
-            
+
             if (_isAccepting)
                 throw new InvalidOperationException("Server is already accepting connection");
-            
+
             _isAccepting = true;
-            
+
             _socketAsyncEventArgs = new SocketAsyncEventArgs();
             _socketAsyncEventArgs.Completed += OnAcceptCompleted;
 
-            _socket = new System.Net.Sockets.Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            _socket = new Socket(_endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             _socket.Bind(_endPoint);
-            _socket.Listen();
+            _socket.Listen(1024);
 
             _logger.LogInformation($"Started socket on endpoint {_endPoint}");
 
@@ -64,15 +64,24 @@ namespace MessageBroker.TCP
             ThrowIfDisposed();
 
             _logger.LogInformation("Stopping socket server");
-            
+
             _isAccepting = false;
 
             _socketAsyncEventArgs.Completed -= OnAcceptCompleted;
 
             _socket.Close();
             _socketAsyncEventArgs.Dispose();
-            
+
             Dispose();
+        }
+
+        /// <summary>
+        /// Will mark the object as disposed
+        /// <remarks>Calling Dispose will not stop the server, Stop must be called</remarks>
+        /// </summary>
+        public void Dispose()
+        {
+            _isDisposed = true;
         }
 
         /// <summary>
@@ -113,14 +122,14 @@ namespace MessageBroker.TCP
             BeginAcceptConnection();
         }
 
-        private void OnAcceptSuccess(System.Net.Sockets.Socket socket)
+        private void OnAcceptSuccess(Socket socket)
         {
             _logger.LogInformation($"Accepted new socket connection from {socket.RemoteEndPoint}");
 
             var tcpSocket = new TcpSocket(socket);
 
             var socketAcceptedEventArgs = new SocketAcceptedEventArgs {Socket = tcpSocket};
-            
+
             OnSocketAccepted?.Invoke(this, socketAcceptedEventArgs);
         }
 
@@ -132,16 +141,7 @@ namespace MessageBroker.TCP
         private void ThrowIfDisposed()
         {
             if (_isDisposed)
-                throw new ObjectDisposedException($"Server has been disposed");
-        }
-
-        /// <summary>
-        /// Will mark the object as disposed
-        /// <remarks>Calling Dispose will not stop the server, Stop must be called</remarks>
-        /// </summary>
-        public void Dispose()
-        {
-            _isDisposed = true;
+                throw new ObjectDisposedException("Server has been disposed");
         }
     }
 }

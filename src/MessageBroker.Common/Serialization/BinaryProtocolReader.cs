@@ -1,19 +1,15 @@
 ﻿using System;
 using System.Buffers;
-using System.Text;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
 
-namespace MessageBroker.Serialization
+namespace MessageBroker.Common.Serialization
 {
     /// <summary>
     /// A utility class to that provides helper methods to deserialize binary to payload
     /// </summary>
     public class BinaryProtocolReader : IPooledObject
     {
-        
-        public Guid PoolId { get; set; }
-        
         /// <summary>
         /// Offset of receive data buffer that data was read from
         /// further reading will start from this offset
@@ -24,6 +20,8 @@ namespace MessageBroker.Serialization
         /// received data buffer
         /// </summary>
         private Memory<byte> _receivedData;
+
+        public Guid PoolId { get; set; }
 
 
         /// <summary>
@@ -55,7 +53,6 @@ namespace MessageBroker.Serialization
                 throw new ArgumentOutOfRangeException(
                     $"Cannot read Guid, current is {_currentOffset}, needed is {BinaryProtocolConfiguration.SizeForGuid}, available is {_receivedData.Length - _currentOffset}");
             }
-  
         }
 
         /// <summary>
@@ -106,15 +103,15 @@ namespace MessageBroker.Serialization
                 var sizeToRead = BitConverter.ToInt32(spanForSizeOfBinaryData);
 
                 _currentOffset += BinaryProtocolConfiguration.SizeForInt;
-            
+
                 var data = _receivedData.Span.Slice(_currentOffset, sizeToRead);
-            
+
                 _currentOffset += sizeToRead + 1;
-            
+
                 var arr = ArrayPool<byte>.Shared.Rent(sizeToRead);
-            
+
                 data.CopyTo(arr);
-            
+
                 return (arr, sizeToRead);
             }
             catch (Exception)
@@ -123,6 +120,5 @@ namespace MessageBroker.Serialization
                     $"Cannot read bytes, current is {_currentOffset}, available is {_receivedData.Length - _currentOffset}");
             }
         }
-
     }
 }

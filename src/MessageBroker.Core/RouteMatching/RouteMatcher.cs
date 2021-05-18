@@ -7,11 +7,8 @@ namespace MessageBroker.Core.RouteMatching
     {
         public bool Match(string messageRoute, string topicRoute)
         {
-            if (messageRoute is null || topicRoute is null)
-            {
-                return false;
-            }
-            
+            if (messageRoute is null || topicRoute is null) return false;
+
             const string wildCard = "*";
 
             var messageRouteSegments = messageRoute.Split('/');

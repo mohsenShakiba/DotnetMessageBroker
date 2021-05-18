@@ -1,37 +1,33 @@
 ﻿using System;
-using System.Diagnostics;
-using System.IO;
-using System.Text;
 using System.Threading;
-using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Subscriptions;
 using MessageBroker.Client.Subscriptions.Store;
 using MessageBroker.Client.TaskManager;
-using MessageBroker.Models;
-using MessageBroker.Serialization;
-using MessageBroker.TCP.EventArgs;
+using MessageBroker.Common.Models;
+using MessageBroker.Common.Serialization;
+using MessageBroker.Common.Tcp.EventArgs;
 
 namespace MessageBroker.Client.ReceiveDataProcessing
 {
     public class ReceiveDataProcessor : IReceiveDataProcessor
     {
-        private readonly ISubscriptionStore _subscriptionStore;
-        private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
         private readonly IDeserializer _deserializer;
-        
-        public event Action<Guid> OnOkReceived;
-        public event Action<Guid, string> OnErrorReceived;
+        private readonly ITaskManager _taskManager;
+        private readonly ISubscriptionStore _subscriptionStore;
 
 
         private int _receivedMessagesCount;
 
         public ReceiveDataProcessor(IDeserializer deserializer,
-            ISubscriptionStore subscriptionStore, ISendPayloadTaskManager sendPayloadTaskManager)
+            ISubscriptionStore subscriptionStore, ITaskManager taskManager)
         {
             _deserializer = deserializer;
             _subscriptionStore = subscriptionStore;
-            _sendPayloadTaskManager = sendPayloadTaskManager;
+            _taskManager = taskManager;
         }
+
+        public event Action<Guid> OnOkReceived;
+        public event Action<Guid, string> OnErrorReceived;
 
         public void DataReceived(object clientSessionObject, ClientSessionDataReceivedEventArgs dataReceivedEventArgs)
         {
@@ -55,30 +51,26 @@ namespace MessageBroker.Client.ReceiveDataProcessing
         }
 
 
-
         private void OnMessage(Memory<byte> payloadData)
         {
             Interlocked.Increment(ref _receivedMessagesCount);
             var queueMessage = _deserializer.ToTopicMessage(payloadData);
             if (_subscriptionStore.TryGet(queueMessage.TopicName, out var subscription))
-            {
-                ((Subscription)subscription).OnMessageReceived(queueMessage);
-            }
+                ((Subscription) subscription).OnMessageReceived(queueMessage);
         }
 
         private void OnOk(Memory<byte> payloadData)
         {
             var ack = _deserializer.ToAck(payloadData);
-            _sendPayloadTaskManager.OnPayloadOkResult(ack.Id);
+            _taskManager.OnPayloadOkResult(ack.Id);
             OnOkReceived?.Invoke(ack.Id);
         }
 
         private void OnError(Memory<byte> payloadData)
         {
             var nack = _deserializer.ToError(payloadData);
-            _sendPayloadTaskManager.OnPayloadErrorResult(nack.Id, nack.Message);
+            _taskManager.OnPayloadErrorResult(nack.Id, nack.Message);
             OnErrorReceived?.Invoke(nack.Id, nack.Message);
         }
-
     }
 }

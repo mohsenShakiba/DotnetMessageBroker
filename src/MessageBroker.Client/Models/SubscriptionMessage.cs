@@ -5,12 +5,11 @@ namespace MessageBroker.Client.Models
 {
     public class SubscriptionMessage
     {
-        internal event Action<Guid, bool, CancellationToken> OnMessageProcessedByClient; 
-        
         public Guid MessageId { get; set; }
         public string TopicRoute { get; set; }
         public string TopicName { get; set; }
         public Memory<byte> Data { get; set; }
+        internal event Action<Guid, bool, CancellationToken> OnMessageProcessedByClient;
 
         public void Ack(CancellationToken? cancellationToken = null)
         {
@@ -25,7 +24,7 @@ namespace MessageBroker.Client.Models
             {
                 token = cancellationToken.Value;
             }
-            
+
             OnMessageProcessedByClient?.Invoke(MessageId, true, token);
         }
 
@@ -42,7 +41,7 @@ namespace MessageBroker.Client.Models
             {
                 token = cancellationToken.Value;
             }
-            
+
             OnMessageProcessedByClient?.Invoke(MessageId, false, token);
         }
     }

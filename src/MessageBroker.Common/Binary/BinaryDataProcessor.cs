@@ -1,12 +1,7 @@
 ﻿using System;
 using System.Buffers;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using MessageBroker.Common.Pooling;
-using Serilog.Events;
 
 namespace MessageBroker.Common.Binary
 {
@@ -45,28 +40,19 @@ namespace MessageBroker.Common.Binary
             lock (_dynamicBuffer)
             {
                 binaryPayload = null;
-                
-                if (_disposed)
-                {
-                    return false;
-                }
-                
+
+                if (_disposed) return false;
+
                 var canReadHeaderSize = _dynamicBuffer.CanRead(BinaryProtocolConfiguration.PayloadHeaderSize);
 
-                if (!canReadHeaderSize)
-                {
-                    return false;
-                }
+                if (!canReadHeaderSize) return false;
 
                 var headerSizeBytes = _dynamicBuffer.Read(BinaryProtocolConfiguration.PayloadHeaderSize);
                 var headerSize = BitConverter.ToInt32(headerSizeBytes);
 
                 var canReadPayload = _dynamicBuffer.CanRead(BinaryProtocolConfiguration.PayloadHeaderSize + headerSize);
 
-                if (!canReadPayload)
-                {
-                    return false;
-                }
+                if (!canReadPayload) return false;
 
                 var payload = _dynamicBuffer.ReadAndClear(BinaryProtocolConfiguration.PayloadHeaderSize + headerSize);
 
@@ -81,22 +67,15 @@ namespace MessageBroker.Common.Binary
 
                 return true;
             }
-            
         }
-        
+
         public void Dispose()
         {
             // wait until lock is released
-            while (_isReading)
-            {
-                Thread.Yield();
-            }
-            
-            if (_disposed)
-            {
-                return;
-            }
-            
+            while (_isReading) Thread.Yield();
+
+            if (_disposed) return;
+
             // so that disposing the buffer would not interfere with TreRead method
             lock (_dynamicBuffer)
             {

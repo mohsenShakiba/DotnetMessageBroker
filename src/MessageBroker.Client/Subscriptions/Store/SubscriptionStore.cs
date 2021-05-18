@@ -31,10 +31,7 @@ namespace MessageBroker.Client.Subscriptions.Store
 
         public async ValueTask DisposeAsync()
         {
-            foreach (var (_, subscriber) in _queueDict)
-            {
-                await subscriber.DisposeAsync();
-            }
+            foreach (var (_, subscriber) in _queueDict) await subscriber.DisposeAsync();
         }
     }
 }

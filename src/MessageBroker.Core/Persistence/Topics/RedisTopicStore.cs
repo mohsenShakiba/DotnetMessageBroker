@@ -12,12 +12,13 @@ namespace MessageBroker.Core.Persistence.Topics
     public class RedisTopicStore : ITopicStore
     {
         private const string QueueNameKey = "MessageBroker.Queue.Set";
-        private readonly RedisConnectionProvider _redisConnectionProvider;
         private readonly ILogger<RedisTopicStore> _logger;
-        private readonly IServiceProvider _serviceProvider;
         private readonly List<ITopic> _queues;
+        private readonly RedisConnectionProvider _redisConnectionProvider;
+        private readonly IServiceProvider _serviceProvider;
 
-        public RedisTopicStore(RedisConnectionProvider redisConnectionProvider, ILogger<RedisTopicStore> logger, IServiceProvider serviceProvider)
+        public RedisTopicStore(RedisConnectionProvider redisConnectionProvider, ILogger<RedisTopicStore> logger,
+            IServiceProvider serviceProvider)
         {
             _redisConnectionProvider = redisConnectionProvider;
             _logger = logger;
@@ -31,7 +32,6 @@ namespace MessageBroker.Core.Persistence.Topics
             var results = connection.GetDatabase().SetScan(QueueNameKey);
 
             foreach (var result in results)
-            {
                 try
                 {
                     var queue = DeserializeIQueue(result);
@@ -41,7 +41,6 @@ namespace MessageBroker.Core.Persistence.Topics
                 {
                     _logger.LogError("Failed to deserialize topic data");
                 }
-            }
 
             _logger.LogInformation($"Found {results.Count()} topics");
         }

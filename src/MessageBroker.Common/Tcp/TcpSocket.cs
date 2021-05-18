@@ -4,7 +4,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MessageBroker.TCP
+namespace MessageBroker.Common.Tcp
 {
     /// <inheritdoc cref="ISocket" />
     public sealed class TcpSocket : ISocket
@@ -12,20 +12,13 @@ namespace MessageBroker.TCP
         private readonly Socket _socket;
 
         private bool _disposed;
-        
-        public bool Connected => _socket?.Connected ?? false;
 
         public TcpSocket(Socket socket)
         {
             _socket = socket;
         }
 
-        public static TcpSocket NewFromEndPoint(IPEndPoint ipEndPoint)
-        {
-            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.Connect(ipEndPoint);
-            return new TcpSocket(socket);
-        }
+        public bool Connected => _socket?.Connected ?? false;
 
         public void Disconnect()
         {
@@ -56,10 +49,10 @@ namespace MessageBroker.TCP
         {
             if (_disposed)
                 return 0;
-            
+
             try
             {
-                return await _socket.SendAsync(data, SocketFlags.None, cancellationToken: cancellationToken);
+                return await _socket.SendAsync(data, SocketFlags.None, cancellationToken);
             }
             catch (TaskCanceledException)
             {
@@ -76,7 +69,7 @@ namespace MessageBroker.TCP
         {
             if (_disposed)
                 return 0;
-            
+
             try
             {
                 return await _socket.ReceiveAsync(buffer, SocketFlags.None, cancellationToken);
@@ -95,7 +88,6 @@ namespace MessageBroker.TCP
         public void Dispose()
         {
             if (!_disposed)
-            {
                 try
                 {
                     _socket.Dispose();
@@ -105,8 +97,13 @@ namespace MessageBroker.TCP
                 {
                     // ignore ObjectDisposedException
                 }
-            }
         }
 
+        public static TcpSocket NewFromEndPoint(EndPoint endPoint)
+        {
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket.Connect(endPoint);
+            return new TcpSocket(socket);
+        }
     }
 }

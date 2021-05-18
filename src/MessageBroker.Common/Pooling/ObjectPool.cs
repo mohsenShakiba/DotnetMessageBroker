@@ -14,19 +14,18 @@ namespace MessageBroker.Common.Pooling
 
         public ObjectPool()
         {
-            _objectTypeDict = new ();
-            _pooledObjectDict = new();
-            _objectTypeStatDict = new ();
+            _objectTypeDict = new Dictionary<int, Queue<object>>();
+            _pooledObjectDict = new Dictionary<Guid, bool>();
+            _objectTypeStatDict = new ConcurrentDictionary<Type, int>();
         }
 
         public T Rent<T>() where T : IPooledObject, new()
         {
             var type = typeof(T);
             var typeKey = type.Name.GetHashCode();
-            
+
             lock (_objectTypeDict)
             {
-
                 if (!_objectTypeDict.ContainsKey(typeKey))
                 {
                     _objectTypeDict[typeKey] = new Queue<object>();
@@ -61,10 +60,9 @@ namespace MessageBroker.Common.Pooling
         {
             var type = typeof(T);
             var typeKey = type.Name.GetHashCode();
-            
+
             lock (_objectTypeDict)
             {
-
 #if DEBUG
                 var keyExists = _pooledObjectDict.TryGetValue(o.PoolId, out var isReturnedToPool);
 

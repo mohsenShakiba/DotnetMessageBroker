@@ -1,9 +1,9 @@
 ﻿using System;
 using MessageBroker.Common.Binary;
+using MessageBroker.Common.Models;
 using MessageBroker.Common.Pooling;
-using MessageBroker.Models;
 
-namespace MessageBroker.Serialization
+namespace MessageBroker.Common.Serialization
 {
     /// <inheritdoc />
     public class Deserializer : IDeserializer
@@ -109,10 +109,6 @@ namespace MessageBroker.Serialization
                     OriginalMessageData = dataSize.OriginalData
                 };
             }
-            catch
-            {
-                throw;
-            }
             finally
             {
                 ObjectPool.Shared.Return(binaryReader);
@@ -159,7 +155,7 @@ namespace MessageBroker.Serialization
                 return new SubscribeTopic
                 {
                     Id = id,
-                    TopicName = queueName,
+                    TopicName = queueName
                 };
             }
             finally

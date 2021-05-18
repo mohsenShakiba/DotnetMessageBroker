@@ -1,13 +1,13 @@
 ﻿using System;
 
-namespace MessageBroker.Models
+namespace MessageBroker.Common.Models
 {
     /// <summary>
     /// Model for subscribing to topic if exists
     /// </summary>
     public struct SubscribeTopic
     {
-        public Guid Id { get; init; }
-        public string TopicName { get; init; }
+        public Guid Id { get; set; }
+        public string TopicName { get; set; }
     }
 }

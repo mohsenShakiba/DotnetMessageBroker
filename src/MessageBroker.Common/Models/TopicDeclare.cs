@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace MessageBroker.Models
+namespace MessageBroker.Common.Models
 {
     /// <summary>
     /// Model for declaring a queue
@@ -8,8 +8,8 @@ namespace MessageBroker.Models
     /// </summary>
     public struct TopicDeclare
     {
-        public Guid Id { get; init; }
-        public string Name { get; init; }
-        public string Route { get; init; }
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public string Route { get; set; }
     }
 }

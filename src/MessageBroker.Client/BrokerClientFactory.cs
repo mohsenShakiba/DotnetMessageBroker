@@ -9,63 +9,46 @@ using MessageBroker.Client.Subscriptions.Store;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
+using MessageBroker.Common.Serialization;
 using MessageBroker.Core.Clients;
-using MessageBroker.Serialization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Client
 {
-    public class BrokerClientFactory : IAsyncDisposable
+    public class BrokerClientFactory
     {
-        
-        private IServiceProvider _serviceProvider;
-        
-
         public IBrokerClient GetClient()
         {
-            SetupServiceProvider();
-
-            var scope = _serviceProvider.CreateScope();
+            var serviceProvider = SetupServiceProvider();
             
-            return scope.ServiceProvider.GetRequiredService<IBrokerClient>();
+            return serviceProvider.GetRequiredService<IBrokerClient>();
         }
 
-        private void SetupServiceProvider()
+        private IServiceProvider SetupServiceProvider(Action<ServiceCollection> configure = default)
         {
-            if (_serviceProvider is null)
-            {
-                var serviceCollection = new ServiceCollection();
+            var serviceCollection = new ServiceCollection();
 
-                serviceCollection.AddLogging();
-                
-                serviceCollection.AddSingleton<ISerializer, Serializer>();
-                serviceCollection.AddSingleton<IDeserializer, Deserializer>();
-                serviceCollection.AddSingleton<ISendPayloadTaskManager, SendPayloadTaskManager>();
-                serviceCollection.AddSingleton<IPayloadFactory, PayloadFactory>();
-                serviceCollection.AddSingleton<StringPool>();
-                
-                serviceCollection.AddScoped<IBinaryDataProcessor, BinaryDataProcessor>();
-                serviceCollection.AddScoped<ISubscription, Subscription>();
-                serviceCollection.AddScoped<IConnectionManager, ConnectionManager>();
-                serviceCollection.AddScoped<ISendDataProcessor, SendDataProcessor>();
-                serviceCollection.AddScoped<IReceiveDataProcessor, ReceiveDataProcessor>();
-                serviceCollection.AddScoped<ISubscriptionStore, SubscriptionStore>();
-                serviceCollection.AddScoped<IClient, Core.Clients.Client>();
-                serviceCollection.AddScoped<IBrokerClient, BrokerClient>();
-
-                _serviceProvider = serviceCollection.BuildServiceProvider();
-            }
-        }
-
-        public ValueTask DisposeAsync()
-        {
-            if (_serviceProvider is not null)
-            {
-                var client = _serviceProvider.GetRequiredService<IBrokerClient>();
-                return client.DisposeAsync();
-            }
+            serviceCollection.AddLogging();
             
-            return ValueTask.CompletedTask;
+            serviceCollection.AddSingleton<ISerializer, Serializer>();
+            serviceCollection.AddSingleton<IDeserializer, Deserializer>();
+            serviceCollection.AddSingleton<ITaskManager, TaskManager.TaskManager>();
+            serviceCollection.AddSingleton<IPayloadFactory, PayloadFactory>();
+            serviceCollection.AddSingleton<StringPool>();
+            serviceCollection.AddSingleton<IConnectionManager, ConnectionManager>();
+            serviceCollection.AddSingleton<ISendDataProcessor, SendDataProcessor>();
+            serviceCollection.AddSingleton<IReceiveDataProcessor, ReceiveDataProcessor>();
+            serviceCollection.AddSingleton<ISubscriptionStore, SubscriptionStore>();
+            serviceCollection.AddSingleton<IBrokerClient, BrokerClient>();
+
+            serviceCollection.AddTransient<IBinaryDataProcessor, BinaryDataProcessor>();
+            serviceCollection.AddTransient<ISubscription, Subscription>();
+            serviceCollection.AddTransient<IClient, Core.Clients.Client>();
+            
+            configure?.Invoke(serviceCollection);
+            
+            return serviceCollection.BuildServiceProvider();
         }
     }
 }
