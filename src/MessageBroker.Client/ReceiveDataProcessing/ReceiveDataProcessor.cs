@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using MessageBroker.Client.Subscriptions;
 using MessageBroker.Client.Subscriptions.Store;
@@ -7,17 +8,26 @@ using MessageBroker.Common.Models;
 using MessageBroker.Common.Serialization;
 using MessageBroker.Common.Tcp.EventArgs;
 
+[assembly: InternalsVisibleTo("Tests")]
+
 namespace MessageBroker.Client.ReceiveDataProcessing
 {
+    /// <inheritdoc />
     public class ReceiveDataProcessor : IReceiveDataProcessor
     {
         private readonly IDeserializer _deserializer;
-        private readonly ITaskManager _taskManager;
         private readonly ISubscriptionStore _subscriptionStore;
+        private readonly ITaskManager _taskManager;
 
 
         private int _receivedMessagesCount;
 
+        /// <summary>
+        /// Instantiates a new <see cref="ReceiveDataProcessor" />
+        /// </summary>
+        /// <param name="deserializer"></param>
+        /// <param name="subscriptionStore"></param>
+        /// <param name="taskManager"></param>
         public ReceiveDataProcessor(IDeserializer deserializer,
             ISubscriptionStore subscriptionStore, ITaskManager taskManager)
         {
@@ -26,9 +36,13 @@ namespace MessageBroker.Client.ReceiveDataProcessing
             _taskManager = taskManager;
         }
 
+        /// <inheritdoc />
         public event Action<Guid> OnOkReceived;
+
+        /// <inheritdoc />
         public event Action<Guid, string> OnErrorReceived;
 
+        /// <inheritdoc />
         public void DataReceived(object clientSessionObject, ClientSessionDataReceivedEventArgs dataReceivedEventArgs)
         {
             var data = dataReceivedEventArgs.Data;

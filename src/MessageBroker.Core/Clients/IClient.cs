@@ -23,10 +23,13 @@ namespace MessageBroker.Core.Clients
         /// </summary>
         Guid Id { get; }
 
+        /// <summary>
+        /// The max number of parallel messages that can be sent to client
+        /// </summary>
         int MaxConcurrency { get; }
 
         /// <summary>
-        /// Returns true if <see cref="Close" /> or <see cref="Dispose" /> is called
+        /// Returns true if <see cref="Close" /> is called or object is disposed
         /// </summary>
         bool IsClosed { get; }
 
@@ -46,7 +49,7 @@ namespace MessageBroker.Core.Clients
         event EventHandler<ClientSessionDataReceivedEventArgs> OnDataReceived;
 
         /// <summary>
-        /// Will setup the client to use <see cref="ISocket"/> as the underlying socket object
+        /// Will setup the client to use <see cref="ISocket" /> as the underlying socket object
         /// </summary>
         /// <param name="socket">Provided socket to use as underlying socket</param>
         /// <exception cref="InvalidOperationException">If the provided socket is not in connected state</exception>

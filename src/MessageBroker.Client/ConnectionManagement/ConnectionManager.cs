@@ -16,12 +16,18 @@ namespace MessageBroker.Client.ConnectionManagement
     public class ConnectionManager : IConnectionManager
     {
         private readonly ILogger<ConnectionManager> _logger;
-        private readonly IServiceProvider _serviceProvider;
         private readonly IReceiveDataProcessor _receiveDataProcessor;
         private readonly SemaphoreSlim _semaphore;
+        private readonly IServiceProvider _serviceProvider;
         private ClientConnectionConfiguration _configuration;
 
 
+        /// <summary>
+        /// Instantiates a new <see cref="IConnectionManager" /> used by the <see cref="IBrokerClient" />
+        /// </summary>
+        /// <param name="receiveDataProcessor">The <see cref="IReceiveDataProcessor" /></param>
+        /// <param name="logger">The <see cref="ILogger" /></param>
+        /// <param name="serviceProvider">The <see cref="IServiceProvider" /></param>
         public ConnectionManager(IReceiveDataProcessor receiveDataProcessor, ILogger<ConnectionManager> logger,
             IServiceProvider serviceProvider)
         {
@@ -32,13 +38,20 @@ namespace MessageBroker.Client.ConnectionManagement
         }
 
 
+        /// <inheritdoc />
         public IClient Client { get; private set; }
+
+        /// <inheritdoc />
         public ISocket Socket { get; private set; }
 
 
+        /// <inheritdoc />
         public event EventHandler<ClientConnectionEventArgs> OnConnected;
+
+        /// <inheritdoc />
         public event EventHandler<ClientDisconnectedEventArgs> OnDisconnected;
 
+        /// <inheritdoc />
         public void Connect(ClientConnectionConfiguration configuration)
         {
             _configuration = configuration;
@@ -81,10 +94,11 @@ namespace MessageBroker.Client.ConnectionManagement
                 // if auto reconnect is active, try to reconnect
                 if (_configuration.AutoReconnect)
                 {
-                    _logger.LogWarning($"Couldn't connect to endpoint: {_configuration.EndPoint} with error: {e} retrying in 1 second");
-                    
+                    _logger.LogWarning(
+                        $"Couldn't connect to endpoint: {_configuration.EndPoint} with error: {e} retrying in 1 second");
+
                     Thread.Sleep(1000);
-                    
+
                     Reconnect();
                 }
                 else
@@ -101,6 +115,7 @@ namespace MessageBroker.Client.ConnectionManagement
             OnConnected?.Invoke(this, new ClientConnectionEventArgs());
         }
 
+        /// <inheritdoc />
         public void Reconnect()
         {
             if (Socket.Connected)
@@ -109,11 +124,13 @@ namespace MessageBroker.Client.ConnectionManagement
             Connect(_configuration ?? throw new ArgumentNullException("No configuration exists for reconnection"));
         }
 
+        /// <inheritdoc />
         public void Disconnect()
         {
             Socket?.Disconnect();
         }
 
+        /// <inheritdoc />
         public async Task<bool> SendAsync(SerializedPayload serializedPayload, CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)

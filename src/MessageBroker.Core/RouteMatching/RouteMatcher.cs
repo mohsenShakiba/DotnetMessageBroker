@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Core.RouteMatching
 {
     /// <inheritdoc />
-    public class RouteMatcher : IRouteMatcher
+    internal class RouteMatcher : IRouteMatcher
     {
         public bool Match(string messageRoute, string topicRoute)
         {

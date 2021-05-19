@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -13,10 +14,12 @@ using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.RouteMatching;
 using Microsoft.Extensions.Logging;
 
+[assembly: InternalsVisibleTo("Tests")]
+
 namespace MessageBroker.Core.Topics
 {
     /// <inheritdoc />
-    public class Topic : ITopic
+    internal class Topic : ITopic
     {
         private readonly IDispatcher _dispatcher;
         private readonly ILogger<Topic> _logger;
@@ -51,6 +54,7 @@ namespace MessageBroker.Core.Topics
         }
 
         public string Name { get; private set; }
+
         public string Route { get; private set; }
 
 
@@ -184,6 +188,11 @@ namespace MessageBroker.Core.Topics
             }
         }
 
+        /// <summary>
+        /// Called when <see cref="Ack" /> or <see cref="Nack" /> is received for a message
+        /// </summary>
+        /// <param name="messageId"></param>
+        /// <param name="ack"></param>
         public void OnStatusChanged(Guid messageId, bool ack)
         {
             if (ack)

@@ -1,21 +1,21 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using MessageBroker.Common.Models;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Core.Persistence.Messages
 {
-    /// <inheritdoc />
-    public class InMemoryMessageStore : IMessageStore
+    internal class InMemoryMessageStore : IMessageStore
     {
         private readonly ConcurrentDictionary<Guid, TopicMessage> _store;
-
 
         public InMemoryMessageStore()
         {
             _store = new ConcurrentDictionary<Guid, TopicMessage>();
         }
-
 
         public void Setup()
         {

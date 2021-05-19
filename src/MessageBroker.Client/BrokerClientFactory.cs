@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Payloads;
 using MessageBroker.Client.ReceiveDataProcessing;
@@ -12,16 +11,22 @@ using MessageBroker.Common.Pooling;
 using MessageBroker.Common.Serialization;
 using MessageBroker.Core.Clients;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Client
 {
+    /// <summary>
+    /// Factory for creating <see cref="IBrokerClient" />
+    /// </summary>
     public class BrokerClientFactory
     {
-        public IBrokerClient GetClient()
+        /// <summary>
+        /// Instantiates and returns a new <see cref="IBrokerClient" />
+        /// </summary>
+        /// <returns>Created <see cref="IBrokerClient" /></returns>
+        public IBrokerClient GetClient(Action<ServiceCollection> configure = default)
         {
-            var serviceProvider = SetupServiceProvider();
-            
+            var serviceProvider = SetupServiceProvider(configure);
+
             return serviceProvider.GetRequiredService<IBrokerClient>();
         }
 
@@ -30,7 +35,7 @@ namespace MessageBroker.Client
             var serviceCollection = new ServiceCollection();
 
             serviceCollection.AddLogging();
-            
+
             serviceCollection.AddSingleton<ISerializer, Serializer>();
             serviceCollection.AddSingleton<IDeserializer, Deserializer>();
             serviceCollection.AddSingleton<ITaskManager, TaskManager.TaskManager>();
@@ -45,9 +50,9 @@ namespace MessageBroker.Client
             serviceCollection.AddTransient<IBinaryDataProcessor, BinaryDataProcessor>();
             serviceCollection.AddTransient<ISubscription, Subscription>();
             serviceCollection.AddTransient<IClient, Core.Clients.Client>();
-            
+
             configure?.Invoke(serviceCollection);
-            
+
             return serviceCollection.BuildServiceProvider();
         }
     }

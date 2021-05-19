@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using MessageBroker.Common.Models;
 using MessageBroker.Common.Serialization;
 using MessageBroker.Core.Persistence.Redis;
 
+[assembly: InternalsVisibleTo("Tests")]
+
 namespace MessageBroker.Core.Persistence.Messages
 {
     /// <inheritdoc />
-    public class RedisMessageStore : IMessageStore
+    internal class RedisMessageStore : IMessageStore
     {
         private const string MessageRedisKey = "MessageBroker.Messages.Set";
         private readonly IDeserializer _deserializer;

@@ -4,9 +4,16 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageVersion>0.9.5</PackageVersion>
     <Title>Message Broker</Title>
     <Authors>m.shakiba</Authors>
+    <Description>MessageBroker server</Description>
+    <PackageProjectUrl>https://github.com/mohsenShakiba/DotnetMessageBroker</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mohsenShakiba/DotnetMessageBroker</RepositoryUrl>
+    <Copyright>Copyright Mohsen Shakiba</Copyright>
+    <PackageTags>message-broker;messaging-platform;broker;publish-subscribe;pub-sub;</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
 
   <ItemGroup>

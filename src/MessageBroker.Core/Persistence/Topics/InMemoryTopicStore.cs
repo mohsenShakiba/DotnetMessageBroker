@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using MessageBroker.Core.Topics;
 using Microsoft.Extensions.DependencyInjection;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Core.Persistence.Topics
 {
     /// <inheritdoc />
-    public class InMemoryTopicStore : ITopicStore
+    internal class InMemoryTopicStore : ITopicStore
     {
         private readonly List<ITopic> _queues;
         private readonly IServiceProvider _serviceProvider;

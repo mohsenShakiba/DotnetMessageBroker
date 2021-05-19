@@ -1,11 +1,15 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Models;
 using MessageBroker.Common.Serialization;
 
+[assembly: InternalsVisibleTo("Tests")]
+
 namespace MessageBroker.Client.Payloads
 {
-    public class PayloadFactory : IPayloadFactory
+    /// <inheritdoc />
+    internal class PayloadFactory : IPayloadFactory
     {
         private readonly ISerializer _serializer;
 

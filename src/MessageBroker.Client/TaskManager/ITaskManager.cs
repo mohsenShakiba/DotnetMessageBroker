@@ -25,6 +25,7 @@ namespace MessageBroker.Client.TaskManager
         /// <param name="completeOnAcknowledge">
         /// If true will wait until payload is acknowledged by the server, otherwise will wait until the message is sent
         /// </param>
+        /// <param name="cancellationToken">The <see cref="CancellationToken" /> used to async operations</param>
         /// <returns>Returns a task containing the result of payload send process</returns>
         Task<SendAsyncResult> Setup(Guid id, bool completeOnAcknowledge, CancellationToken cancellationToken);
 

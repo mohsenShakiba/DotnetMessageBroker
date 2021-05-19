@@ -8,7 +8,7 @@ namespace MessageBroker.Client.TaskManager
     /// Contains logic for completing task returned to client on whether <see cref="CompleteOnAcknowledge" /> is true or
     /// false
     /// </summary>
-    public class SendPayloadTaskCompletionSource
+    internal class SendPayloadTaskCompletionSource
     {
         public TaskCompletionSource<SendAsyncResult> TaskCompletionSource { get; set; }
         public bool CompleteOnAcknowledge { get; set; }

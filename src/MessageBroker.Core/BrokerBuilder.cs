@@ -23,6 +23,9 @@ namespace MessageBroker.Core
     {
         private readonly IServiceCollection _serviceCollection;
 
+        /// <summary>
+        /// Will instantiate a new <see cref="BrokerBuilder" />
+        /// </summary>
         public BrokerBuilder()
         {
             _serviceCollection = new ServiceCollection();
@@ -99,7 +102,7 @@ namespace MessageBroker.Core
         private void AddRequiredServices()
         {
             _serviceCollection.AddLogging();
-            
+
             _serviceCollection.AddSingleton<IPayloadProcessor, PayloadProcessor>();
             _serviceCollection.AddSingleton<IClientStore, ClientStore>();
             _serviceCollection.AddSingleton<IMessageStore, InMemoryMessageStore>();

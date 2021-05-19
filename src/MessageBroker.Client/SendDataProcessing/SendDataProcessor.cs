@@ -1,13 +1,17 @@
-﻿using System.Threading;
+﻿using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Common.Binary;
 
+[assembly: InternalsVisibleTo("Tests")]
+
 namespace MessageBroker.Client.SendDataProcessing
 {
-    public class SendDataProcessor : ISendDataProcessor
+    /// <inheritdoc />
+    internal class SendDataProcessor : ISendDataProcessor
     {
         private readonly IConnectionManager _connectionManager;
         private readonly ITaskManager _taskManager;

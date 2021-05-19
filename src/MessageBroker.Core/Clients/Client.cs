@@ -22,15 +22,16 @@ namespace MessageBroker.Core.Clients
         /// retrieving them
         /// </summary>
         private readonly IBinaryDataProcessor _binaryDataProcessor;
-        
+
+        private readonly CancellationTokenSource _cancellationTokenSource;
+        private readonly ILogger<Client> _logger;
+        private readonly Channel<SerializedPayload> _queue;
+
         /// <summary>
         /// A buffer used to store temporary received data
         /// </summary>
         private readonly byte[] _receiveBuffer;
 
-        private readonly CancellationTokenSource _cancellationTokenSource;
-        private readonly ILogger<Client> _logger;
-        private readonly Channel<SerializedPayload> _queue;
         private readonly ConcurrentDictionary<Guid, AsyncPayloadTicket> _tickets;
 
         /// <summary>
@@ -39,6 +40,11 @@ namespace MessageBroker.Core.Clients
         private ISocket _socket;
 
 
+        /// <summary>
+        /// Will create a new <see cref="Client" />
+        /// </summary>
+        /// <param name="logger">Logger used for client</param>
+        /// <param name="binaryDataProcessor">Optional <see cref="IBinaryDataProcessor" /> used for processing data</param>
         public Client(ILogger<Client> logger, IBinaryDataProcessor binaryDataProcessor = null)
         {
             _logger = logger;
@@ -66,23 +72,34 @@ namespace MessageBroker.Core.Clients
             MaxConcurrency = 100;
         }
 
+        /// <inheritdoc />
         public Guid Id { get; }
+
+        /// <inheritdoc />
         public int MaxConcurrency { get; private set; }
+
+        /// <inheritdoc />
         public bool ReachedMaxConcurrency => _tickets.Count >= MaxConcurrency;
+
+        /// <inheritdoc />
         public bool IsClosed { get; private set; }
 
+        /// <inheritdoc />
         public event EventHandler<ClientSessionDisconnectedEventArgs> OnDisconnected;
 
+        /// <inheritdoc />
         public event EventHandler<ClientSessionDataReceivedEventArgs> OnDataReceived;
 
+        /// <inheritdoc />
         public void Setup(ISocket socket)
         {
             if (!socket.Connected)
                 throw new InvalidOperationException("The provided tcp socket was not in connected state");
-            
+
             _socket = socket;
         }
 
+        /// <inheritdoc />
         public void Close()
         {
             // we need to lock the close method
@@ -125,6 +142,7 @@ namespace MessageBroker.Core.Clients
             }
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             Close();
@@ -193,6 +211,7 @@ namespace MessageBroker.Core.Clients
 
         #region Receive
 
+        /// <inheritdoc />
         public void StartReceiveProcess()
         {
             ThrowIfDisposed();
@@ -261,6 +280,7 @@ namespace MessageBroker.Core.Clients
 
         #region Send
 
+        /// <inheritdoc />
         public void StartSendProcess()
         {
             ThrowIfDisposed();
@@ -271,6 +291,7 @@ namespace MessageBroker.Core.Clients
             });
         }
 
+        /// <inheritdoc />
         public async Task SendNextMessageInQueue()
         {
             var serializedPayload = await _queue.Reader.ReadAsync();
@@ -284,6 +305,7 @@ namespace MessageBroker.Core.Clients
             ObjectPool.Shared.Return(serializedPayload);
         }
 
+        /// <inheritdoc />
         public AsyncPayloadTicket Enqueue(SerializedPayload serializedPayload)
         {
             lock (this)
@@ -307,26 +329,31 @@ namespace MessageBroker.Core.Clients
             }
         }
 
+        /// <inheritdoc />
         public void EnqueueFireAndForget(SerializedPayload serializedPayload)
         {
             _queue.Writer.TryWrite(serializedPayload);
         }
 
+        /// <inheritdoc />
         public void OnPayloadAckReceived(Guid payloadId)
         {
             DisposeMessagePayloadAndSetStatus(payloadId, true);
         }
 
+        /// <inheritdoc />
         public void OnPayloadNackReceived(Guid payloadId)
         {
             DisposeMessagePayloadAndSetStatus(payloadId, false);
         }
 
+        /// <inheritdoc />
         public void ConfigureConcurrency(int maxConcurrency)
         {
             MaxConcurrency = maxConcurrency;
         }
 
+        /// <inheritdoc />
         public async Task<bool> SendAsync(Memory<byte> payload, CancellationToken cancellationToken)
         {
             var sendSize = await _socket.SendAsync(payload, cancellationToken);

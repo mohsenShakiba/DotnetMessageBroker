@@ -14,11 +14,6 @@ namespace MessageBroker.Client.Subscriptions
         string Name { get; }
 
         /// <summary>
-        /// Route of topic
-        /// </summary>
-        string Route { get; }
-
-        /// <summary>
         /// Called when new message is received from topic
         /// </summary>
         event Action<SubscriptionMessage> MessageReceived;

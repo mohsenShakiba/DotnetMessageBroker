@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
@@ -9,18 +10,24 @@ using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Client.SendDataProcessing;
 using MessageBroker.Common.Models;
 
+[assembly: InternalsVisibleTo("Tests")]
+
 namespace MessageBroker.Client.Subscriptions
 {
     /// <inheritdoc />
-    public class Subscription : ISubscription
+    internal class Subscription : ISubscription
     {
         private readonly IConnectionManager _connectionManager;
         private readonly IPayloadFactory _payloadFactory;
         private readonly ISendDataProcessor _sendDataProcessor;
-
         private bool _disposed;
 
-
+        /// <summary>
+        /// Instantiates a new <see cref="Subscription" />
+        /// </summary>
+        /// <param name="payloadFactory">The <see cref="IPayloadFactory" /></param>
+        /// <param name="connectionManager">The <see cref="IConnectionManager" /></param>
+        /// <param name="sendDataProcessor">The <see cref="ISendDataProcessor" /></param>
         public Subscription(IPayloadFactory payloadFactory, IConnectionManager connectionManager,
             ISendDataProcessor sendDataProcessor)
         {
@@ -32,8 +39,9 @@ namespace MessageBroker.Client.Subscriptions
         }
 
         public event Action<SubscriptionMessage> MessageReceived;
+
         public string Name { get; private set; }
-        public string Route { get; private set; }
+
 
         public async ValueTask DisposeAsync()
         {
@@ -49,19 +57,17 @@ namespace MessageBroker.Client.Subscriptions
         }
 
 
-        public async Task SetupAsync(string name, string route, CancellationToken cancellationToken)
+        public async Task SetupAsync(string name, CancellationToken cancellationToken)
         {
             Name = name;
-            Route = route;
-
             await SubscribeAsync(cancellationToken);
         }
 
         /// <summary>
-        /// This method is used by <see cref="IReceiveDataProcessor"/> to dispatch received messages 
+        /// This method is used by <see cref="IReceiveDataProcessor" /> to dispatch received messages
         /// </summary>
         /// <param name="topicMessage">Message received from server</param>
-        public virtual void OnMessageReceived(TopicMessage topicMessage)
+        public void OnMessageReceived(TopicMessage topicMessage)
         {
             try
             {

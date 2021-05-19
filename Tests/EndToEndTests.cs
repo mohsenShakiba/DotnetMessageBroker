@@ -59,7 +59,7 @@ namespace Tests
             PopulateTopicWithMessage(topicName, numberOfMessagesToBeReceived, messageStore, broker);
 
             // get new subscription 
-            var subscription = await subscriberClient.GetTopicSubscriptionAsync(topicName, topicName);
+            var subscription = await subscriberClient.GetTopicSubscriptionAsync(topicName);
 
             // setup subscriber
             subscription.MessageReceived += msg =>
@@ -126,7 +126,7 @@ namespace Tests
             PopulateTopicWithMessage(topicName, numberOfMessagesToBeReceived, messageStore, broker);
 
             // get new subscription 
-            var subscription = await subscriberClient.GetTopicSubscriptionAsync(topicName, topicName);
+            var subscription = await subscriberClient.GetTopicSubscriptionAsync(topicName);
 
             // setup subscriber
             subscription.MessageReceived += msg =>
@@ -201,7 +201,7 @@ namespace Tests
 
                 var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(1));
 
-                var publishResult = await publisherClient.PublishRawAsync(msg, true, cancellationTokenSource.Token);
+                var publishResult = await publisherClient.PublishAsync(topicName, msg.Data.ToArray(), cancellationTokenSource.Token);
 
                 if (publishResult.IsSuccess) messageStore.OnMessageSent(msg.Id);
             }

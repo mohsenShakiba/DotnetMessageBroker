@@ -7,7 +7,7 @@ using MessageBroker.Client.Models;
 namespace MessageBroker.Client.TaskManager
 {
     /// <inheritdoc />
-    public class TaskManager : ITaskManager
+    internal class TaskManager : ITaskManager
     {
         private readonly ConcurrentDictionary<Guid, SendPayloadTaskCompletionSource> _tasks;
         private bool _disposed;

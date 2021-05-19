@@ -2,13 +2,16 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using MessageBroker.Core.Clients;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Core.Dispatching
 {
     /// <inheritdoc />
-    public class DefaultDispatcher : IDispatcher
+    internal class DefaultDispatcher : IDispatcher
     {
         private readonly ConcurrentDictionary<Guid, IClient> _clients;
         private readonly ReaderWriterLockSlim _wrLock;
@@ -48,7 +51,6 @@ namespace MessageBroker.Core.Dispatching
                 _wrLock.ExitWriteLock();
             }
         }
-
 
         public IClient NextAvailable()
         {

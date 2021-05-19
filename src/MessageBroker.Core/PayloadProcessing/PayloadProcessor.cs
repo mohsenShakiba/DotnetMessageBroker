@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using MessageBroker.Common.Models;
 using MessageBroker.Common.Serialization;
 using MessageBroker.Core.Clients.Store;
@@ -6,10 +7,12 @@ using MessageBroker.Core.Persistence.Topics;
 using Microsoft.Extensions.Logging;
 using Serilog;
 
+[assembly: InternalsVisibleTo("Tests")]
+
 namespace MessageBroker.Core.PayloadProcessing
 {
     /// <inheritdoc />
-    public class PayloadProcessor : IPayloadProcessor
+    internal class PayloadProcessor : IPayloadProcessor
     {
         private readonly IClientStore _clientStore;
         private readonly IDeserializer _deserializer;
@@ -203,7 +206,7 @@ namespace MessageBroker.Core.PayloadProcessing
             if (_clientStore.TryGet(clientId, out var client))
             {
                 client.ConfigureConcurrency(configureClient.PrefetchCount);
-                
+
                 SendReceivedPayloadOk(clientId, configureClient.Id);
             }
             else
@@ -238,6 +241,5 @@ namespace MessageBroker.Core.PayloadProcessing
                 sendQueue.EnqueueFireAndForget(sendPayload);
             }
         }
-        
     }
 }

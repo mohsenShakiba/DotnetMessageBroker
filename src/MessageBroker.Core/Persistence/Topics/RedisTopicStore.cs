@@ -1,15 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using MessageBroker.Core.Persistence.Redis;
 using MessageBroker.Core.Topics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+[assembly: InternalsVisibleTo("Tests")]
+
 namespace MessageBroker.Core.Persistence.Topics
 {
     /// <inheritdoc />
-    public class RedisTopicStore : ITopicStore
+    internal class RedisTopicStore : ITopicStore
     {
         private const string QueueNameKey = "MessageBroker.Queue.Set";
         private readonly ILogger<RedisTopicStore> _logger;

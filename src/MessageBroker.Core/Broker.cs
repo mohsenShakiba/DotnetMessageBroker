@@ -8,7 +8,6 @@ using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.Persistence.Topics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace MessageBroker.Core
 {
@@ -23,6 +22,16 @@ namespace MessageBroker.Core
         private readonly ITopicStore _topicStore;
         private bool _disposed;
 
+        /// <summary>
+        /// Creates a new instance of <see cref="Broker" />
+        /// </summary>
+        /// <param name="listener">The <see cref="IListener" /></param>
+        /// <param name="payloadProcessor">The <see cref="IPayloadProcessor" /></param>
+        /// <param name="clientStore">The <see cref="IClientStore" /></param>
+        /// <param name="topicStore">The <see cref="ITopicStore" /></param>
+        /// <param name="messageStore">The <see cref="IMessageStore" /></param>
+        /// <param name="serviceProvider">The <see cref="IServiceProvider" /></param>
+        /// <param name="logger">The <see cref="ILogger" /></param>
         public Broker(IListener listener, IPayloadProcessor payloadProcessor, IClientStore clientStore,
             ITopicStore topicStore,
             IMessageStore messageStore, IServiceProvider serviceProvider, ILogger<Broker> logger)
@@ -36,8 +45,10 @@ namespace MessageBroker.Core
             ServiceProvider = serviceProvider;
         }
 
+        /// <inheritdoc />
         public IServiceProvider ServiceProvider { get; }
 
+        /// <inheritdoc />
         public void Start()
         {
             _listener.OnSocketAccepted += ClientConnected;
@@ -47,11 +58,13 @@ namespace MessageBroker.Core
             _messageStore.Setup();
         }
 
+        /// <inheritdoc />
         public void Stop()
         {
             Dispose();
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             if (!_disposed)
@@ -68,7 +81,7 @@ namespace MessageBroker.Core
             try
             {
                 var clientSession = ServiceProvider.GetRequiredService<IClient>();
-                
+
                 clientSession.Setup(eventArgs.Socket);
 
                 clientSession.OnDisconnected += ClientDisconnected;
