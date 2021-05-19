@@ -1,13 +1,13 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement.ConnectionStatusEventArgs;
 using MessageBroker.Client.ReceiveDataProcessing;
+using MessageBroker.Common.Binary;
+using MessageBroker.Common.Tcp;
+using MessageBroker.Common.Tcp.EventArgs;
 using MessageBroker.Core.Clients;
-using MessageBroker.Models.Binary;
-using MessageBroker.TCP;
-using MessageBroker.TCP.EventArgs;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MessageBroker.Client.ConnectionManagement
@@ -15,54 +15,67 @@ namespace MessageBroker.Client.ConnectionManagement
     /// <inheritdoc />
     public class ConnectionManager : IConnectionManager
     {
-        private readonly IReceiveDataProcessor _receiveDataProcessor;
         private readonly ILogger<ConnectionManager> _logger;
-        private readonly ILoggerFactory _loggerFactory;
+        private readonly IReceiveDataProcessor _receiveDataProcessor;
+        private readonly SemaphoreSlim _semaphore;
+        private readonly IServiceProvider _serviceProvider;
         private ClientConnectionConfiguration _configuration;
-        private SemaphoreSlim _semaphore;
 
 
-        public IClient Client { get; private set; }
-        public ISocket Socket { get; private set; }
-
-
-        public event EventHandler<ClientConnectionEventArgs> OnConnected;
-        public event EventHandler<ClientDisconnectedEventArgs> OnDisconnected;
-
-
-        public ConnectionManager(IReceiveDataProcessor receiveDataProcessor, ILogger<ConnectionManager> logger, ILoggerFactory loggerFactory)
+        /// <summary>
+        /// Instantiates a new <see cref="IConnectionManager" /> used by the <see cref="IBrokerClient" />
+        /// </summary>
+        /// <param name="receiveDataProcessor">The <see cref="IReceiveDataProcessor" /></param>
+        /// <param name="logger">The <see cref="ILogger" /></param>
+        /// <param name="serviceProvider">The <see cref="IServiceProvider" /></param>
+        public ConnectionManager(IReceiveDataProcessor receiveDataProcessor, ILogger<ConnectionManager> logger,
+            IServiceProvider serviceProvider)
         {
             _receiveDataProcessor = receiveDataProcessor;
             _logger = logger;
-            _loggerFactory = loggerFactory;
+            _serviceProvider = serviceProvider;
             _semaphore = new SemaphoreSlim(1, 1);
         }
 
+
+        /// <inheritdoc />
+        public IClient Client { get; private set; }
+
+        /// <inheritdoc />
+        public ISocket Socket { get; private set; }
+
+
+        /// <inheritdoc />
+        public event EventHandler<ClientConnectionEventArgs> OnConnected;
+
+        /// <inheritdoc />
+        public event EventHandler<ClientDisconnectedEventArgs> OnDisconnected;
+
+        /// <inheritdoc />
         public void Connect(ClientConnectionConfiguration configuration)
         {
             _configuration = configuration;
 
             try
             {
-
-                // wait for semphore to be release by SendAsync
+                // wait for semaphore to be release by SendAsync
                 // otherwise creating new client while SendAsync is using the old client would cause weired behavior
                 _semaphore.Wait();
 
                 // connect the tcp client
-                var ipEndpoint = configuration.IpEndPoint ??
-                                 throw new ArgumentNullException(nameof(configuration.IpEndPoint));
+                var endPoint = configuration.EndPoint ??
+                               throw new ArgumentNullException(nameof(configuration.EndPoint));
 
                 // dispose the old socket and client
                 Socket?.Dispose();
                 Client?.Dispose();
 
                 // create new tcp socket
-                var newTcpSocket = TCP.TcpSocket.NewFromEndPoint(ipEndpoint);
+                var newTcpSocket = TcpSocket.NewFromEndPoint(endPoint);
 
                 // once the TcpSocket is connected, create new client from it
-                var logger = _loggerFactory.CreateLogger<Core.Clients.Client>();
-                var newClient = new Core.Clients.Client(newTcpSocket, logger);
+                var newClient = _serviceProvider.GetRequiredService<IClient>();
+                newClient.Setup(newTcpSocket);
 
                 newClient.OnDataReceived += ClientDataReceived;
                 newClient.OnDisconnected += ClientDisconnected;
@@ -73,7 +86,25 @@ namespace MessageBroker.Client.ConnectionManagement
                 Client = newClient;
                 Socket = newTcpSocket;
 
-                _logger.LogInformation($"Broker client connected to: {_configuration.IpEndPoint} with auto connect: {_configuration.AutoReconnect}");
+                _logger.LogInformation(
+                    $"Broker client connected to: {_configuration.EndPoint} with auto connect: {_configuration.AutoReconnect}");
+            }
+            catch (Exception e)
+            {
+                // if auto reconnect is active, try to reconnect
+                if (_configuration.AutoReconnect)
+                {
+                    _logger.LogWarning(
+                        $"Couldn't connect to endpoint: {_configuration.EndPoint} with error: {e} retrying in 1 second");
+
+                    Thread.Sleep(1000);
+
+                    Reconnect();
+                }
+                else
+                {
+                    throw;
+                }
             }
             finally
             {
@@ -82,71 +113,80 @@ namespace MessageBroker.Client.ConnectionManagement
 
             // note: must be called after releasing semaphore
             OnConnected?.Invoke(this, new ClientConnectionEventArgs());
-
         }
 
+        /// <inheritdoc />
         public void Reconnect()
         {
             if (Socket.Connected)
-            {
                 throw new InvalidOperationException("The socket object is in connected state, cannot be reconnected");
-            }
 
-            Connect(_configuration ?? throw new ArgumentNullException($"No configuration exists for reconnection"));
+            Connect(_configuration ?? throw new ArgumentNullException("No configuration exists for reconnection"));
         }
 
+        /// <inheritdoc />
         public void Disconnect()
         {
             Socket?.Disconnect();
         }
 
+        /// <inheritdoc />
         public async Task<bool> SendAsync(SerializedPayload serializedPayload, CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 // wait for connection to be reestablished
-                if (!Socket.Connected)
+                if (!(Socket?.Connected ?? false))
                 {
                     _logger.LogTrace("Waiting for broker to reconnect");
-                    await Task.Delay(10);
-                    continue;
-                }
-                
-                _semaphore.Wait();
-
-                try
-                {
-
-                    var result = await Client.SendAsync(serializedPayload.Data, cancellationToken);
-                    
-                    _logger.LogTrace($"Sending payload with id {serializedPayload.PayloadId}");
-
-                    // if success then exit loop and return true
-                    if (result)
+                    try
                     {
-                        return true;
+                        await Task.Delay(1000, cancellationToken);
+                        continue;
                     }
-
-                    // if auto connect is enabled, wait for socket to be re-established
-                    if (_configuration.AutoReconnect)
-                    {
-                        await Task.Delay(5);
-                    }
-                    // otherwise break and return false
-                    else
+                    catch (TaskCanceledException)
                     {
                         return false;
                     }
+                }
+
+                try
+                {
+                    await _semaphore.WaitAsync(cancellationToken);
+
+                    var result = await Client.SendAsync(serializedPayload.Data, cancellationToken);
+
+                    _logger.LogTrace($"Sending payload with id {serializedPayload.PayloadId}");
+
+                    if (result) return true;
+
+                    if (!_configuration.AutoReconnect) return false;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return false;
+                }
+                catch (OperationCanceledException)
+                {
+                    return false;
                 }
                 finally
                 {
                     _semaphore.Release();
                 }
-       
             }
 
             // only when cancellation is requested
             return false;
+        }
+
+        /// <summary>
+        /// Will disconnect and dispose the <see cref="IClient" />
+        /// </summary>
+        public void Dispose()
+        {
+            Client?.Dispose();
+            Disconnect();
         }
 
         private void ClientDataReceived(object clientSession, ClientSessionDataReceivedEventArgs eventArgs)
@@ -167,16 +207,6 @@ namespace MessageBroker.Client.ConnectionManagement
 
                 Reconnect();
             }
-    
-        }
-
-        /// <summary>
-        /// Will disconnect and dispose the <see cref="IClient"/>
-        /// </summary>
-        public void Dispose()
-        {
-            Client?.Dispose();
-            Disconnect();
         }
     }
 }

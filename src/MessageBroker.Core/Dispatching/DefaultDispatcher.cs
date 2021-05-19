@@ -2,22 +2,24 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using MessageBroker.Core.Clients;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Core.Dispatching
 {
     /// <inheritdoc />
-    public class DefaultDispatcher : IDispatcher
+    internal class DefaultDispatcher : IDispatcher
     {
-
         private readonly ConcurrentDictionary<Guid, IClient> _clients;
         private readonly ReaderWriterLockSlim _wrLock;
 
         public DefaultDispatcher()
         {
-            _clients = new();
-            _wrLock = new();
+            _clients = new ConcurrentDictionary<Guid, IClient>();
+            _wrLock = new ReaderWriterLockSlim();
         }
 
         public void Add(IClient client)
@@ -27,10 +29,8 @@ namespace MessageBroker.Core.Dispatching
                 _wrLock.EnterWriteLock();
 
                 if (_clients.Keys.Any(sendQueueId => sendQueueId == client.Id))
-                {
                     throw new Exception("Added SendQueue already exists");
-                }
-                
+
                 _clients[client.Id] = client;
             }
             finally
@@ -52,7 +52,6 @@ namespace MessageBroker.Core.Dispatching
             }
         }
 
-
         public IClient NextAvailable()
         {
             try
@@ -60,12 +59,8 @@ namespace MessageBroker.Core.Dispatching
                 _wrLock.EnterReadLock();
 
                 foreach (var (_, client) in _clients)
-                {
                     if (!client.ReachedMaxConcurrency)
-                    {
                         return client;
-                    }
-                }
 
                 return null;
             }
@@ -73,8 +68,6 @@ namespace MessageBroker.Core.Dispatching
             {
                 _wrLock.ExitReadLock();
             }
-     
         }
-
     }
 }

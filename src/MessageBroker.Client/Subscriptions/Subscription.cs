@@ -1,33 +1,35 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.ConnectionManagement.ConnectionStatusEventArgs;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.Payloads;
+using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Client.SendDataProcessing;
-using MessageBroker.Client.TaskManager;
-using MessageBroker.Models;
-using MessageBroker.Serialization;
+using MessageBroker.Common.Models;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Client.Subscriptions
 {
-    
     /// <inheritdoc />
-    public class Subscription : ISubscription
+    internal class Subscription : ISubscription
     {
-        private readonly IPayloadFactory _payloadFactory;
         private readonly IConnectionManager _connectionManager;
+        private readonly IPayloadFactory _payloadFactory;
         private readonly ISendDataProcessor _sendDataProcessor;
-
         private bool _disposed;
 
-        public event Action<SubscriptionMessage> MessageReceived;
-        public string Name { get; private set; }
-        public string Route { get; private set; }
-
-
-        public Subscription(IPayloadFactory payloadFactory, IConnectionManager connectionManager, ISendDataProcessor sendDataProcessor)
+        /// <summary>
+        /// Instantiates a new <see cref="Subscription" />
+        /// </summary>
+        /// <param name="payloadFactory">The <see cref="IPayloadFactory" /></param>
+        /// <param name="connectionManager">The <see cref="IConnectionManager" /></param>
+        /// <param name="sendDataProcessor">The <see cref="ISendDataProcessor" /></param>
+        public Subscription(IPayloadFactory payloadFactory, IConnectionManager connectionManager,
+            ISendDataProcessor sendDataProcessor)
         {
             _payloadFactory = payloadFactory;
             _connectionManager = connectionManager;
@@ -36,21 +38,41 @@ namespace MessageBroker.Client.Subscriptions
             connectionManager.OnConnected += OnConnected;
         }
 
+        public event Action<SubscriptionMessage> MessageReceived;
 
-        internal async Task SetupAsync(string name, string route, CancellationToken cancellationToken)
+        public string Name { get; private set; }
+
+
+        public async ValueTask DisposeAsync()
+        {
+            _disposed = true;
+
+            MessageReceived = null;
+
+            _connectionManager.OnConnected -= OnConnected;
+
+            var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+
+            await UnSubscribeAsync(cancellationTokenSource.Token);
+        }
+
+
+        public async Task SetupAsync(string name, CancellationToken cancellationToken)
         {
             Name = name;
-            Route = route;
-
             await SubscribeAsync(cancellationToken);
         }
 
-        internal void OnMessageReceived(TopicMessage topicMessage)
+        /// <summary>
+        /// This method is used by <see cref="IReceiveDataProcessor" /> to dispatch received messages
+        /// </summary>
+        /// <param name="topicMessage">Message received from server</param>
+        public void OnMessageReceived(TopicMessage topicMessage)
         {
             try
             {
                 ThrowIfDisposed();
-                
+
                 var subscriptionMessage = new SubscriptionMessage
                 {
                     MessageId = topicMessage.Id,
@@ -74,21 +96,17 @@ namespace MessageBroker.Client.Subscriptions
         private async void OnMessageProcessedByClient(Guid messageId, bool ack, CancellationToken cancellationToken)
         {
             if (ack)
-            {
                 await AckAsync(messageId, cancellationToken);
-            }
             else
-            {
                 await NackAsync(messageId, cancellationToken);
-            }
         }
 
         private async Task SubscribeAsync(CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
-            
+
             var serializedPayload = _payloadFactory.NewSubscribeTopic(Name);
-            
+
             var result = await _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken);
 
             if (!result.IsSuccess)
@@ -114,7 +132,7 @@ namespace MessageBroker.Client.Subscriptions
             var serializedPayload = _payloadFactory.NewAck(messageId);
             await _sendDataProcessor.SendAsync(serializedPayload, false, cancellationToken);
         }
-        
+
         private async Task NackAsync(Guid messageId, CancellationToken cancellationToken)
         {
             var serializedPayload = _payloadFactory.NewNack(messageId);
@@ -125,19 +143,6 @@ namespace MessageBroker.Client.Subscriptions
         private async void OnConnected(object connectionManager, ClientConnectionEventArgs e)
         {
             await SubscribeAsync(CancellationToken.None);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            _disposed = true;
-
-            MessageReceived = null;
-
-            _connectionManager.OnConnected -= OnConnected;
-
-            var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            
-            await UnSubscribeAsync(cancellationTokenSource.Token);
         }
 
         private void ThrowIfDisposed()

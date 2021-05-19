@@ -1,42 +1,48 @@
-﻿using System.Threading;
+﻿using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.TaskManager;
-using MessageBroker.Models.Binary;
+using MessageBroker.Common.Binary;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Client.SendDataProcessing
 {
-    public class SendDataProcessor: ISendDataProcessor
+    /// <inheritdoc />
+    internal class SendDataProcessor : ISendDataProcessor
     {
-        private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
         private readonly IConnectionManager _connectionManager;
+        private readonly ITaskManager _taskManager;
 
-        public SendDataProcessor(ISendPayloadTaskManager sendPayloadTaskManager, IConnectionManager connectionManager)
+        public SendDataProcessor(ITaskManager taskManager, IConnectionManager connectionManager)
         {
-            _sendPayloadTaskManager = sendPayloadTaskManager;
+            _taskManager = taskManager;
             _connectionManager = connectionManager;
         }
-        
-        public async Task<SendAsyncResult> SendAsync(SerializedPayload serializedPayload, bool completeOnSeverOkReceived, CancellationToken cancellationToken)
+
+        public async Task<SendAsyncResult> SendAsync(SerializedPayload serializedPayload,
+            bool completeOnSeverOkReceived, CancellationToken cancellationToken)
         {
             if (completeOnSeverOkReceived)
             {
-                var sendPayloadTask = _sendPayloadTaskManager.Setup(serializedPayload.PayloadId, true, cancellationToken);
+                var sendPayloadTask =
+                    _taskManager.Setup(serializedPayload.PayloadId, true, cancellationToken);
 
                 var sendSuccess = await _connectionManager.SendAsync(serializedPayload, cancellationToken);
 
                 if (sendSuccess)
-                    _sendPayloadTaskManager.OnPayloadSendSuccess(serializedPayload.PayloadId);
+                    _taskManager.OnPayloadSendSuccess(serializedPayload.PayloadId);
                 else
-                    _sendPayloadTaskManager.OnPayloadSendFailed(serializedPayload.PayloadId);
+                    _taskManager.OnPayloadSendFailed(serializedPayload.PayloadId);
 
                 return await sendPayloadTask;
             }
             else
             {
                 var sendSuccess = await _connectionManager.SendAsync(serializedPayload, cancellationToken);
-                return new SendAsyncResult{IsSuccess = sendSuccess};
+                return new SendAsyncResult {IsSuccess = sendSuccess};
             }
         }
     }

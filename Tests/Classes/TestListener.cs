@@ -1,22 +1,12 @@
 ﻿using System;
-using MessageBroker.TCP;
-using MessageBroker.TCP.EventArgs;
+using MessageBroker.Common.Tcp;
+using MessageBroker.Common.Tcp.EventArgs;
 
 namespace Tests.Classes
 {
-    public class TestListener: IListener
+    public class TestListener : IListener
     {
         public event EventHandler<SocketAcceptedEventArgs> OnSocketAccepted;
-
-        public void AcceptTestSocket(ISocket socket)
-        {
-            OnSocketAccepted?.Invoke(this, new SocketAcceptedEventArgs {Socket = socket});
-        }
-
-        public TestSocket CreateTestSocket()
-        {
-            return new TestSocket();
-        }
 
         public void Start()
         {
@@ -27,10 +17,20 @@ namespace Tests.Classes
         {
             // no-op
         }
-        
+
         public void Dispose()
         {
             // no-op
+        }
+
+        public void AcceptTestSocket(ISocket socket)
+        {
+            OnSocketAccepted?.Invoke(this, new SocketAcceptedEventArgs {Socket = socket});
+        }
+
+        public TestSocket CreateTestSocket()
+        {
+            return new();
         }
     }
 }

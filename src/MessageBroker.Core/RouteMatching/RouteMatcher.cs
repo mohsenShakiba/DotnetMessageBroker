@@ -1,17 +1,17 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Core.RouteMatching
 {
     /// <inheritdoc />
-    public class RouteMatcher : IRouteMatcher
+    internal class RouteMatcher : IRouteMatcher
     {
         public bool Match(string messageRoute, string topicRoute)
         {
-            if (messageRoute is null || topicRoute is null)
-            {
-                return false;
-            }
-            
+            if (messageRoute is null || topicRoute is null) return false;
+
             const string wildCard = "*";
 
             var messageRouteSegments = messageRoute.Split('/');

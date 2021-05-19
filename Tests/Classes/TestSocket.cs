@@ -1,24 +1,18 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using MessageBroker.TCP;
+using MessageBroker.Common.Tcp;
 
 namespace Tests.Classes
 {
-    public class TestSocket: ISocket
+    public class TestSocket : ISocket
     {
-        private bool _connected = true;
-        private Memory<byte> _data = default;
-        public bool Connected => _connected;
-        
-        public void SendTestData(Memory<byte> data)
-        {
-            _data = data;
-        }
+        private Memory<byte> _data;
+        public bool Connected { get; private set; } = true;
 
         public void Disconnect()
         {
-            _connected = false;
+            Connected = false;
         }
 
         public void SimulateInterrupt()
@@ -28,7 +22,7 @@ namespace Tests.Classes
 
         public ValueTask<int> SendAsync(Memory<byte> data, CancellationToken cancellationToken)
         {
-            if (!_connected)
+            if (!Connected)
                 return ValueTask.FromResult(0);
 
             return ValueTask.FromResult(data.Length);
@@ -38,13 +32,12 @@ namespace Tests.Classes
         {
             while (true)
             {
-                if (!_connected)
+                if (!Connected)
                     return 0;
-                
+
                 await Task.Delay(100, cancellationToken);
 
                 if (_data.Length > 0)
-                {
                     try
                     {
                         _data.CopyTo(buffer);
@@ -54,13 +47,17 @@ namespace Tests.Classes
                     {
                         _data = default;
                     }
-                }
             }
         }
 
         public void Dispose()
         {
             Disconnect();
+        }
+
+        public void SendTestData(Memory<byte> data)
+        {
+            _data = data;
         }
     }
 }

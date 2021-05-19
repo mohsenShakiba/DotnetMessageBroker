@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text;
-using MessageBroker.Models;
-using MessageBroker.Serialization;
+using MessageBroker.Common.Models;
+using MessageBroker.Common.Serialization;
 using Tests.Classes;
 using Xunit;
 
@@ -9,8 +9,8 @@ namespace Tests.Serialization
 {
     public class SerializerTests
     {
-        private readonly Serializer _serializer;
         private readonly Deserializer _deserializer;
+        private readonly Serializer _serializer;
 
         public SerializerTests()
         {
@@ -25,7 +25,7 @@ namespace Tests.Serialization
             {
                 Id = Guid.NewGuid(),
                 Route = RandomGenerator.GenerateString(10),
-                Data = Encoding.UTF8.GetBytes(RandomGenerator.GenerateString(10)),
+                Data = Encoding.UTF8.GetBytes(RandomGenerator.GenerateString(10))
             };
 
             var b = _serializer.Serialize(msg);
@@ -45,7 +45,7 @@ namespace Tests.Serialization
                 Id = Guid.NewGuid(),
                 TopicName = RandomGenerator.GenerateString(10),
                 Route = RandomGenerator.GenerateString(10),
-                Data = Encoding.UTF8.GetBytes(RandomGenerator.GenerateString(10)),
+                Data = Encoding.UTF8.GetBytes(RandomGenerator.GenerateString(10))
             };
 
             var b = _serializer.Serialize(msg);
@@ -88,7 +88,7 @@ namespace Tests.Serialization
             var subscribeQueue = new SubscribeTopic
             {
                 Id = Guid.NewGuid(),
-                TopicName = RandomGenerator.GenerateString(10),
+                TopicName = RandomGenerator.GenerateString(10)
             };
 
             var b = _serializer.Serialize(subscribeQueue);

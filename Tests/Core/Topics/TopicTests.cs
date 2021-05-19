@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MessageBroker.Common.Async;
+using MessageBroker.Common.Binary;
+using MessageBroker.Common.Models;
+using MessageBroker.Common.Serialization;
 using MessageBroker.Core.Clients;
-using MessageBroker.Core.Clients.Store;
 using MessageBroker.Core.Dispatching;
 using MessageBroker.Core.Persistence.Messages;
 using MessageBroker.Core.RouteMatching;
 using MessageBroker.Core.Topics;
-using MessageBroker.Models;
-using MessageBroker.Models.Async;
-using MessageBroker.Models.Binary;
-using MessageBroker.Serialization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Tests.Classes;
@@ -55,7 +54,7 @@ namespace Tests.Core.Topics
 
             mockClient.Verify(cs => cs.Enqueue(It.IsAny<SerializedPayload>()));
         }
-        
+
         [Fact]
         public async Task OnMessage_SubscriptionIsAddedAfterTheMessage_ClientEnqueueIsCalled()
         {
@@ -80,18 +79,18 @@ namespace Tests.Core.Topics
             );
 
             topic.Setup("TEST", "TEST");
-            
+
             var sampleMessage = RandomGenerator.GetMessage("TEST");
-            
+
             topic.OnMessage(sampleMessage);
-            
+
             topic.ClientSubscribed(mockClient.Object);
 
             await topic.ReadNextMessage();
-            
+
             mockClient.Verify(cs => cs.Enqueue(It.IsAny<SerializedPayload>()));
         }
-        
+
         [Fact]
         public void OnMessage_AnyCondition_MessageIsAddedToMessageStore()
         {
@@ -99,23 +98,23 @@ namespace Tests.Core.Topics
             var serializer = new Serializer();
             var routeMatcher = new RouteMatcher();
             var dispatcher = new DefaultDispatcher();
-        
+
             var topic = new Topic(dispatcher,
                 messageStore.Object,
                 routeMatcher,
                 serializer,
                 NullLogger<Topic>.Instance
             );
-        
+
             topic.Setup("TEST", "TEST");
 
             var sampleMessage = RandomGenerator.GetMessage("TEST");
-            
+
             topic.OnMessage(sampleMessage);
-        
+
             messageStore.Verify(ms => ms.Add(It.IsAny<TopicMessage>()));
         }
-        
+
         [Fact]
         public async Task OnNack_AnyCondition_RequeueMessage()
         {
@@ -134,26 +133,26 @@ namespace Tests.Core.Topics
                 serializer,
                 NullLogger<Topic>.Instance
             );
-            
+
             topic.Setup("TEST", "TEST");
-        
+
             topic.ClientSubscribed(client.Object);
 
             var sampleMessage = RandomGenerator.GetMessage("TEST");
-        
+
             topic.OnMessage(sampleMessage);
-        
+
             await topic.ReadNextMessage();
 
             client.Verify(ms => ms.Enqueue(It.IsAny<SerializedPayload>()));
 
             topic.OnStatusChanged(sampleMessage.Id, false);
-            
+
             await topic.ReadNextMessage();
-            
+
             client.Verify(ms => ms.Enqueue(It.IsAny<SerializedPayload>()));
         }
-        
+
         [Fact]
         public void OnAck_AnyCondition_MessageIsDeleted()
         {
@@ -168,13 +167,13 @@ namespace Tests.Core.Topics
                 serializer,
                 NullLogger<Topic>.Instance
             );
-            
+
             topic.Setup("TEST", "TEST");
-        
+
             var sampleMessage = RandomGenerator.GetMessage("TEST");
-        
+
             topic.OnMessage(sampleMessage);
-        
+
             topic.OnStatusChanged(sampleMessage.Id, true);
             messageStore.Verify(ms => ms.Delete(sampleMessage.Id));
         }
@@ -186,11 +185,11 @@ namespace Tests.Core.Topics
             var routeMatcher = new RouteMatcher();
             var dispatcher = new DefaultDispatcher();
             var messageStore = new Mock<IMessageStore>();
-            
+
             var client = new Mock<IClient>();
             client.Setup(c => c.ReachedMaxConcurrency).Returns(false);
             client.Setup(c => c.Enqueue(It.IsAny<SerializedPayload>())).Returns(new AsyncPayloadTicket());
-            
+
             var sampleMessage = RandomGenerator.GetMessage("TEST");
             var topicMessage = sampleMessage.ToTopicMessage(sampleMessage.Route);
 
@@ -203,17 +202,14 @@ namespace Tests.Core.Topics
                 serializer,
                 NullLogger<Topic>.Instance
             );
-            
+
             topic.Setup("TEST", "TEST");
-            
+
             topic.ClientSubscribed(client.Object);
 
             await topic.ReadNextMessage();
-            
-            client.Verify(c => c.Enqueue(It.IsAny<SerializedPayload>()));
 
+            client.Verify(c => c.Enqueue(It.IsAny<SerializedPayload>()));
         }
-        
-    
     }
 }

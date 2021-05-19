@@ -15,11 +15,6 @@ namespace MessageBroker.Common.DynamicThrottling
     /// </summary>
     public class DynamicWaitThrottling
     {
-        public int MaxDelay { get; }
-        public int Multiplier { get; }
-        public int BaseDelay { get; }
-        public int CurrentDelay { get; private set; }
-
         public DynamicWaitThrottling(int baseDelay = 1, int multiplier = 4, int maxDelay = 100)
         {
             BaseDelay = baseDelay;
@@ -27,6 +22,11 @@ namespace MessageBroker.Common.DynamicThrottling
             Multiplier = multiplier;
             MaxDelay = maxDelay;
         }
+
+        public int MaxDelay { get; }
+        public int Multiplier { get; }
+        public int BaseDelay { get; }
+        public int CurrentDelay { get; private set; }
 
         public Task WaitAsync(CancellationToken? cancellationToken = null)
         {

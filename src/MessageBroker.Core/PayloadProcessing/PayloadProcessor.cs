@@ -1,22 +1,24 @@
 ﻿using System;
-using System.Linq;
+using System.Runtime.CompilerServices;
+using MessageBroker.Common.Models;
+using MessageBroker.Common.Serialization;
 using MessageBroker.Core.Clients.Store;
 using MessageBroker.Core.Persistence.Topics;
-using MessageBroker.Models;
-using MessageBroker.Serialization;
 using Microsoft.Extensions.Logging;
 using Serilog;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Core.PayloadProcessing
 {
     /// <inheritdoc />
-    public class PayloadProcessor : IPayloadProcessor
+    internal class PayloadProcessor : IPayloadProcessor
     {
-        private readonly IDeserializer _deserializer;
-        private readonly ISerializer _serializer;
         private readonly IClientStore _clientStore;
-        private readonly ITopicStore _topicStore;
+        private readonly IDeserializer _deserializer;
         private readonly ILogger<PayloadProcessor> _logger;
+        private readonly ISerializer _serializer;
+        private readonly ITopicStore _topicStore;
 
         public PayloadProcessor(IDeserializer deserializer, ISerializer serializer, IClientStore clientStore,
             ITopicStore topicStore, ILogger<PayloadProcessor> logger)
@@ -66,27 +68,26 @@ namespace MessageBroker.Core.PayloadProcessing
                         var queueDelete = _deserializer.ToTopicDelete(data);
                         OnDeleteQueue(clientId, queueDelete);
                         break;
+                    case PayloadType.Configure:
+                        var configure = _deserializer.ToConfigureClient(data);
+                        OnConfigureClient(clientId, configure);
+                        break;
                 }
             }
             catch (Exception e)
             {
                 _logger.LogError($"Failed to deserialize data from client: {clientId} with error: {e}");
-
             }
-           
         }
 
 
         private void OnMessage(Guid clientId, Message message)
         {
-
             var matchedAnyTopic = false;
-            
+
             // dispatch the message to matched queues
             foreach (var topic in _topicStore.GetAll())
-            {
                 if (topic.MessageRouteMatch(message.Route))
-                {
                     try
                     {
                         topic.OnMessage(message);
@@ -97,18 +98,12 @@ namespace MessageBroker.Core.PayloadProcessing
                     {
                         _logger.LogError($"Failed to write message: {message.Id} to topic: {topic.Name}");
                     }
-                }
-            }
 
             if (matchedAnyTopic)
-            {
                 // send received ack to publisher
                 SendReceivedPayloadOk(clientId, message.Id);
-            }
             else
-            {
                 SendReceivePayloadError(clientId, message.Id, "No topic was found");
-            }
 
             // must return the original message data to buffer pool
             message.Dispose();
@@ -162,7 +157,7 @@ namespace MessageBroker.Core.PayloadProcessing
                 SendReceivePayloadError(clientId, unsubscribeTopic.Id, "Internal error");
                 return;
             }
-            
+
             if (_topicStore.TryGetValue(unsubscribeTopic.TopicName, out var queue))
             {
                 queue.ClientUnsubscribed(client);
@@ -204,6 +199,20 @@ namespace MessageBroker.Core.PayloadProcessing
             _topicStore.Delete(topicDelete.Name);
 
             SendReceivedPayloadOk(clientId, topicDelete.Id);
+        }
+
+        private void OnConfigureClient(Guid clientId, ConfigureClient configureClient)
+        {
+            if (_clientStore.TryGet(clientId, out var client))
+            {
+                client.ConfigureConcurrency(configureClient.PrefetchCount);
+
+                SendReceivedPayloadOk(clientId, configureClient.Id);
+            }
+            else
+            {
+                SendReceivePayloadError(clientId, configureClient.Id, "Client not found");
+            }
         }
 
         private void SendReceivedPayloadOk(Guid clientId, Guid payloadId)

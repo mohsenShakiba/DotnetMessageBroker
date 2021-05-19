@@ -1,12 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageVersion>0.9.0</PackageVersion>
     <Title>Message Broker</Title>
     <Authors>m.shakiba</Authors>
+    <Description>MessageBroker server</Description>
+    <PackageProjectUrl>https://github.com/mohsenShakiba/DotnetMessageBroker</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mohsenShakiba/DotnetMessageBroker</RepositoryUrl>
+    <Copyright>Copyright Mohsen Shakiba</Copyright>
+    <PackageTags>message-broker;messaging-platform;broker;publish-subscribe;pub-sub;</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,10 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\MessageBroker.SocketServer\MessageBroker.SocketServer.csproj" />
-    <ProjectReference Include="..\MessageBroker.Models\MessageBroker.Models.csproj" />
-    <ProjectReference Include="..\MessageBroker.Serialization\MessageBroker.Serialization.csproj" />
-    <ProjectReference Include="..\MessageBroker.TCP\MessageBroker.TCP.csproj" />
+    <ProjectReference Include="..\MessageBroker.Common\MessageBroker.Common.csproj" />
   </ItemGroup>
 
 </Project>

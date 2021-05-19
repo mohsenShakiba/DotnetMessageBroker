@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
-using MessageBroker.Common.Pooling;
-using MessageBroker.Models;
-using MessageBroker.Models.Binary;
-using MessageBroker.Serialization;
+using MessageBroker.Common.Binary;
+using MessageBroker.Common.Models;
+using MessageBroker.Common.Serialization;
 
 namespace Tests.Classes
 {
@@ -25,11 +24,11 @@ namespace Tests.Classes
 
         public static Message GetMessage(string route)
         {
-            return new Message
+            return new()
             {
                 Data = Encoding.UTF8.GetBytes(GenerateString(10)),
                 Id = Guid.NewGuid(),
-                Route = route ?? GenerateString(10),
+                Route = route ?? GenerateString(10)
             };
         }
 

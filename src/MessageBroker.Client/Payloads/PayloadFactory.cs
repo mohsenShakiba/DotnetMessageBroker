@@ -1,11 +1,15 @@
 ﻿using System;
-using MessageBroker.Models;
-using MessageBroker.Models.Binary;
-using MessageBroker.Serialization;
+using System.Runtime.CompilerServices;
+using MessageBroker.Common.Binary;
+using MessageBroker.Common.Models;
+using MessageBroker.Common.Serialization;
+
+[assembly: InternalsVisibleTo("Tests")]
 
 namespace MessageBroker.Client.Payloads
 {
-    public class PayloadFactory: IPayloadFactory
+    /// <inheritdoc />
+    internal class PayloadFactory : IPayloadFactory
     {
         private readonly ISerializer _serializer;
 
@@ -13,16 +17,16 @@ namespace MessageBroker.Client.Payloads
         {
             _serializer = serializer;
         }
-        
+
         public SerializedPayload NewSubscribeTopic(string topicName)
         {
             var payload = new SubscribeTopic
             {
                 Id = Guid.NewGuid(),
-                TopicName = topicName,
+                TopicName = topicName
             };
 
-            return _serializer.Serialize(payload); 
+            return _serializer.Serialize(payload);
         }
 
         public SerializedPayload NewUnsubscribeTopic(string topicName)
@@ -30,10 +34,10 @@ namespace MessageBroker.Client.Payloads
             var payload = new UnsubscribeTopic
             {
                 Id = Guid.NewGuid(),
-                TopicName = topicName,
+                TopicName = topicName
             };
 
-            return _serializer.Serialize(payload); 
+            return _serializer.Serialize(payload);
         }
 
         public SerializedPayload NewAck(Guid messageId)
@@ -43,7 +47,7 @@ namespace MessageBroker.Client.Payloads
                 Id = messageId
             };
 
-            return _serializer.Serialize(payload); 
+            return _serializer.Serialize(payload);
         }
 
         public SerializedPayload NewNack(Guid messageId)
@@ -53,7 +57,7 @@ namespace MessageBroker.Client.Payloads
                 Id = messageId
             };
 
-            return _serializer.Serialize(payload); 
+            return _serializer.Serialize(payload);
         }
 
         public SerializedPayload NewMessage(byte[] data, string route)
@@ -65,7 +69,7 @@ namespace MessageBroker.Client.Payloads
                 Route = route
             };
 
-            return _serializer.Serialize(payload); 
+            return _serializer.Serialize(payload);
         }
 
         public SerializedPayload NewDeclareTopic(string name, string route)
@@ -77,7 +81,7 @@ namespace MessageBroker.Client.Payloads
                 Route = route
             };
 
-            return _serializer.Serialize(payload); 
+            return _serializer.Serialize(payload);
         }
 
         public SerializedPayload NewDeleteTopic(string name)
@@ -85,21 +89,21 @@ namespace MessageBroker.Client.Payloads
             var payload = new TopicDelete
             {
                 Id = Guid.NewGuid(),
-                Name = name,
+                Name = name
             };
 
-            return _serializer.Serialize(payload); 
+            return _serializer.Serialize(payload);
         }
 
         public SerializedPayload NewConfigureClient(int prefetchCount)
         {
-            var payload = new ConfigureClient()
+            var payload = new ConfigureClient
             {
                 Id = Guid.NewGuid(),
                 PrefetchCount = prefetchCount
             };
 
-            return _serializer.Serialize(payload); 
+            return _serializer.Serialize(payload);
         }
     }
 }

@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Tasks;
-using MessageBroker.TCP;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Serilog.Core;
 using Xunit;
+using TcpListener = MessageBroker.Common.Tcp.TcpListener;
 
 namespace Tests.TCP
 {
@@ -28,12 +26,12 @@ namespace Tests.TCP
                 socketWasAccepted = true;
             };
 
-            var client = new System.Net.Sockets.TcpClient();
-            
+            var client = new TcpClient();
+
             client.Connect(endPoint);
 
             manualResetEvent.WaitOne(TimeSpan.FromSeconds(10));
-            
+
             Assert.True(socketWasAccepted);
         }
     }

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Payloads;
 using MessageBroker.Client.ReceiveDataProcessing;
@@ -9,63 +8,52 @@ using MessageBroker.Client.Subscriptions.Store;
 using MessageBroker.Client.TaskManager;
 using MessageBroker.Common.Binary;
 using MessageBroker.Common.Pooling;
+using MessageBroker.Common.Serialization;
 using MessageBroker.Core.Clients;
-using MessageBroker.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MessageBroker.Client
 {
-    public class BrokerClientFactory : IAsyncDisposable
+    /// <summary>
+    /// Factory for creating <see cref="IBrokerClient" />
+    /// </summary>
+    public class BrokerClientFactory
     {
-        
-        private IServiceProvider _serviceProvider;
-        
-
-        public IBrokerClient GetClient()
+        /// <summary>
+        /// Instantiates and returns a new <see cref="IBrokerClient" />
+        /// </summary>
+        /// <returns>Created <see cref="IBrokerClient" /></returns>
+        public IBrokerClient GetClient(Action<ServiceCollection> configure = default)
         {
-            SetupServiceProvider();
+            var serviceProvider = SetupServiceProvider(configure);
 
-            var scope = _serviceProvider.CreateScope();
-            
-            return scope.ServiceProvider.GetRequiredService<IBrokerClient>();
+            return serviceProvider.GetRequiredService<IBrokerClient>();
         }
 
-        private void SetupServiceProvider()
+        private IServiceProvider SetupServiceProvider(Action<ServiceCollection> configure = default)
         {
-            if (_serviceProvider is null)
-            {
-                var serviceCollection = new ServiceCollection();
+            var serviceCollection = new ServiceCollection();
 
-                serviceCollection.AddLogging();
-                
-                serviceCollection.AddSingleton<ISerializer, Serializer>();
-                serviceCollection.AddSingleton<IDeserializer, Deserializer>();
-                serviceCollection.AddSingleton<ISendPayloadTaskManager, SendPayloadTaskManager>();
-                serviceCollection.AddSingleton<IPayloadFactory, PayloadFactory>();
-                serviceCollection.AddSingleton<StringPool>();
-                
-                serviceCollection.AddScoped<IBinaryDataProcessor, BinaryDataProcessor>();
-                serviceCollection.AddScoped<ISubscription, Subscription>();
-                serviceCollection.AddScoped<IConnectionManager, ConnectionManager>();
-                serviceCollection.AddScoped<ISendDataProcessor, SendDataProcessor>();
-                serviceCollection.AddScoped<IReceiveDataProcessor, ReceiveDataProcessor>();
-                serviceCollection.AddScoped<ISubscriptionStore, SubscriptionStore>();
-                serviceCollection.AddScoped<IClient, Core.Clients.Client>();
-                serviceCollection.AddScoped<IBrokerClient, BrokerClient>();
+            serviceCollection.AddLogging();
 
-                _serviceProvider = serviceCollection.BuildServiceProvider();
-            }
-        }
+            serviceCollection.AddSingleton<ISerializer, Serializer>();
+            serviceCollection.AddSingleton<IDeserializer, Deserializer>();
+            serviceCollection.AddSingleton<ITaskManager, TaskManager.TaskManager>();
+            serviceCollection.AddSingleton<IPayloadFactory, PayloadFactory>();
+            serviceCollection.AddSingleton<StringPool>();
+            serviceCollection.AddSingleton<IConnectionManager, ConnectionManager>();
+            serviceCollection.AddSingleton<ISendDataProcessor, SendDataProcessor>();
+            serviceCollection.AddSingleton<IReceiveDataProcessor, ReceiveDataProcessor>();
+            serviceCollection.AddSingleton<ISubscriptionStore, SubscriptionStore>();
+            serviceCollection.AddSingleton<IBrokerClient, BrokerClient>();
 
-        public ValueTask DisposeAsync()
-        {
-            if (_serviceProvider is not null)
-            {
-                var client = _serviceProvider.GetRequiredService<IBrokerClient>();
-                return client.DisposeAsync();
-            }
-            
-            return ValueTask.CompletedTask;
+            serviceCollection.AddTransient<IBinaryDataProcessor, BinaryDataProcessor>();
+            serviceCollection.AddTransient<ISubscription, Subscription>();
+            serviceCollection.AddTransient<IClient, Core.Clients.Client>();
+
+            configure?.Invoke(serviceCollection);
+
+            return serviceCollection.BuildServiceProvider();
         }
     }
 }

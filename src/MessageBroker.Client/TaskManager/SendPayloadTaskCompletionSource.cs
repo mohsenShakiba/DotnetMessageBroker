@@ -5,13 +5,14 @@ using MessageBroker.Client.Models;
 namespace MessageBroker.Client.TaskManager
 {
     /// <summary>
-    /// Contains logic for completing task returned to client on whether <see cref="CompleteOnAcknowledge"/> is true or false
+    /// Contains logic for completing task returned to client on whether <see cref="CompleteOnAcknowledge" /> is true or
+    /// false
     /// </summary>
-    public class SendPayloadTaskCompletionSource
+    internal class SendPayloadTaskCompletionSource
     {
-        public TaskCompletionSource<SendAsyncResult> TaskCompletionSource { get; init; }
+        public TaskCompletionSource<SendAsyncResult> TaskCompletionSource { get; set; }
         public bool CompleteOnAcknowledge { get; set; }
-        public CancellationToken CancellationToken { get; init; }
+        public CancellationToken CancellationToken { get; set; }
 
         public void OnOk()
         {

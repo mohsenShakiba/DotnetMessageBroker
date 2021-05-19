@@ -4,80 +4,93 @@ using System.Threading.Tasks;
 using MessageBroker.Client.ConnectionManagement;
 using MessageBroker.Client.Models;
 using MessageBroker.Client.Payloads;
-using MessageBroker.Client.ReceiveDataProcessing;
 using MessageBroker.Client.SendDataProcessing;
 using MessageBroker.Client.Subscriptions;
 using MessageBroker.Client.Subscriptions.Store;
 using MessageBroker.Client.TaskManager;
-using MessageBroker.Models;
-using MessageBroker.Serialization;
-using Microsoft.Extensions.DependencyInjection;
+using MessageBroker.Common.Serialization;
 
 namespace MessageBroker.Client
 {
+    /// <inheritdoc />
     public class BrokerClient : IBrokerClient
     {
-        private readonly IConnectionManager _connectionManager;
-        private readonly ISubscriptionStore _subscriptionStore;
+        private readonly IPayloadFactory _payloadFactory;
         private readonly ISendDataProcessor _sendDataProcessor;
         private readonly ISerializer _serializer;
-        private readonly ISendPayloadTaskManager _sendPayloadTaskManager;
-        private readonly IPayloadFactory _payloadFactory;
+        private readonly ISubscriptionStore _subscriptionStore;
+        private readonly ITaskManager _taskManager;
 
         private bool _isDisposed;
 
-        public bool Connected => _connectionManager.Socket.Connected;
-        public IConnectionManager ConnectionManager => _connectionManager;
-
+        /// <summary>
+        /// Instantiates a new <see cref="BrokerClient" />
+        /// </summary>
+        /// <remarks>This object is recommended to be created using <see cref="BrokerClientFactory" /></remarks>
+        /// <param name="payloadFactory">The <see cref="IPayloadFactory" /></param>
+        /// <param name="connectionManager">The <see cref="IConnectionManager" /></param>
+        /// <param name="sendDataProcessor">The <see cref="ISendDataProcessor" /></param>
+        /// <param name="subscriptionStore">The <see cref="ISubscriptionStore" /></param>
+        /// <param name="serializer">The <see cref="ISerializer" /></param>
+        /// <param name="taskManager">The <see cref="ITaskManager" /></param>
         public BrokerClient(IPayloadFactory payloadFactory, IConnectionManager connectionManager,
-            ISendDataProcessor sendDataProcessor, ISubscriptionStore subscriptionStore, ISerializer serializer, ISendPayloadTaskManager sendPayloadTaskManager)
+            ISendDataProcessor sendDataProcessor, ISubscriptionStore subscriptionStore, ISerializer serializer,
+            ITaskManager taskManager)
         {
             _payloadFactory = payloadFactory;
-            _connectionManager = connectionManager;
+            ConnectionManager = connectionManager;
             _subscriptionStore = subscriptionStore;
             _sendDataProcessor = sendDataProcessor;
             _serializer = serializer;
-            _sendPayloadTaskManager = sendPayloadTaskManager;
+            _taskManager = taskManager;
         }
 
+        /// <inheritdoc />
+        public bool Connected => ConnectionManager.Socket.Connected;
+
+        /// <inheritdoc />
+        public IConnectionManager ConnectionManager { get; }
+
+        /// <inheritdoc />
         public void Connect(ClientConnectionConfiguration configuration)
         {
-            _connectionManager.Connect(configuration);
+            ConnectionManager.Connect(configuration);
         }
 
+        /// <inheritdoc />
         public void Reconnect()
         {
-            _connectionManager.Reconnect();
+            ConnectionManager.Reconnect();
         }
 
+        /// <inheritdoc />
         public void Disconnect()
         {
-            _connectionManager.Disconnect();
+            ConnectionManager.Disconnect();
         }
 
-        public async Task<ISubscription> GetTopicSubscriptionAsync(string name, string route, CancellationToken? cancellationToken = null)
+        /// <inheritdoc />
+        public async Task<ISubscription> GetTopicSubscriptionAsync(string name,
+            CancellationToken? cancellationToken = null)
         {
-            var subscription = new Subscription(_payloadFactory, _connectionManager, _sendDataProcessor);
+            var subscription = new Subscription(_payloadFactory, ConnectionManager, _sendDataProcessor);
 
             _subscriptionStore.Add(name, subscription);
 
-            await subscription.SetupAsync(name, route, cancellationToken ?? CancellationToken.None);
+            await subscription.SetupAsync(name, cancellationToken ?? CancellationToken.None);
 
             return subscription;
         }
 
-        public Task<SendAsyncResult> PublishAsync(string route, byte[] data, CancellationToken? cancellationToken = null)
+        /// <inheritdoc />
+        public Task<SendAsyncResult> PublishAsync(string route, byte[] data,
+            CancellationToken? cancellationToken = null)
         {
             var serializedPayload = _payloadFactory.NewMessage(data, route);
             return _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken ?? CancellationToken.None);
         }
 
-        public Task<SendAsyncResult> PublishRawAsync(Message message, bool waitForAcknowledge, CancellationToken cancellationToken)
-        {
-            var serializedPayload = _serializer.Serialize(message);
-            return _sendDataProcessor.SendAsync(serializedPayload, waitForAcknowledge, cancellationToken);
-        }
-
+        /// <inheritdoc />
         public Task<SendAsyncResult> DeclareTopicAsync(string name, string route,
             CancellationToken? cancellationToken = null)
         {
@@ -85,12 +98,22 @@ namespace MessageBroker.Client
             return _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken ?? CancellationToken.None);
         }
 
+        /// <inheritdoc />
         public Task<SendAsyncResult> DeleteTopicAsync(string name, CancellationToken? cancellationToken = null)
         {
             var serializedPayload = _payloadFactory.NewDeleteTopic(name);
             return _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken ?? CancellationToken.None);
         }
 
+        /// <inheritdoc />
+        public Task<SendAsyncResult> ConfigureClientAsync(int prefetchCount,
+            CancellationToken? cancellationToken = null)
+        {
+            var serializedPayload = _payloadFactory.NewConfigureClient(prefetchCount);
+            return _sendDataProcessor.SendAsync(serializedPayload, true, cancellationToken ?? CancellationToken.None);
+        }
+
+        /// <inheritdoc />
         public async ValueTask DisposeAsync()
         {
             if (_isDisposed)
@@ -100,7 +123,7 @@ namespace MessageBroker.Client
 
             await _subscriptionStore.DisposeAsync();
 
-            _sendPayloadTaskManager.Dispose();
+            _taskManager.Dispose();
         }
     }
 }
