@@ -142,3 +142,5 @@ For example:
 - `*` and `foo/bar` will match
 - `foo/bar/foo` and `foo/bar` will **NOT** match
 Note: left side is the topic route and the right side is the message route
+
+Sponsored by [PersianSaze](https://persiansaze.com/).
